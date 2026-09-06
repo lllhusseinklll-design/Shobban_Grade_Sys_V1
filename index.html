@@ -8274,7 +8274,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
       const confirmPin = prompt('أعد إدخال الرقم السري الجديد للتأكيد:');
       if (confirmPin === null) return;
       if (confirmPin.trim() !== trimmedNew) { alert('⚠️ الرقمان اللذان أدخلتهما غير متطابقين.'); return; }
-      a.pin = trimmedNew;
+      a.pin = ''; // لا داعي لحفظه نصياً: صاحب الحساب هو من اختاره ويعرفه، ولا يحتاج أحد لطباعته لاحقاً
       a.pinHash = await sha256Hex(trimmedNew);
       saveRootDB(root);
       if (isAdmin) currentStageAdmin = a;
@@ -9084,7 +9084,14 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
       document.getElementById('printCardsArea').innerHTML = pagesHtml;
       setTimeout(() => {
         window.print();
-        setTimeout(() => { if (typeof clearAllPrintAreas === 'function') clearAllPrintAreas(); }, 800);
+        setTimeout(() => {
+          if (typeof clearAllPrintAreas === 'function') clearAllPrintAreas();
+          // أمان: بعد طباعة البطاقة يُمحى الرقم السري النصي نهائياً من التخزين المحلي/السحابي — لا يُعرض مجدداً
+          // إلا بإعادة توليد رقم جديد. فقط الـ hash يبقى محفوظاً للتحقق عند تسجيل الدخول.
+          let changed = false;
+          people.forEach(a => { if (a.pin) { a.pin = ''; changed = true; } });
+          if (changed) { try { saveRootDB(root); } catch(e){ console.error(e); } try { loadStagesMgmtUI(); } catch(e){} }
+        }, 800);
       }, 50);
     }
 
@@ -15452,6 +15459,15 @@ function renderMonthlyExportButtons() {
       XLSX.utils.book_append_sheet(wb, ws, 'المعلمون');
       const schoolName = (db.schoolInfo && db.schoolInfo.schoolName) || 'بيانات_المعلمين';
       downloadWorkbook(wb, `${schoolName}_بيانات_المعلمين.xlsx`);
+      // أمان: بعد تصدير الملف يُمحى الرقم السري النصي نهائياً من التخزين — يبقى الـ hash فقط للتحقق عند الدخول.
+      // الملف المُصدَّر يحتوي على الأرقام لحظة التصدير فقط؛ أي نسخة لاحقة من هذا التصدير لن تُظهرها مجدداً.
+      let changed = false;
+      teachers.forEach(t => { if (t.pin) { t.pin = ''; changed = true; } });
+      if (changed) {
+        try { saveDB(db); } catch(e){ console.error(e); }
+        if (typeof scheduleCloudPush === 'function') scheduleCloudPush();
+        try { loadTeachersUI(); } catch(e){}
+      }
     }
 
     // ============================================================
@@ -15718,7 +15734,19 @@ function renderMonthlyExportButtons() {
       }
       const area = document.getElementById('printCardsArea');
       area.innerHTML = pagesHtml;
-      setTimeout(() => { window.print(); }, 50);
+      setTimeout(() => {
+        window.print();
+        setTimeout(() => {
+          // أمان: بعد طباعة البطاقة يُمحى الرقم السري النصي نهائياً من التخزين — يبقى فقط الـ hash للتحقق لاحقاً عند الدخول
+          let changed = false;
+          teachers.forEach(t => { if (t.pin) { t.pin = ''; changed = true; } });
+          if (changed) {
+            try { saveDB(db); } catch(e){ console.error(e); }
+            if (typeof scheduleCloudPush === 'function') scheduleCloudPush();
+            try { loadTeachersUI(); } catch(e){}
+          }
+        }, 800);
+      }, 50);
     }
 
     function printAllTeacherCards() {
@@ -18758,6 +18786,10 @@ function roundToHalf(n){ if (!Number.isFinite(n)) return 0; return Math.round(n 
     if (holidaySet.has(iso)) {
       return { ok:false, reason:'هذا اليوم إجازة رسمية — لا يمكن تسجيل الحضور', holiday:true, term:tm.term, month:tm.month };
     }
+    const wd = parseISO(iso);
+    if (wd && !isNaN(wd.getTime()) && wd.getDay() === 5) { // 5 = Friday
+      return { ok:false, reason:'اليوم الجمعة — إجازة أسبوعية، لا يمكن تسجيل الحضور', holiday:true, friday:true, term:tm.term, month:tm.month };
+    }
     return { ok:true, term:tm.term, month:tm.month };
   }
   function tdaEnsureStudentAddedAt(st, iso){
@@ -19976,6 +20008,19 @@ function roundToHalf(n){ if (!Number.isFinite(n)) return 0; return Math.round(n 
     try { if (typeof refreshTeacherCheckInButton==='function') refreshTeacherCheckInButton(); } catch(e){}
   };
   const TEACHER_DAILY_ATT_POINTS = 25;
+  /** يتحقق هل اليوم إجازة أسبوعية (الجمعة) أو إجازة رسمية مسجّلة — يمنع تسجيل الحضور اليومي فيهما */
+  function teacherCheckInDayBlocked(db, iso){
+    const d = new Date(iso + 'T12:00:00');
+    if (!isNaN(d.getTime())) {
+      const dayIdx = (typeof jsDayToStudyIdx === 'function') ? jsDayToStudyIdx(d.getDay()) : -1;
+      if (dayIdx < 0) return { blocked:true, reason:'اليوم الجمعة — إجازة أسبوعية، لا داعي لتسجيل الحضور.' };
+    }
+    const holidaySet = (typeof collectSchoolHolidaySet === 'function') ? collectSchoolHolidaySet() : new Set((ensureAttendance(db).holidays)||[]);
+    if (holidaySet.has(iso)) {
+      return { blocked:true, reason:'اليوم إجازة رسمية — لا داعي لتسجيل الحضور.' };
+    }
+    return { blocked:false, reason:'' };
+  }
   window.teacherCheckInToday = function(){
     if (currentAccountType !== 'teacher' || !currentTeacher) {
       alert('تسجيل الحضور الصباحي متاح للمعلم فقط.');
@@ -19984,6 +20029,13 @@ function roundToHalf(n){ if (!Number.isFinite(n)) return 0; return Math.round(n 
     const db = loadDB();
     if (!isTeacherDailyAttendanceEnabled(db)) {
       alert('الحضور اليومي موقوف في هذه المرحلة.');
+      return;
+    }
+    const iso0 = todayISO();
+    const dayGate = teacherCheckInDayBlocked(db, iso0);
+    if (dayGate.blocked) {
+      alert('⛔ ' + dayGate.reason);
+      try { refreshTeacherCheckInButton(); } catch(e){}
       return;
     }
     const presence = ensureTeacherPresence(db);
@@ -20019,6 +20071,11 @@ function roundToHalf(n){ if (!Number.isFinite(n)) return 0; return Math.round(n 
     const presence = ensureTeacherPresence(db);
     const iso = todayISO();
     const done = !!presence.records[presenceKey(currentTeacher.id, iso)];
+    const dayGate = teacherCheckInDayBlocked(db, iso);
+    if (dayGate.blocked && !done) {
+      slot.innerHTML = `<div style="background:#f1f5f9;border:1px solid #cbd5e1;border-radius:12px;padding:12px 14px;font-size:13px;color:#475569">📅 ${esc(dayGate.reason)}</div>`;
+      return;
+    }
     slot.innerHTML = done
       ? `<div class="success-box" style="margin:0">✅ تم تسجيل حضورك اليوم (${esc(iso)})</div>`
       : `<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;background:#f0fdf4;border:1px solid #86efac;border-radius:12px;padding:12px 14px">
