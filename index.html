@@ -3592,6 +3592,42 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
           </div>
         </div>
 
+        <!-- ===== تكامل سلوكي: رصد مخالفة من المعلم أثناء الحصة ===== -->
+        <div class="card" id="soloukiBehaviorCard" style="background:linear-gradient(180deg,#fdf4ff,#faf5ff);border:1px solid #e9d5ff;margin-bottom:14px;">
+          <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;">
+            <div>
+              <h3 style="margin:0 0 4px;font-size:15px;color:#6b21a8;">⚖️ مواظبة وسلوك — رصد مخالفة (سلوكي)</h3>
+              <p style="margin:0;font-size:12.5px;color:#7e22ce;line-height:1.7;">يسجّل المعلم المخالفة هنا دون دخول إضافي. تُرسل عبر جسر آمن إلى نظام سلوكي (لا تُخزَّن محلياً).</p>
+            </div>
+            <button type="button" class="btn btn-primary btn-sm" id="soloukiOpenRecordBtn" onclick="openSoloukiViolationModal()">➕ رصد مخالفة</button>
+          </div>
+          <div id="soloukiBridgeStatus" style="font-size:12.5px;color:#64748b;line-height:1.7;">حالة الجسر: يُفحص عند فتح النافذة.</div>
+          <div id="soloukiBridgeAdminCfg" style="display:none;margin-top:12px;padding-top:12px;border-top:1px dashed #e9d5ff;">
+            <div style="font-weight:800;font-size:13px;color:#6b21a8;margin-bottom:8px;">⚙️ إعدادات الجسر (رئيس الكنترول فقط)</div>
+            <div class="up-field-grid cols-2" style="margin-bottom:8px;">
+              <div class="up-field">
+                <label>عنوان Edge Function التسجيل (سلوكي)</label>
+                <input type="url" id="soloukiRecordUrl" placeholder="https://xxxx.supabase.co/functions/v1/teacher-behavior-record" dir="ltr">
+              </div>
+              <div class="up-field">
+                <label>عنوان Edge Function الكتالوج (سلوكي)</label>
+                <input type="url" id="soloukiCatalogUrl" placeholder="https://xxxx.supabase.co/functions/v1/teacher-behavior-catalog" dir="ltr">
+              </div>
+              <div class="up-field">
+                <label>مسار وكيل رصد (موصى به — يحمي السر)</label>
+                <input type="text" id="soloukiProxyPath" placeholder="/api/solouki-bridge" dir="ltr" value="/api/solouki-bridge">
+              </div>
+              <div class="up-field">
+                <label>موقع افتراضي للمخالفة</label>
+                <input type="text" id="soloukiDefaultLocation" value="الفصل" placeholder="الفصل">
+              </div>
+            </div>
+            <p class="up-hint" style="margin:0 0 8px;">السر المشترك <code>TEACHER_BEHAVIOR_BRIDGE_SECRET</code> يُضبط في متغيرات بيئة Vercel لمشروع رصد فقط (لا يُوضع هنا أبداً). الواجهة تستدعي الوكيل <code>/api/solouki-bridge</code> الذي يضيف السر من السيرفر.</p>
+            <button type="button" class="btn btn-success btn-sm" onclick="saveSoloukiBridgeSettings()">💾 حفظ إعدادات الجسر</button>
+            <span id="soloukiCfgMsg" style="font-size:13px;margin-right:10px;"></span>
+          </div>
+        </div>
+
         <div class="card" id="attScheduleCard" style="background:#f8fafc; margin-bottom:14px;">
           <h3 style="margin:0 0 10px; font-size:15px;">🗓️ أيام حصص المادة في هذا الفصل</h3>
           <p style="font-size:13px; color:#64748b; margin-bottom:10px;">يضبطها المعلم مرة واحدة وتُحفظ مع المادة/الفصل.</p>
@@ -4030,6 +4066,37 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
   </div>
 
   <!-- نافذة حل تعارضات الدرجات عند الحفظ (مستخدم آخر عدّل نفس الخانات) -->
+  <!-- نافذة رصد مخالفة سلوكي -->
+  <div id="soloukiViolationModal" class="mg-modal-overlay" style="display:none;">
+    <div class="mg-modal-box" style="max-width:560px;">
+      <div class="mg-modal-header ui-modal-header ui-type-info" style="display:flex;justify-content:space-between;align-items:center;">
+        <span>⚖️ رصد مخالفة سلوك (سلوكي)</span>
+        <button type="button" class="btn btn-outline btn-sm" onclick="closeSoloukiViolationModal()">إغلاق</button>
+      </div>
+      <div class="mg-modal-body" style="padding:16px 18px;">
+        <div class="form-group" style="margin-bottom:12px;">
+          <label>الطالب (من الفصل الحالي)</label>
+          <select id="soloukiStudentSelect" style="width:100%;padding:8px 12px;border:1px solid #cbd5e1;border-radius:6px;"></select>
+        </div>
+        <div class="form-group" style="margin-bottom:12px;">
+          <label>بند المخالفة (من كتالوج سلوكي)</label>
+          <select id="soloukiViolationSelect" style="width:100%;padding:8px 12px;border:1px solid #cbd5e1;border-radius:6px;">
+            <option value="">— جاري تحميل الكتالوج —</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin-bottom:12px;">
+          <label>ملاحظات (اختياري)</label>
+          <textarea id="soloukiNotes" rows="3" style="width:100%;padding:8px 12px;border:1px solid #cbd5e1;border-radius:6px;font-family:inherit;" placeholder="مثال: أثناء الحصة"></textarea>
+        </div>
+        <div id="soloukiModalMsg" style="font-size:13px;color:#64748b;min-height:20px;line-height:1.7;"></div>
+      </div>
+      <div class="mg-modal-footer">
+        <button type="button" class="btn btn-outline" onclick="closeSoloukiViolationModal()">إلغاء</button>
+        <button type="button" class="btn btn-primary" id="soloukiSubmitBtn" onclick="submitSoloukiViolation()">✅ تسجيل المخالفة</button>
+      </div>
+    </div>
+  </div>
+
   <div id="gradeConflictModalOverlay" class="mg-modal-overlay" style="display:none;">
     <div class="mg-modal-box" style="max-width:720px;">
       <div class="mg-modal-header" style="color:#991b1b; background:#fef2f2; border-bottom-color:#fca5a5;">⚠️ تعارض في الدرجات مع جهاز/مستخدم آخر</div>
@@ -8274,7 +8341,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
       const confirmPin = prompt('أعد إدخال الرقم السري الجديد للتأكيد:');
       if (confirmPin === null) return;
       if (confirmPin.trim() !== trimmedNew) { alert('⚠️ الرقمان اللذان أدخلتهما غير متطابقين.'); return; }
-      a.pin = ''; // لا داعي لحفظه نصياً: صاحب الحساب هو من اختاره ويعرفه، ولا يحتاج أحد لطباعته لاحقاً
+      a.pin = trimmedNew;
       a.pinHash = await sha256Hex(trimmedNew);
       saveRootDB(root);
       if (isAdmin) currentStageAdmin = a;
@@ -8610,6 +8677,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
         'الاسم': 'رئيس الكنترول',
         'المعرّف الداخلي': 'superadmin',
         'المرحلة / المراحل': 'كل المراحل',
+        'الفصول (لسلوكي)': '',
         'البريد المقترح للسحابة': '',
         'ملاحظات': 'حساب رئيسي — يُدار يدوياً على Supabase'
       });
@@ -8623,6 +8691,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
           'الاسم': a.name || '',
           'المعرّف الداخلي': a.id || '',
           'المرحلة / المراحل': stages,
+          'الفصول (لسلوكي)': '',
           'البريد المقترح للسحابة': 'sa_' + String(a.id).replace(/[^a-zA-Z0-9_-]/g, '_') + '@school.local',
           'ملاحظات': 'تشغيل المرحلة'
         });
@@ -8637,30 +8706,83 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
           'الاسم': a.name || '',
           'المعرّف الداخلي': a.id || '',
           'المرحلة / المراحل': stages,
+          'الفصول (لسلوكي)': '',
           'البريد المقترح للسحابة': 'mon_' + String(a.id).replace(/[^a-zA-Z0-9_-]/g, '_') + '@school.local',
           'ملاحظات': 'عرض ومتابعة فقط'
         });
       });
       (root.stages || []).forEach(st => {
-        ((st.data && st.data.teachers) || []).forEach(t => {
+        const stageLabel = (typeof stageDisplayLabel === 'function') ? stageDisplayLabel(st) : (st.name || st.id || '');
+        const stageSection = st.section || '';
+        const db = (st.data) || {};
+        const classGrade = db.classGrade || {};
+        ((db.teachers) || []).forEach(t => {
+          // بناء قائمة فصول المعلم بصيغة سلوكي: المرحلة|الصف|الفصل|القسم;...
+          const parts = [];
+          const seen = new Set();
+          (t.assignments || []).forEach(a => {
+            (a.classes || []).forEach(ck => {
+              let cls = ck, sec = stageSection || '';
+              if (typeof splitClassSectionKey === 'function') {
+                const sp = splitClassSectionKey(ck);
+                cls = sp.cls || ck;
+                sec = sp.section || sec || '';
+              } else if (String(ck).indexOf('§') >= 0) {
+                const i = String(ck).lastIndexOf('§');
+                cls = ck.slice(0, i);
+                sec = ck.slice(i + 1);
+              }
+              // الصف من classGrade أو من أول طالب في الفصل
+              let grade = classGrade[ck] || classGrade[cls] || '';
+              if (!grade && Array.isArray(db.students)) {
+                const sample = db.students.find(s => {
+                  const key = (typeof classSectionKey === 'function')
+                    ? classSectionKey(s.class, s.section)
+                    : ((s.class || '') + '§' + (s.section || ''));
+                  return key === ck || s.class === cls;
+                });
+                if (sample) grade = sample.grade || '';
+              }
+              const sectionOut = sec || stageSection || 'arabic';
+              const token = [stageLabel, grade || '', cls || '', sectionOut].join('|');
+              if (!seen.has(token)) {
+                seen.add(token);
+                parts.push(token);
+              }
+            });
+          });
           rows.push({
             'نوع الحساب': 'معلم',
             'الاسم': t.name || '',
             'المعرّف الداخلي': t.id || '',
-            'المرحلة / المراحل': stageDisplayLabel(st),
+            'المرحلة / المراحل': stageLabel,
+            'الفصول (لسلوكي)': parts.join(';'),
             'البريد المقترح للسحابة': (typeof teacherCloudEmail === 'function') ? teacherCloudEmail(t.id) : '',
             'ملاحظات': ((t.assignments || []).map(a => a.subjectName).filter(Boolean).join('، ')) || ''
           });
         });
       });
+      // ورقة ثانية مخصّصة لاستيراد سلوكي (Teacher ID + اسم + الفصول فقط)
+      const soloukiRows = rows
+        .filter(r => r['نوع الحساب'] === 'معلم' && r['المعرّف الداخلي'])
+        .map(r => ({
+          'Teacher ID': r['المعرّف الداخلي'],
+          'اسم المعلم': r['الاسم'],
+          'الفصول': r['الفصول (لسلوكي)'] || ''
+        }));
       const ws = XLSX.utils.json_to_sheet(rows);
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, 'دليل الحسابات');
+      if (soloukiRows.length) {
+        const ws2 = XLSX.utils.json_to_sheet(soloukiRows);
+        XLSX.utils.book_append_sheet(wb, ws2, 'للاستيراد في سلوكي');
+      }
       const stamp = new Date().toISOString().slice(0, 10);
       XLSX.writeFile(wb, 'دليل-حسابات-المنظومة-' + stamp + '.xlsx');
-      try { recordAudit('تصدير دليل الحسابات', 'عدد الصفوف: ' + rows.length); } catch (e) {}
-      alert('✅ تم تنزيل ملف Excel بدليل الحسابات (' + rows.length + ' صف) بدون أرقام سرية.');
+      try { recordAudit('تصدير دليل الحسابات', 'عدد الصفوف: ' + rows.length + ' · معلمون لسلوكي: ' + soloukiRows.length); } catch (e) {}
+      alert('✅ تم تنزيل ملف Excel بدليل الحسابات (' + rows.length + ' صف)\nورقة «للاستيراد في سلوكي» جاهزة (' + soloukiRows.length + ' معلم) بدون أرقام سرية.');
     };
+
 
 
     function switchStagesInnerTab(tab) {
@@ -9084,14 +9206,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
       document.getElementById('printCardsArea').innerHTML = pagesHtml;
       setTimeout(() => {
         window.print();
-        setTimeout(() => {
-          if (typeof clearAllPrintAreas === 'function') clearAllPrintAreas();
-          // أمان: بعد طباعة البطاقة يُمحى الرقم السري النصي نهائياً من التخزين المحلي/السحابي — لا يُعرض مجدداً
-          // إلا بإعادة توليد رقم جديد. فقط الـ hash يبقى محفوظاً للتحقق عند تسجيل الدخول.
-          let changed = false;
-          people.forEach(a => { if (a.pin) { a.pin = ''; changed = true; } });
-          if (changed) { try { saveRootDB(root); } catch(e){ console.error(e); } try { loadStagesMgmtUI(); } catch(e){} }
-        }, 800);
+        setTimeout(() => { if (typeof clearAllPrintAreas === 'function') clearAllPrintAreas(); }, 800);
       }, 50);
     }
 
@@ -15459,15 +15574,6 @@ function renderMonthlyExportButtons() {
       XLSX.utils.book_append_sheet(wb, ws, 'المعلمون');
       const schoolName = (db.schoolInfo && db.schoolInfo.schoolName) || 'بيانات_المعلمين';
       downloadWorkbook(wb, `${schoolName}_بيانات_المعلمين.xlsx`);
-      // أمان: بعد تصدير الملف يُمحى الرقم السري النصي نهائياً من التخزين — يبقى الـ hash فقط للتحقق عند الدخول.
-      // الملف المُصدَّر يحتوي على الأرقام لحظة التصدير فقط؛ أي نسخة لاحقة من هذا التصدير لن تُظهرها مجدداً.
-      let changed = false;
-      teachers.forEach(t => { if (t.pin) { t.pin = ''; changed = true; } });
-      if (changed) {
-        try { saveDB(db); } catch(e){ console.error(e); }
-        if (typeof scheduleCloudPush === 'function') scheduleCloudPush();
-        try { loadTeachersUI(); } catch(e){}
-      }
     }
 
     // ============================================================
@@ -15734,19 +15840,7 @@ function renderMonthlyExportButtons() {
       }
       const area = document.getElementById('printCardsArea');
       area.innerHTML = pagesHtml;
-      setTimeout(() => {
-        window.print();
-        setTimeout(() => {
-          // أمان: بعد طباعة البطاقة يُمحى الرقم السري النصي نهائياً من التخزين — يبقى فقط الـ hash للتحقق لاحقاً عند الدخول
-          let changed = false;
-          teachers.forEach(t => { if (t.pin) { t.pin = ''; changed = true; } });
-          if (changed) {
-            try { saveDB(db); } catch(e){ console.error(e); }
-            if (typeof scheduleCloudPush === 'function') scheduleCloudPush();
-            try { loadTeachersUI(); } catch(e){}
-          }
-        }, 800);
-      }, 50);
+      setTimeout(() => { window.print(); }, 50);
     }
 
     function printAllTeacherCards() {
@@ -18786,10 +18880,6 @@ function roundToHalf(n){ if (!Number.isFinite(n)) return 0; return Math.round(n 
     if (holidaySet.has(iso)) {
       return { ok:false, reason:'هذا اليوم إجازة رسمية — لا يمكن تسجيل الحضور', holiday:true, term:tm.term, month:tm.month };
     }
-    const wd = parseISO(iso);
-    if (wd && !isNaN(wd.getTime()) && wd.getDay() === 5) { // 5 = Friday
-      return { ok:false, reason:'اليوم الجمعة — إجازة أسبوعية، لا يمكن تسجيل الحضور', holiday:true, friday:true, term:tm.term, month:tm.month };
-    }
     return { ok:true, term:tm.term, month:tm.month };
   }
   function tdaEnsureStudentAddedAt(st, iso){
@@ -20008,19 +20098,6 @@ function roundToHalf(n){ if (!Number.isFinite(n)) return 0; return Math.round(n 
     try { if (typeof refreshTeacherCheckInButton==='function') refreshTeacherCheckInButton(); } catch(e){}
   };
   const TEACHER_DAILY_ATT_POINTS = 25;
-  /** يتحقق هل اليوم إجازة أسبوعية (الجمعة) أو إجازة رسمية مسجّلة — يمنع تسجيل الحضور اليومي فيهما */
-  function teacherCheckInDayBlocked(db, iso){
-    const d = new Date(iso + 'T12:00:00');
-    if (!isNaN(d.getTime())) {
-      const dayIdx = (typeof jsDayToStudyIdx === 'function') ? jsDayToStudyIdx(d.getDay()) : -1;
-      if (dayIdx < 0) return { blocked:true, reason:'اليوم الجمعة — إجازة أسبوعية، لا داعي لتسجيل الحضور.' };
-    }
-    const holidaySet = (typeof collectSchoolHolidaySet === 'function') ? collectSchoolHolidaySet() : new Set((ensureAttendance(db).holidays)||[]);
-    if (holidaySet.has(iso)) {
-      return { blocked:true, reason:'اليوم إجازة رسمية — لا داعي لتسجيل الحضور.' };
-    }
-    return { blocked:false, reason:'' };
-  }
   window.teacherCheckInToday = function(){
     if (currentAccountType !== 'teacher' || !currentTeacher) {
       alert('تسجيل الحضور الصباحي متاح للمعلم فقط.');
@@ -20029,13 +20106,6 @@ function roundToHalf(n){ if (!Number.isFinite(n)) return 0; return Math.round(n 
     const db = loadDB();
     if (!isTeacherDailyAttendanceEnabled(db)) {
       alert('الحضور اليومي موقوف في هذه المرحلة.');
-      return;
-    }
-    const iso0 = todayISO();
-    const dayGate = teacherCheckInDayBlocked(db, iso0);
-    if (dayGate.blocked) {
-      alert('⛔ ' + dayGate.reason);
-      try { refreshTeacherCheckInButton(); } catch(e){}
       return;
     }
     const presence = ensureTeacherPresence(db);
@@ -20071,11 +20141,6 @@ function roundToHalf(n){ if (!Number.isFinite(n)) return 0; return Math.round(n 
     const presence = ensureTeacherPresence(db);
     const iso = todayISO();
     const done = !!presence.records[presenceKey(currentTeacher.id, iso)];
-    const dayGate = teacherCheckInDayBlocked(db, iso);
-    if (dayGate.blocked && !done) {
-      slot.innerHTML = `<div style="background:#f1f5f9;border:1px solid #cbd5e1;border-radius:12px;padding:12px 14px;font-size:13px;color:#475569">📅 ${esc(dayGate.reason)}</div>`;
-      return;
-    }
     slot.innerHTML = done
       ? `<div class="success-box" style="margin:0">✅ تم تسجيل حضورك اليوم (${esc(iso)})</div>`
       : `<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;background:#f0fdf4;border:1px solid #86efac;border-radius:12px;padding:12px 14px">
@@ -21065,6 +21130,302 @@ function roundToHalf(n){ if (!Number.isFinite(n)) return 0; return Math.round(n 
       if (typeof clearAllPrintAreas==='function') clearAllPrintAreas();
     }, 800);
   };
+
+
+  // ========== تكامل سلوكي (جسر رصد مخالفة) ==========
+  function getSoloukiBridgeCfg() {
+    try {
+      const root = (typeof getRootDB === 'function') ? getRootDB() : {};
+      const cfg = root.soloukiBridge || {};
+      return {
+        recordUrl: cfg.recordUrl || '',
+        catalogUrl: cfg.catalogUrl || '',
+        proxyPath: cfg.proxyPath || '/api/solouki-bridge',
+        defaultLocation: cfg.defaultLocation || 'الفصل'
+      };
+    } catch (e) {
+      return { recordUrl: '', catalogUrl: '', proxyPath: '/api/solouki-bridge', defaultLocation: 'الفصل' };
+    }
+  }
+
+  window.saveSoloukiBridgeSettings = function() {
+    if (currentAccountType !== 'superadmin') {
+      alert('إعدادات الجسر متاحة لرئيس الكنترول فقط.');
+      return;
+    }
+    try {
+      const root = getRootDB();
+      root.soloukiBridge = {
+        recordUrl: (document.getElementById('soloukiRecordUrl') || {}).value || '',
+        catalogUrl: (document.getElementById('soloukiCatalogUrl') || {}).value || '',
+        proxyPath: (document.getElementById('soloukiProxyPath') || {}).value || '/api/solouki-bridge',
+        defaultLocation: (document.getElementById('soloukiDefaultLocation') || {}).value || 'الفصل'
+      };
+      if (typeof persistRootDB === 'function') persistRootDB(root);
+      else if (typeof saveRootDB === 'function') saveRootDB(root);
+      if (typeof scheduleCloudPush === 'function') scheduleCloudPush();
+      const msg = document.getElementById('soloukiCfgMsg');
+      if (msg) { msg.style.color = '#0b5e42'; msg.textContent = '✅ تم حفظ إعدادات الجسر.'; }
+      updateSoloukiBridgeStatusUI();
+    } catch (e) {
+      alert('تعذر الحفظ: ' + (e.message || e));
+    }
+  };
+
+  function loadSoloukiBridgeSettingsIntoForm() {
+    const cfg = getSoloukiBridgeCfg();
+    const a = document.getElementById('soloukiRecordUrl');
+    const b = document.getElementById('soloukiCatalogUrl');
+    const c = document.getElementById('soloukiProxyPath');
+    const d = document.getElementById('soloukiDefaultLocation');
+    if (a) a.value = cfg.recordUrl || '';
+    if (b) b.value = cfg.catalogUrl || '';
+    if (c) c.value = cfg.proxyPath || '/api/solouki-bridge';
+    if (d) d.value = cfg.defaultLocation || 'الفصل';
+    const adminBox = document.getElementById('soloukiBridgeAdminCfg');
+    if (adminBox) adminBox.style.display = (currentAccountType === 'superadmin') ? 'block' : 'none';
+  }
+
+  function updateSoloukiBridgeStatusUI() {
+    const el = document.getElementById('soloukiBridgeStatus');
+    if (!el) return;
+    const cfg = getSoloukiBridgeCfg();
+    const ready = !!(cfg.proxyPath || cfg.recordUrl);
+    el.innerHTML = ready
+      ? ('حالة الجسر: <span style="color:#0b5e42;font-weight:700;">جاهز للإرسال عبر ' + (cfg.proxyPath || 'عنوان مباشر') + '</span>')
+      : '<span style="color:#b45309;">لم تُضبط إعدادات الجسر بعد — رئيس الكنترول يضبطها من القسم أدناه.</span>';
+  }
+
+  function soloukiCurrentTeacherId() {
+    if (currentAccountType === 'teacher' && currentTeacher && currentTeacher.id) return String(currentTeacher.id);
+    return '';
+  }
+
+  function soloukiStudentsForCurrentClass() {
+    try {
+      const db = (typeof loadDB === 'function') ? loadDB() : null;
+      if (!db) return [];
+      const classSel = document.getElementById('attClassSelect');
+      const ck = classSel ? classSel.value : '';
+      if (!ck) return [];
+      return (db.students || []).filter(s => {
+        const key = (typeof classSectionKey === 'function')
+          ? classSectionKey(s.class, s.section)
+          : ((s.class || '') + '§' + (s.section || ''));
+        return key === ck || s.class === ck;
+      }).slice().sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'ar'));
+    } catch (e) {
+      return [];
+    }
+  }
+
+  let _soloukiCatalogCache = null;
+  let _soloukiCatalogAt = 0;
+
+  async function fetchSoloukiCatalog() {
+    const now = Date.now();
+    if (_soloukiCatalogCache && (now - _soloukiCatalogAt) < 5 * 60 * 1000) {
+      return _soloukiCatalogCache;
+    }
+    const cfg = getSoloukiBridgeCfg();
+    const proxy = (cfg.proxyPath || '/api/solouki-bridge').replace(/\/$/, '');
+    let data = null;
+    // 1) عبر وكيل رصد (يحمي السر)
+    try {
+      const res = await fetch(proxy, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'catalog' })
+      });
+      if (res.ok) {
+        data = await res.json();
+      }
+    } catch (e) { /* fallthrough */ }
+    // 2) مباشر إلى كتالوج سلوكي إن وُجد عنوان (يتطلب أن يقبل الطلب بدون سر أو عبر وكيل فقط — الأفضل الوكيل)
+    if (!data && cfg.catalogUrl) {
+      try {
+        const res = await fetch(cfg.catalogUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'list' })
+        });
+        if (res.ok) data = await res.json();
+      } catch (e) {}
+    }
+    if (!data || data.ok === false) {
+      throw new Error((data && (data.error || data.message)) || 'تعذر جلب كتالوج المخالفات من سلوكي. تأكد من نشر /api/solouki-bridge وضبط الأسرار.');
+    }
+    // تطبيع: violations array
+    const list = data.violations || data.items || data.catalog || [];
+    _soloukiCatalogCache = Array.isArray(list) ? list : [];
+    _soloukiCatalogAt = now;
+    return _soloukiCatalogCache;
+  }
+
+  window.openSoloukiViolationModal = async function() {
+    const tid = soloukiCurrentTeacherId();
+    if (currentAccountType === 'teacher' && !tid) {
+      alert('يجب تسجيل الدخول كمعلم لرصد مخالفة.');
+      return;
+    }
+    // السماح لرئيس الكنترول بالتجربة مع اختيار معلم يدوياً لاحقاً إن لزم
+    const modal = document.getElementById('soloukiViolationModal');
+    if (!modal) return;
+    modal.style.display = 'flex';
+    const msg = document.getElementById('soloukiModalMsg');
+    if (msg) { msg.style.color = '#64748b'; msg.textContent = ''; }
+
+    // تعبئة الطلاب
+    const stuSel = document.getElementById('soloukiStudentSelect');
+    const students = soloukiStudentsForCurrentClass();
+    if (stuSel) {
+      if (!students.length) {
+        stuSel.innerHTML = '<option value="">— لا طلاب في الفصل المحدد (اختر فصلاً من فلاتر المواظبة) —</option>';
+      } else {
+        stuSel.innerHTML = students.map(s => {
+          const nid = s.nationalId || '';
+          const label = (s.name || '') + (nid ? (' — ' + nid) : '');
+          return '<option value="' + String(nid).replace(/"/g, '') + '" data-name="' + String(s.name || '').replace(/"/g, '&quot;') + '">' + (label.replace(/</g, '&lt;')) + '</option>';
+        }).join('');
+      }
+    }
+
+    // كتالوج
+    const vSel = document.getElementById('soloukiViolationSelect');
+    if (vSel) {
+      vSel.innerHTML = '<option value="">— جاري التحميل… —</option>';
+      try {
+        const list = await fetchSoloukiCatalog();
+        if (!list.length) {
+          vSel.innerHTML = '<option value="">— لا بنود نشطة في الكتالوج —</option>';
+        } else {
+          vSel.innerHTML = '<option value="">— اختر بند المخالفة —</option>' + list.map(v => {
+            const id = v.id != null ? v.id : (v.violation_id != null ? v.violation_id : '');
+            const title = v.title || v.name || v.label || ('مخالفة #' + id);
+            const pts = (v.points != null ? v.points : v.degree_deduction);
+            const extra = pts != null ? (' (' + pts + ')') : '';
+            return '<option value="' + String(id) + '">' + String(title + extra).replace(/</g, '&lt;') + '</option>';
+          }).join('');
+        }
+        if (msg) { msg.style.color = '#0b5e42'; msg.textContent = 'تم تحميل ' + list.length + ' بنداً من كتالوج سلوكي.'; }
+      } catch (e) {
+        vSel.innerHTML = '<option value="">— فشل تحميل الكتالوج —</option>';
+        if (msg) { msg.style.color = '#b91c1c'; msg.textContent = e.message || String(e); }
+      }
+    }
+  };
+
+  window.closeSoloukiViolationModal = function() {
+    const modal = document.getElementById('soloukiViolationModal');
+    if (modal) modal.style.display = 'none';
+  };
+
+  window.submitSoloukiViolation = async function() {
+    const msg = document.getElementById('soloukiModalMsg');
+    const btn = document.getElementById('soloukiSubmitBtn');
+    const stuSel = document.getElementById('soloukiStudentSelect');
+    const vSel = document.getElementById('soloukiViolationSelect');
+    const notesEl = document.getElementById('soloukiNotes');
+    const nationalId = stuSel ? String(stuSel.value || '').trim() : '';
+    const violationId = vSel ? String(vSel.value || '').trim() : '';
+    const notes = notesEl ? String(notesEl.value || '').trim() : '';
+    let teacherId = soloukiCurrentTeacherId();
+
+    if (currentAccountType !== 'teacher') {
+      // رئيس الكنترول قد يجرّب: نطلب معرف معلم
+      if (!teacherId) {
+        teacherId = prompt('أنت لست معلماً. أدخل المعرّف الداخلي للمعلم (Teacher ID) للتجربة:') || '';
+        teacherId = String(teacherId).trim();
+      }
+    }
+    if (!teacherId) {
+      if (msg) { msg.style.color = '#b91c1c'; msg.textContent = 'معرّف المعلم غير متوفر.'; }
+      return;
+    }
+    if (!nationalId || nationalId.length < 14) {
+      if (msg) { msg.style.color = '#b91c1c'; msg.textContent = 'اختر طالباً برقم قومي صالح (14 رقماً).'; }
+      return;
+    }
+    if (!violationId) {
+      if (msg) { msg.style.color = '#b91c1c'; msg.textContent = 'اختر بند المخالفة.'; }
+      return;
+    }
+
+    const cfg = getSoloukiBridgeCfg();
+    const proxy = (cfg.proxyPath || '/api/solouki-bridge').replace(/\/$/, '');
+    const payload = {
+      action: 'record_violation',
+      external_teacher_id: teacherId,
+      student_national_id: nationalId.replace(/\D/g, ''),
+      violation_id: isNaN(Number(violationId)) ? violationId : Number(violationId),
+      location_text: cfg.defaultLocation || 'الفصل',
+      notes: notes || 'أثناء الحصة'
+    };
+
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ جاري الإرسال…'; }
+    if (msg) { msg.style.color = '#64748b'; msg.textContent = 'إرسال إلى سلوكي عبر الجسر…'; }
+
+    try {
+      const res = await fetch(proxy, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      let data = null;
+      try { data = await res.json(); } catch (e) { data = null; }
+      if (!res.ok || !data || data.ok === false) {
+        const err = (data && (data.error || data.message)) || ('HTTP ' + res.status);
+        throw new Error(err);
+      }
+      if (msg) {
+        msg.style.color = '#0b5e42';
+        msg.textContent = '✅ تم تسجيل المخالفة في سلوكي' + (data.record_id ? (' (رقم السجل: ' + data.record_id + ')') : '') + '.';
+      }
+      try { recordAudit('رصد مخالفة سلوكي', 'معلم=' + teacherId + ' طالب=' + nationalId + ' بند=' + violationId); } catch (e) {}
+      if (notesEl) notesEl.value = '';
+      setTimeout(function() { closeSoloukiViolationModal(); }, 1200);
+    } catch (e) {
+      if (msg) {
+        msg.style.color = '#b91c1c';
+        msg.textContent = '❌ فشل التسجيل: ' + (e.message || e) +
+          '\nتأكد من: نشر /api/solouki-bridge · السر في Vercel · دليل المعلمين في سلوكي · تفعيل مفتاح المرحلة.';
+      }
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = '✅ تسجيل المخالفة'; }
+    }
+  };
+
+  // إظهار بطاقة السلوك وإعداداتها عند فتح تبويب المواظبة
+  (function hookSoloukiOnAttendanceTab() {
+    const orig = window.onAttendanceFilterChange;
+    window.onAttendanceFilterChange = function() {
+      if (typeof orig === 'function') {
+        try { orig.apply(this, arguments); } catch (e) {}
+      }
+      try { updateSoloukiBridgeStatusUI(); } catch (e) {}
+    };
+    document.addEventListener('DOMContentLoaded', function() {
+      try {
+        loadSoloukiBridgeSettingsIntoForm();
+        updateSoloukiBridgeStatusUI();
+      } catch (e) {}
+    });
+    // عند تفعيل التبويب
+    const prevActivate = window.activateTab;
+    if (typeof prevActivate === 'function') {
+      window.activateTab = function(tabName) {
+        const r = prevActivate.apply(this, arguments);
+        if (tabName === 'attendance') {
+          try {
+            loadSoloukiBridgeSettingsIntoForm();
+            updateSoloukiBridgeStatusUI();
+          } catch (e) {}
+        }
+        return r;
+      };
+    }
+  })();
+
 
     document.addEventListener('DOMContentLoaded', function(){
     const dash = document.getElementById('dashboard');
