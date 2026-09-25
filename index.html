@@ -21299,12 +21299,27 @@ function roundToHalf(n){ if (!Number.isFinite(n)) return 0; return Math.round(n 
         if (!list.length) {
           vSel.innerHTML = '<option value="">— لا بنود نشطة في الكتالوج —</option>';
         } else {
-          vSel.innerHTML = '<option value="">— اختر بند المخالفة —</option>' + list.map(v => {
+          // ترتيب مثل سلوكي: حسب الدرجة ثم رقم البند (code)
+          const sorted = list.slice().sort(function(a, b) {
+            const da = Number(a.degree_id != null ? a.degree_id : 99);
+            const db = Number(b.degree_id != null ? b.degree_id : 99);
+            if (da !== db) return da - db;
+            return String(a.code || '').localeCompare(String(b.code || ''), 'ar', { numeric: true });
+          });
+          vSel.innerHTML = '<option value="">— اختر بند المخالفة —</option>' + sorted.map(v => {
             const id = v.id != null ? v.id : (v.violation_id != null ? v.violation_id : '');
-            const title = v.title || v.name || v.label || ('مخالفة #' + id);
-            const pts = (v.points != null ? v.points : v.degree_deduction);
-            const extra = pts != null ? (' (' + pts + ')') : '';
-            return '<option value="' + String(id) + '">' + String(title + extra).replace(/</g, '&lt;') + '</option>';
+            const code = v.code != null && v.code !== '' ? String(v.code) : '';
+            const degreeId = v.degree_id != null ? Number(v.degree_id) : null;
+            const degreeLabel = degreeId === 1 ? 'درجة 1'
+              : degreeId === 2 ? 'درجة 2'
+              : degreeId === 3 ? 'درجة 3'
+              : degreeId === 4 ? 'درجة 4'
+              : (degreeId != null && !isNaN(degreeId) ? ('درجة ' + degreeId) : '');
+            const desc = v.description_ar || v.title || v.name || v.label || ('مخالفة #' + id);
+            // الشكل: [درجة 1] 1.1 — التأخر عن الطابور...
+            const prefix = [degreeLabel, code].filter(Boolean).join(' · ');
+            const label = prefix ? (prefix + ' — ' + desc) : desc;
+            return '<option value="' + String(id) + '">' + String(label).replace(/</g, '&lt;') + '</option>';
           }).join('');
         }
         if (msg) { msg.style.color = '#0b5e42'; msg.textContent = 'تم تحميل ' + list.length + ' بنداً من كتالوج سلوكي.'; }
