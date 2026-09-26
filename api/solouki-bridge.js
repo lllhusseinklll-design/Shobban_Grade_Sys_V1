@@ -1,114 +1,86 @@
 /**
- * Vercel Serverless Function — وكيل جسر سلوكي
+ * Vercel Serverless — جسر رصد → سلوكي
  * المسار: /api/solouki-bridge
  *
- * متغيرات البيئة المطلوبة في مشروع رصد على Vercel:
- *   SOLOUKI_BRIDGE_SECRET   = نفس السر المضبوط في Supabase سلوكي (TEACHER_BEHAVIOR_BRIDGE_SECRET)
- *   SOLOUKI_RECORD_URL      = https://<SOLOUKI_REF>.supabase.co/functions/v1/teacher-behavior-record
- *   SOLOUKI_CATALOG_URL     = https://<SOLOUKI_REF>.supabase.co/functions/v1/teacher-behavior-catalog
- *
- * الواجهة (index.html) تستدعي هذا المسار فقط — السر لا يصل للمتصفح أبداً.
+ * متغيرات البيئة في Vercel (رصد فقط — لا تُوضع في المتصفح):
+ *   SOLOUKI_BRIDGE_SECRET  = نفس TEACHER_BEHAVIOR_BRIDGE_SECRET في سلوكي
+ *   SOLOUKI_CATALOG_URL    = https://<SOLOUKI_REF>.supabase.co/functions/v1/teacher-behavior-catalog
+ *   SOLOUKI_RECORD_URL     = https://<SOLOUKI_REF>.supabase.co/functions/v1/teacher-behavior-record
+ *   (أو SOLOUKI_BRIDGE_URL كبديل لـ RECORD)
  */
+const cors = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+};
+
+function json(res, status, body) {
+  res.statusCode = status;
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  Object.entries(cors).forEach(([k, v]) => res.setHeader(k, v));
+  res.end(JSON.stringify(body));
+}
 
 module.exports = async function handler(req, res) {
-  // CORS بسيط لنفس الأصل / اختبار محلي
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') {
+    Object.entries(cors).forEach(([k, v]) => res.setHeader(k, v));
     res.statusCode = 204;
     return res.end();
   }
   if (req.method !== 'POST') {
-    res.statusCode = 405;
-    res.setHeader('Content-Type', 'application/json; charset=utf-8');
-    return res.end(JSON.stringify({ ok: false, error: 'method_not_allowed' }));
+    return json(res, 405, { ok: false, error: 'method_not_allowed' });
   }
 
   const secret = process.env.SOLOUKI_BRIDGE_SECRET || '';
-  const recordUrl = process.env.SOLOUKI_RECORD_URL || '';
   const catalogUrl = process.env.SOLOUKI_CATALOG_URL || '';
+  const recordUrl =
+    process.env.SOLOUKI_RECORD_URL ||
+    process.env.SOLOUKI_BRIDGE_URL ||
+    '';
 
   if (!secret) {
-    res.statusCode = 500;
-    res.setHeader('Content-Type', 'application/json; charset=utf-8');
-    return res.end(JSON.stringify({
-      ok: false,
-      error: 'server_misconfigured',
-      message: 'SOLOUKI_BRIDGE_SECRET غير مضبوط في بيئة Vercel'
-    }));
+    return json(res, 500, { ok: false, error: 'server_missing_SOLOUKI_BRIDGE_SECRET' });
   }
 
   let body = req.body;
   if (typeof body === 'string') {
-    try { body = JSON.parse(body); } catch (e) { body = {}; }
+    try { body = JSON.parse(body); } catch { body = null; }
   }
-  if (!body || typeof body !== 'object') body = {};
-
-  const action = body.action || 'record_violation';
-  const targetUrl = (action === 'catalog' || action === 'list')
-    ? catalogUrl
-    : recordUrl;
-
-  if (!targetUrl) {
-    res.statusCode = 500;
-    res.setHeader('Content-Type', 'application/json; charset=utf-8');
-    return res.end(JSON.stringify({
-      ok: false,
-      error: 'server_misconfigured',
-      message: (action === 'catalog' ? 'SOLOUKI_CATALOG_URL' : 'SOLOUKI_RECORD_URL') + ' غير مضبوط'
-    }));
+  if (!body || typeof body !== 'object') {
+    return json(res, 400, { ok: false, error: 'invalid_json' });
   }
 
-  // تنظيف الحمولة قبل الإرسال لسلوكي
-  let outbound;
+  const action = String(body.action || '').trim();
+  let target = '';
   if (action === 'catalog' || action === 'list') {
-    outbound = { action: 'list' };
-  } else if (action === 'record_merit') {
-    outbound = {
-      action: 'record_merit',
-      external_teacher_id: String(body.external_teacher_id || ''),
-      student_national_id: String(body.student_national_id || '').replace(/\D/g, ''),
-      title: body.title || '',
-      points: body.points != null ? Number(body.points) : undefined,
-      notes: body.notes || ''
-    };
+    target = catalogUrl;
+    if (!target) {
+      return json(res, 500, { ok: false, error: 'server_missing_SOLOUKI_CATALOG_URL' });
+    }
   } else {
-    outbound = {
-      action: 'record_violation',
-      external_teacher_id: String(body.external_teacher_id || ''),
-      student_national_id: String(body.student_national_id || '').replace(/\D/g, ''),
-      violation_id: body.violation_id,
-      location_id: body.location_id,
-      location_text: body.location_text || body.location || 'الفصل',
-      notes: body.notes || 'أثناء الحصة'
-    };
+    target = recordUrl;
+    if (!target) {
+      return json(res, 500, { ok: false, error: 'server_missing_SOLOUKI_RECORD_URL' });
+    }
   }
 
   try {
-    const upstream = await fetch(targetUrl, {
+    const upstream = await fetch(target, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-solouki-bridge-secret': secret
+        'x-solouki-bridge-secret': secret,
       },
-      body: JSON.stringify(outbound)
+      body: JSON.stringify(body),
     });
     const text = await upstream.text();
     let data;
-    try { data = JSON.parse(text); } catch (e) {
-      data = { ok: false, error: 'invalid_upstream_json', raw: text.slice(0, 400) };
-    }
+    try { data = JSON.parse(text); } catch { data = { ok: false, error: 'invalid_upstream_json', raw: text.slice(0, 500) }; }
+    Object.entries(cors).forEach(([k, v]) => res.setHeader(k, v));
     res.statusCode = upstream.status;
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
-    return res.end(JSON.stringify(data));
+    res.end(JSON.stringify(data));
   } catch (e) {
-    res.statusCode = 502;
-    res.setHeader('Content-Type', 'application/json; charset=utf-8');
-    return res.end(JSON.stringify({
-      ok: false,
-      error: 'upstream_unreachable',
-      message: e.message || String(e)
-    }));
+    return json(res, 502, { ok: false, error: 'upstream_fetch_failed', detail: String(e && e.message || e) });
   }
 };
