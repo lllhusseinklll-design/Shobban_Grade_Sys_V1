@@ -18870,6 +18870,22 @@ function roundToHalf(n){ if (!Number.isFinite(n)) return 0; return Math.round(n 
     // up to ~31 days back
     const min = addDaysISO(today, -31);
     if (iso < min) return { ok:false, reason:'يُسمح بالتعديل خلال آخر 31 يوماً فقط' };
+
+    // —— منع الجمعة دائماً، والسبت ما لم يُفعَّل من إعدادات المدرسة ——
+    const d = parseISO(iso);
+    if (d) {
+      const js = d.getDay(); // 0=أحد … 5=جمعة … 6=سبت
+      if (js === 5) {
+        return { ok:false, reason:'يوم الجمعة إجازة أسبوعية — لا يمكن تسجيل الحضور', weekend:true };
+      }
+      if (js === 6) {
+        const att = ensureAttendance(loadDB());
+        if (!att.saturdayEnabled) {
+          return { ok:false, reason:'يوم السبت إجازة أسبوعية — لم يُفعَّل ضمن أيام الدراسة', weekend:true };
+        }
+      }
+    }
+
     const tm = findTermMonthForDate(iso);
     if (!tm) return { ok:false, reason:'التاريخ خارج نطاق الشهور المعرّفة. اضبط تواريخ الأسبوع الأول من بيانات المدرسة.' };
     const db = loadDB();
