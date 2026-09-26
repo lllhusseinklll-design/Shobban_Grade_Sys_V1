@@ -20114,6 +20114,22 @@ function roundToHalf(n){ if (!Number.isFinite(n)) return 0; return Math.round(n 
     try { if (typeof refreshTeacherCheckInButton==='function') refreshTeacherCheckInButton(); } catch(e){}
   };
   const TEACHER_DAILY_ATT_POINTS = 25;
+
+  /** هل التاريخ يوم عمل مدرسي؟ الجمعة دائماً إجازة؛ السبت فقط إذا saturdayEnabled */
+  function isSchoolWorkdayISO(iso, db){
+    const d = (typeof parseISO === 'function') ? parseISO(iso) : null;
+    if (!d) return true;
+    const js = d.getDay(); // 0=أحد … 5=جمعة … 6=سبت
+    if (js === 5) return false;
+    if (js === 6) {
+      try {
+        const att = ensureAttendance(db || loadDB());
+        return !!att.saturdayEnabled;
+      } catch (e) { return false; }
+    }
+    return true;
+  }
+
   window.teacherCheckInToday = function(){
     if (currentAccountType !== 'teacher' || !currentTeacher) {
       alert('تسجيل الحضور الصباحي متاح للمعلم فقط.');
@@ -20124,8 +20140,16 @@ function roundToHalf(n){ if (!Number.isFinite(n)) return 0; return Math.round(n 
       alert('الحضور اليومي موقوف في هذه المرحلة.');
       return;
     }
-    const presence = ensureTeacherPresence(db);
     const iso = todayISO();
+    if (!isSchoolWorkdayISO(iso, db)) {
+      const d = parseISO(iso);
+      const js = d ? d.getDay() : -1;
+      alert(js === 5
+        ? 'يوم الجمعة إجازة أسبوعية — لا يمكن تسجيل حضور المعلم.'
+        : 'يوم السبت إجازة أسبوعية — لم يُفعَّل ضمن أيام الدراسة.');
+      return;
+    }
+    const presence = ensureTeacherPresence(db);
     const already = !!presence.records[presenceKey(currentTeacher.id, iso)];
     presence.records[presenceKey(currentTeacher.id, iso)] = true;
     let note = '';
@@ -20156,6 +20180,15 @@ function roundToHalf(n){ if (!Number.isFinite(n)) return 0; return Math.round(n 
     const db = loadDB();
     const presence = ensureTeacherPresence(db);
     const iso = todayISO();
+    if (!isSchoolWorkdayISO(iso, db)) {
+      const d = parseISO(iso);
+      const js = d ? d.getDay() : -1;
+      const msg = js === 5
+        ? 'يوم الجمعة إجازة أسبوعية — لا يُطلب تسجيل حضور المعلم.'
+        : 'يوم السبت إجازة أسبوعية — لا يُطلب تسجيل حضور المعلم (ما لم يُفعَّل السبت).';
+      slot.innerHTML = `<div style="margin:0;padding:12px 14px;background:#fef3c7;border:1px solid #fcd34d;border-radius:12px;color:#92400e;font-size:13px">📅 ${msg}</div>`;
+      return;
+    }
     const done = !!presence.records[presenceKey(currentTeacher.id, iso)];
     slot.innerHTML = done
       ? `<div class="success-box" style="margin:0">✅ تم تسجيل حضورك اليوم (${esc(iso)})</div>`
