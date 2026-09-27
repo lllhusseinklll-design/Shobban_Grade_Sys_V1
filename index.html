@@ -11299,6 +11299,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
 
         // جسم فارغ للتعبئة اليدوية
         const emptyCell = '<td class="blank-cell"></td>';
+        const emptyAvgCell = '<td class="blank-cell avg-col"></td>';
         let bodyHtml = '';
         const list = students.length ? students : [{ name: '', seat: '' }];
         list.forEach((s, idx) => {
@@ -11308,7 +11309,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
           row += `<td class="name-col">${escapeHtml(s.name || '')}</td>`;
           weeklyComps.forEach(() => {
             for (let wi = 0; wi < weekCount; wi++) row += (typeof isWeekExcluded === 'function' ? isWeekExcluded(term, month - 1, wi) : (wi >= scopeWeeks)) ? '<td class="blank-cell week-out-of-scope"></td>' : emptyCell;
-            row += emptyCell; // متوسط
+            row += emptyAvgCell; // متوسط
           });
           if (attendanceComp) row += emptyCell;
           if (monthlyComp) row += emptyCell;
