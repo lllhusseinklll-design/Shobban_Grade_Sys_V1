@@ -3599,7 +3599,10 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
               <h3 style="margin:0 0 4px;font-size:15px;color:#6b21a8;">⚖️ مواظبة وسلوك — رصد مخالفة (سلوكي)</h3>
               <p style="margin:0;font-size:12.5px;color:#7e22ce;line-height:1.7;">يسجّل المعلم المخالفة هنا دون دخول إضافي. تُرسل عبر جسر آمن إلى نظام سلوكي (لا تُخزَّن محلياً).</p>
             </div>
-            <button type="button" class="btn btn-primary btn-sm" id="soloukiOpenRecordBtn" onclick="openSoloukiViolationModal()">➕ رصد مخالفة</button>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <button type="button" class="btn btn-primary btn-sm" id="soloukiOpenRecordBtn" onclick="openSoloukiViolationModal()">➕ رصد مخالفة</button>
+              <button type="button" class="btn btn-success btn-sm" id="soloukiOpenMeritBtn" onclick="openSoloukiMeritModal()">🏅 إضافة تكريم</button>
+            </div>
           </div>
           <div id="soloukiBridgeStatus" style="font-size:12.5px;color:#64748b;line-height:1.7;">حالة الجسر: يُفحص عند فتح النافذة.</div>
           <div id="soloukiBridgeAdminCfg" style="display:none;margin-top:12px;padding-top:12px;border-top:1px dashed #e9d5ff;">
@@ -4093,6 +4096,39 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
       <div class="mg-modal-footer">
         <button type="button" class="btn btn-outline" onclick="closeSoloukiViolationModal()">إلغاء</button>
         <button type="button" class="btn btn-primary" id="soloukiSubmitBtn" onclick="submitSoloukiViolation()">✅ تسجيل المخالفة</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- نافذة إضافة تكريم (سلوكي) -->
+  <div id="soloukiMeritModal" class="mg-modal-overlay" style="display:none;">
+    <div class="mg-modal-box" style="max-width:560px;">
+      <div class="mg-modal-header ui-modal-header ui-type-info" style="display:flex;justify-content:space-between;align-items:center;">
+        <span>🏅 إضافة تكريم (سلوكي)</span>
+        <button type="button" class="btn btn-outline btn-sm" onclick="closeSoloukiMeritModal()">إغلاق</button>
+      </div>
+      <div class="mg-modal-body" style="padding:16px 18px;">
+        <div class="form-group" style="margin-bottom:12px;">
+          <label>الطالب (من الفصل الحالي)</label>
+          <select id="soloukiMeritStudentSelect" style="width:100%;padding:8px 12px;border:1px solid #cbd5e1;border-radius:6px;"></select>
+        </div>
+        <div class="form-group" style="margin-bottom:12px;">
+          <label>سبب التكريم</label>
+          <input type="text" id="soloukiMeritTitle" style="width:100%;padding:8px 12px;border:1px solid #cbd5e1;border-radius:6px;" placeholder="مثال: تفوق دراسي، مبادرة إيجابية، حسن سلوك...">
+        </div>
+        <div class="form-group" style="margin-bottom:12px;">
+          <label>عدد النقاط (اختياري)</label>
+          <input type="number" id="soloukiMeritPoints" min="0" step="1" style="width:100%;padding:8px 12px;border:1px solid #cbd5e1;border-radius:6px;" placeholder="اتركه فارغاً لاستخدام الافتراضي في سلوكي">
+        </div>
+        <div class="form-group" style="margin-bottom:12px;">
+          <label>ملاحظات (اختياري)</label>
+          <textarea id="soloukiMeritNotes" rows="3" style="width:100%;padding:8px 12px;border:1px solid #cbd5e1;border-radius:6px;font-family:inherit;" placeholder="مثال: أثناء الحصة"></textarea>
+        </div>
+        <div id="soloukiMeritModalMsg" style="font-size:13px;color:#64748b;min-height:20px;line-height:1.7;"></div>
+      </div>
+      <div class="mg-modal-footer">
+        <button type="button" class="btn btn-outline" onclick="closeSoloukiMeritModal()">إلغاء</button>
+        <button type="button" class="btn btn-success" id="soloukiMeritSubmitBtn" onclick="submitSoloukiMerit()">🏅 تسجيل التكريم</button>
       </div>
     </div>
   </div>
@@ -21465,6 +21501,125 @@ function roundToHalf(n){ if (!Number.isFinite(n)) return 0; return Math.round(n 
       }
     } finally {
       if (btn) { btn.disabled = false; btn.textContent = '✅ تسجيل المخالفة'; }
+    }
+  };
+
+  // ===== تكامل سلوكي: إضافة تكريم (action: record_merit) =====
+  window.openSoloukiMeritModal = async function() {
+    const tid = soloukiCurrentTeacherId();
+    if (currentAccountType === 'teacher' && !tid) {
+      alert('يجب تسجيل الدخول كمعلم لإضافة تكريم.');
+      return;
+    }
+    const modal = document.getElementById('soloukiMeritModal');
+    if (!modal) return;
+    modal.style.display = 'flex';
+    const msg = document.getElementById('soloukiMeritModalMsg');
+    if (msg) { msg.style.color = '#64748b'; msg.textContent = ''; }
+
+    const titleEl = document.getElementById('soloukiMeritTitle');
+    const pointsEl = document.getElementById('soloukiMeritPoints');
+    const notesEl = document.getElementById('soloukiMeritNotes');
+    if (titleEl) titleEl.value = '';
+    if (pointsEl) pointsEl.value = '';
+    if (notesEl) notesEl.value = '';
+
+    // تعبئة الطلاب (نفس منطق نافذة المخالفة)
+    const stuSel = document.getElementById('soloukiMeritStudentSelect');
+    const students = soloukiStudentsForCurrentClass();
+    if (stuSel) {
+      if (!students.length) {
+        stuSel.innerHTML = '<option value="">— لا طلاب في الفصل المحدد (اختر فصلاً من فلاتر المواظبة) —</option>';
+      } else {
+        stuSel.innerHTML = students.map(s => {
+          const nid = s.nationalId || '';
+          const label = (s.name || '') + (nid ? (' — ' + nid) : '');
+          return '<option value="' + String(nid).replace(/"/g, '') + '" data-name="' + String(s.name || '').replace(/"/g, '&quot;') + '">' + (label.replace(/</g, '&lt;')) + '</option>';
+        }).join('');
+      }
+    }
+  };
+
+  window.closeSoloukiMeritModal = function() {
+    const modal = document.getElementById('soloukiMeritModal');
+    if (modal) modal.style.display = 'none';
+  };
+
+  window.submitSoloukiMerit = async function() {
+    const msg = document.getElementById('soloukiMeritModalMsg');
+    const btn = document.getElementById('soloukiMeritSubmitBtn');
+    const stuSel = document.getElementById('soloukiMeritStudentSelect');
+    const titleEl = document.getElementById('soloukiMeritTitle');
+    const pointsEl = document.getElementById('soloukiMeritPoints');
+    const notesEl = document.getElementById('soloukiMeritNotes');
+    const nationalId = stuSel ? String(stuSel.value || '').trim() : '';
+    const title = titleEl ? String(titleEl.value || '').trim() : '';
+    const pointsRaw = pointsEl ? String(pointsEl.value || '').trim() : '';
+    const notes = notesEl ? String(notesEl.value || '').trim() : '';
+    let teacherId = soloukiCurrentTeacherId();
+
+    if (currentAccountType !== 'teacher') {
+      if (!teacherId) {
+        teacherId = prompt('أنت لست معلماً. أدخل المعرّف الداخلي للمعلم (Teacher ID) للتجربة:') || '';
+        teacherId = String(teacherId).trim();
+      }
+    }
+    if (!teacherId) {
+      if (msg) { msg.style.color = '#b91c1c'; msg.textContent = 'معرّف المعلم غير متوفر.'; }
+      return;
+    }
+    if (!nationalId || nationalId.length < 14) {
+      if (msg) { msg.style.color = '#b91c1c'; msg.textContent = 'اختر طالباً برقم قومي صالح (14 رقماً).'; }
+      return;
+    }
+    if (!title) {
+      if (msg) { msg.style.color = '#b91c1c'; msg.textContent = 'اكتب سبب التكريم.'; }
+      return;
+    }
+
+    const cfg = getSoloukiBridgeCfg();
+    const proxy = (cfg.proxyPath || '/api/solouki-bridge').replace(/\/$/, '');
+    const payload = {
+      action: 'record_merit',
+      external_teacher_id: teacherId,
+      student_national_id: nationalId.replace(/\D/g, ''),
+      title: title,
+      notes: notes || ''
+    };
+    if (pointsRaw !== '' && !isNaN(Number(pointsRaw))) payload.points = Number(pointsRaw);
+
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ جاري الإرسال…'; }
+    if (msg) { msg.style.color = '#64748b'; msg.textContent = 'إرسال إلى سلوكي عبر الجسر…'; }
+
+    try {
+      const res = await fetch(proxy, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      let data = null;
+      try { data = await res.json(); } catch (e) { data = null; }
+      if (!res.ok || !data || data.ok === false) {
+        const err = (data && (data.error || data.message)) || ('HTTP ' + res.status);
+        throw new Error(err);
+      }
+      if (msg) {
+        msg.style.color = '#0b5e42';
+        msg.textContent = '✅ تم تسجيل التكريم في سلوكي' + (data.record_id ? (' (رقم السجل: ' + data.record_id + ')') : '') + '.';
+      }
+      try { recordAudit('إضافة تكريم سلوكي', 'معلم=' + teacherId + ' طالب=' + nationalId + ' سبب=' + title); } catch (e) {}
+      if (titleEl) titleEl.value = '';
+      if (pointsEl) pointsEl.value = '';
+      if (notesEl) notesEl.value = '';
+      setTimeout(function() { closeSoloukiMeritModal(); }, 1200);
+    } catch (e) {
+      if (msg) {
+        msg.style.color = '#b91c1c';
+        msg.textContent = '❌ فشل التسجيل: ' + (e.message || e) +
+          '\nتأكد من: نشر /api/solouki-bridge · السر في Vercel · دليل المعلمين في سلوكي · تفعيل مفتاح المرحلة · دعم action=record_merit في دالة teacher-behavior-record.';
+      }
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = '🏅 تسجيل التكريم'; }
     }
   };
 
