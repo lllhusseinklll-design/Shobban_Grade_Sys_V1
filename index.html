@@ -4113,12 +4113,18 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
           <select id="soloukiMeritStudentSelect" style="width:100%;padding:8px 12px;border:1px solid #cbd5e1;border-radius:6px;"></select>
         </div>
         <div class="form-group" style="margin-bottom:12px;">
-          <label>سبب التكريم</label>
-          <input type="text" id="soloukiMeritTitle" style="width:100%;padding:8px 12px;border:1px solid #cbd5e1;border-radius:6px;" placeholder="مثال: تفوق دراسي، مبادرة إيجابية، حسن سلوك...">
+          <label>نوع التكريم <span style="color:#dc2626;">*</span></label>
+          <select id="soloukiMeritCategorySelect" style="width:100%;padding:8px 12px;border:1px solid #cbd5e1;border-radius:6px;" onchange="onSoloukiMeritCategoryChange()">
+            <option value="">— جاري التحميل… —</option>
+          </select>
         </div>
         <div class="form-group" style="margin-bottom:12px;">
-          <label>عدد النقاط (اختياري)</label>
-          <input type="number" id="soloukiMeritPoints" min="0" step="1" style="width:100%;padding:8px 12px;border:1px solid #cbd5e1;border-radius:6px;" placeholder="اتركه فارغاً لاستخدام الافتراضي في سلوكي">
+          <label>العنوان <span style="color:#dc2626;">*</span></label>
+          <input type="text" id="soloukiMeritTitle" style="width:100%;padding:8px 12px;border:1px solid #cbd5e1;border-radius:6px;" placeholder="يُملأ تلقائياً من نوع التكريم أو اكتب عنواناً…">
+        </div>
+        <div class="form-group" style="margin-bottom:12px;">
+          <label>عدد النقاط</label>
+          <input type="number" id="soloukiMeritPoints" min="0" max="100" step="1" style="width:100%;padding:8px 12px;border:1px solid #cbd5e1;border-radius:6px;" placeholder="يُملأ من نوع التكريم">
         </div>
         <div class="form-group" style="margin-bottom:12px;">
           <label>ملاحظات (اختياري)</label>
@@ -21315,8 +21321,20 @@ function roundToHalf(n){ if (!Number.isFinite(n)) return 0; return Math.round(n 
 
   let _soloukiCatalogCache = null;
   let _soloukiCatalogAt = 0;
+  let _soloukiViolationsCache = null;
 
-  async function fetchSoloukiCatalog() {
+  const SOLOUKI_MERIT_FALLBACK = [
+    { code: 'ideal',         label_ar: 'الطالب المثالي',           default_points: 15, sort_order: 10 },
+    { code: 'participation', label_ar: 'مشاركة فعّالة في الحصة',    default_points: 5,  sort_order: 20 },
+    { code: 'help_peer',     label_ar: 'مساعدة زميل',               default_points: 8,  sort_order: 30 },
+    { code: 'leadership',    label_ar: 'قيادة / مسؤولية',          default_points: 12, sort_order: 40 },
+    { code: 'attendance',    label_ar: 'انتظام وحضور متميز',        default_points: 5,  sort_order: 50 },
+    { code: 'cleanliness',   label_ar: 'المحافظة على النظافة',      default_points: 5,  sort_order: 60 },
+    { code: 'achievement',   label_ar: 'إنجاز أكاديمي أو فني',      default_points: 10, sort_order: 70 },
+    { code: 'other',         label_ar: 'تكريم آخر',                default_points: 10, sort_order: 99 }
+  ];
+
+  async function fetchSoloukiCatalogRaw() {
     const now = Date.now();
     if (_soloukiCatalogCache && (now - _soloukiCatalogAt) < 5 * 60 * 1000) {
       return _soloukiCatalogCache;
@@ -21324,18 +21342,14 @@ function roundToHalf(n){ if (!Number.isFinite(n)) return 0; return Math.round(n 
     const cfg = getSoloukiBridgeCfg();
     const proxy = (cfg.proxyPath || '/api/solouki-bridge').replace(/\/$/, '');
     let data = null;
-    // 1) عبر وكيل رصد (يحمي السر)
     try {
       const res = await fetch(proxy, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'catalog' })
       });
-      if (res.ok) {
-        data = await res.json();
-      }
+      if (res.ok) data = await res.json();
     } catch (e) { /* fallthrough */ }
-    // 2) مباشر إلى كتالوج سلوكي إن وُجد عنوان (يتطلب أن يقبل الطلب بدون سر أو عبر وكيل فقط — الأفضل الوكيل)
     if (!data && cfg.catalogUrl) {
       try {
         const res = await fetch(cfg.catalogUrl, {
@@ -21347,14 +21361,45 @@ function roundToHalf(n){ if (!Number.isFinite(n)) return 0; return Math.round(n 
       } catch (e) {}
     }
     if (!data || data.ok === false) {
-      throw new Error((data && (data.error || data.message)) || 'تعذر جلب كتالوج المخالفات من سلوكي. تأكد من نشر /api/solouki-bridge وضبط الأسرار.');
+      throw new Error((data && (data.error || data.message)) || 'تعذر جلب كتالوج سلوكي. تأكد من نشر /api/solouki-bridge وضبط الأسرار.');
     }
-    // تطبيع: violations array
-    const list = data.violations || data.items || data.catalog || [];
-    _soloukiCatalogCache = Array.isArray(list) ? list : [];
+    _soloukiCatalogCache = data;
     _soloukiCatalogAt = now;
-    return _soloukiCatalogCache;
+    const list = data.violations || data.items || data.catalog || [];
+    _soloukiViolationsCache = Array.isArray(list) ? list : [];
+    return data;
   }
+
+  async function fetchSoloukiCatalog() {
+    await fetchSoloukiCatalogRaw();
+    return _soloukiViolationsCache || [];
+  }
+
+  async function fetchSoloukiMeritCategories() {
+    try {
+      const data = await fetchSoloukiCatalogRaw();
+      let list = data.merit_categories || data.merits || [];
+      if (!Array.isArray(list) || !list.length) list = SOLOUKI_MERIT_FALLBACK.slice();
+      return list.slice().sort(function(a, b) {
+        return (Number(a.sort_order) || 0) - (Number(b.sort_order) || 0);
+      });
+    } catch (e) {
+      return SOLOUKI_MERIT_FALLBACK.slice();
+    }
+  }
+
+  window.onSoloukiMeritCategoryChange = function() {
+    const sel = document.getElementById('soloukiMeritCategorySelect');
+    const titleEl = document.getElementById('soloukiMeritTitle');
+    const pointsEl = document.getElementById('soloukiMeritPoints');
+    if (!sel) return;
+    const opt = sel.selectedOptions && sel.selectedOptions[0];
+    if (!opt || !opt.value) return;
+    const pts = opt.getAttribute('data-points');
+    const label = opt.getAttribute('data-label') || (opt.textContent || '').replace(/\s*\(\+\d+\)\s*$/, '').trim();
+    if (pointsEl && pts !== null && pts !== '') pointsEl.value = pts;
+    if (titleEl && label) titleEl.value = label;
+  };
 
   window.openSoloukiViolationModal = async function() {
     const tid = soloukiCurrentTeacherId();
@@ -21520,9 +21565,11 @@ function roundToHalf(n){ if (!Number.isFinite(n)) return 0; return Math.round(n 
     const titleEl = document.getElementById('soloukiMeritTitle');
     const pointsEl = document.getElementById('soloukiMeritPoints');
     const notesEl = document.getElementById('soloukiMeritNotes');
+    const catSel = document.getElementById('soloukiMeritCategorySelect');
     if (titleEl) titleEl.value = '';
     if (pointsEl) pointsEl.value = '';
     if (notesEl) notesEl.value = '';
+    if (catSel) catSel.innerHTML = '<option value="">— جاري التحميل… —</option>';
 
     // تعبئة الطلاب (نفس منطق نافذة المخالفة)
     const stuSel = document.getElementById('soloukiMeritStudentSelect');
@@ -21538,6 +21585,27 @@ function roundToHalf(n){ if (!Number.isFinite(n)) return 0; return Math.round(n 
         }).join('');
       }
     }
+
+    // تحميل أنواع التكريم (نفس كتالوج سلوكي)
+    if (catSel) {
+      try {
+        const cats = await fetchSoloukiMeritCategories();
+        catSel.innerHTML = '<option value="">— اختر أو اكتب عنواناً —</option>' + cats.map(function(c) {
+          const code = c.code != null ? String(c.code) : '';
+          const label = c.label_ar || c.label || c.title || code;
+          const pts = (c.default_points != null ? Number(c.default_points) : (c.points != null ? Number(c.points) : 10));
+          return '<option value="' + code.replace(/"/g, '') + '" data-points="' + pts + '" data-label="' + String(label).replace(/"/g, '&quot;') + '">' +
+            String(label).replace(/</g, '&lt;') + ' (+' + pts + ')</option>';
+        }).join('');
+        if (msg) {
+          msg.style.color = '#0b5e42';
+          msg.textContent = 'تم تحميل ' + cats.length + ' نوع تكريم من سلوكي.';
+        }
+      } catch (e) {
+        catSel.innerHTML = '<option value="">— فشل التحميل — استخدم العنوان يدوياً —</option>';
+        if (msg) { msg.style.color = '#b45309'; msg.textContent = (e && e.message) || String(e); }
+      }
+    }
   };
 
   window.closeSoloukiMeritModal = function() {
@@ -21549,14 +21617,22 @@ function roundToHalf(n){ if (!Number.isFinite(n)) return 0; return Math.round(n 
     const msg = document.getElementById('soloukiMeritModalMsg');
     const btn = document.getElementById('soloukiMeritSubmitBtn');
     const stuSel = document.getElementById('soloukiMeritStudentSelect');
+    const catSel = document.getElementById('soloukiMeritCategorySelect');
     const titleEl = document.getElementById('soloukiMeritTitle');
     const pointsEl = document.getElementById('soloukiMeritPoints');
     const notesEl = document.getElementById('soloukiMeritNotes');
     const nationalId = stuSel ? String(stuSel.value || '').trim() : '';
-    const title = titleEl ? String(titleEl.value || '').trim() : '';
+    const category = catSel ? String(catSel.value || '').trim() : '';
+    let title = titleEl ? String(titleEl.value || '').trim() : '';
     const pointsRaw = pointsEl ? String(pointsEl.value || '').trim() : '';
     const notes = notesEl ? String(notesEl.value || '').trim() : '';
     let teacherId = soloukiCurrentTeacherId();
+
+    if (!title && catSel && catSel.selectedOptions && catSel.selectedOptions[0]) {
+      const opt = catSel.selectedOptions[0];
+      title = (opt.getAttribute('data-label') || opt.textContent || '').replace(/\s*\(\+\d+\)\s*$/, '').trim();
+      if (titleEl && title) titleEl.value = title;
+    }
 
     if (currentAccountType !== 'teacher') {
       if (!teacherId) {
@@ -21573,7 +21649,7 @@ function roundToHalf(n){ if (!Number.isFinite(n)) return 0; return Math.round(n 
       return;
     }
     if (!title) {
-      if (msg) { msg.style.color = '#b91c1c'; msg.textContent = 'اكتب سبب التكريم.'; }
+      if (msg) { msg.style.color = '#b91c1c'; msg.textContent = 'اختر نوع التكريم أو اكتب العنوان.'; }
       return;
     }
 
@@ -21584,9 +21660,15 @@ function roundToHalf(n){ if (!Number.isFinite(n)) return 0; return Math.round(n 
       external_teacher_id: teacherId,
       student_national_id: nationalId.replace(/\D/g, ''),
       title: title,
+      category: category || 'general',
       notes: notes || ''
     };
-    if (pointsRaw !== '' && !isNaN(Number(pointsRaw))) payload.points = Number(pointsRaw);
+    if (pointsRaw !== '' && !isNaN(Number(pointsRaw))) {
+      payload.points = Number(pointsRaw);
+    } else if (catSel && catSel.selectedOptions && catSel.selectedOptions[0]) {
+      const pts = catSel.selectedOptions[0].getAttribute('data-points');
+      if (pts !== null && pts !== '' && !isNaN(Number(pts))) payload.points = Number(pts);
+    }
 
     if (btn) { btn.disabled = true; btn.textContent = '⏳ جاري الإرسال…'; }
     if (msg) { msg.style.color = '#64748b'; msg.textContent = 'إرسال إلى سلوكي عبر الجسر…'; }
@@ -21605,12 +21687,14 @@ function roundToHalf(n){ if (!Number.isFinite(n)) return 0; return Math.round(n 
       }
       if (msg) {
         msg.style.color = '#0b5e42';
-        msg.textContent = '✅ تم تسجيل التكريم في سلوكي' + (data.record_id ? (' (رقم السجل: ' + data.record_id + ')') : '') + '.';
+        msg.textContent = '✅ تم تسجيل التكريم في سلوكي' + (data.record_id ? (' (رقم السجل: ' + data.record_id + ')') : '') +
+          (payload.points != null ? (' (+' + payload.points + ' نقطة)') : '') + '.';
       }
-      try { recordAudit('إضافة تكريم سلوكي', 'معلم=' + teacherId + ' طالب=' + nationalId + ' سبب=' + title); } catch (e) {}
+      try { recordAudit('إضافة تكريم سلوكي', 'معلم=' + teacherId + ' طالب=' + nationalId + ' سبب=' + title + ' نقاط=' + (payload.points || '') + ' فئة=' + (category || '')); } catch (e) {}
       if (titleEl) titleEl.value = '';
       if (pointsEl) pointsEl.value = '';
       if (notesEl) notesEl.value = '';
+      if (catSel) catSel.value = '';
       setTimeout(function() { closeSoloukiMeritModal(); }, 1200);
     } catch (e) {
       if (msg) {
