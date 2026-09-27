@@ -15575,7 +15575,9 @@ function renderMonthlyExportButtons() {
       const stageRec = (typeof getStageRecord === 'function') ? getStageRecord(currentStageId) : null;
       const stageName = (stageRec && stageRec.name) ? stageRec.name : '';
       const sectionLabels = { arabic: 'عربي', languages: 'لغات' };
-      const sectionLabel = (stageRec && stageRec.section) ? (sectionLabels[stageRec.section] || stageRec.section) : '';
+      let sectionLabel = (stageRec && stageRec.section) ? (sectionLabels[stageRec.section] || stageRec.section) : '';
+      // لا تُكرَّر كلمة القسم إذا كانت موجودة أصلاً داخل اسم المرحلة نفسه (مثل "ابتدائي لغات")
+      if (sectionLabel && stageName.indexOf(sectionLabel) >= 0) sectionLabel = '';
       const nameParts = ['معلمي', 'رصد'];
       if (stageName) nameParts.push(stageName);
       if (sectionLabel) nameParts.push(sectionLabel);
