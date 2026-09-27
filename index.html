@@ -15572,8 +15572,14 @@ function renderMonthlyExportButtons() {
       ws['!cols'] = [{ wch: 14 }, { wch: 25 }, { wch: 20 }, { wch: 14 }, ...classList.map(() => ({ wch: 10 })), { wch: 15 }];
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, 'المعلمون');
-      const schoolName = (db.schoolInfo && db.schoolInfo.schoolName) || 'بيانات_المعلمين';
-      downloadWorkbook(wb, `${schoolName}_بيانات_المعلمين.xlsx`);
+      const stageRec = (typeof getStageRecord === 'function') ? getStageRecord(currentStageId) : null;
+      const stageName = (stageRec && stageRec.name) ? stageRec.name : '';
+      const sectionLabels = { arabic: 'عربي', languages: 'لغات' };
+      const sectionLabel = (stageRec && stageRec.section) ? (sectionLabels[stageRec.section] || stageRec.section) : '';
+      const nameParts = ['معلمي', 'رصد'];
+      if (stageName) nameParts.push(stageName);
+      if (sectionLabel) nameParts.push(sectionLabel);
+      downloadWorkbook(wb, `${nameParts.join('_')}.xlsx`);
     }
 
     // ============================================================
