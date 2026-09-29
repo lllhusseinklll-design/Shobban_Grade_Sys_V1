@@ -1682,16 +1682,17 @@
       direction: rtl;
       color: #0f172a;
       page-break-after: always;
-      page-break-inside: avoid;
-      padding: 0 1mm;
+      padding: 0;
+      width: 100%;
+      box-sizing: border-box;
     }
-    .class-roster-page:last-child { page-break-after: auto; }
+    .class-roster-page:last-child { page-break-after: auto !important; break-after: avoid-page !important; }
     .class-roster-title {
       text-align: center;
-      font-size: 16px;
+      font-size: 15px;
       font-weight: 900;
       color: #1e3a5f;
-      margin: 2mm 0 3mm;
+      margin: 1.5mm 0 2mm;
       text-decoration: underline;
       text-underline-offset: 2px;
     }
@@ -1699,41 +1700,59 @@
       width: 100%;
       border-collapse: collapse;
       table-layout: fixed;
-      font-size: 10px;
+      font-size: 11px;
       border: 1.5px solid #1e3a5f;
     }
+    /* نسب الأعمدة: م 4% | الاسم 36% | الحالة 10% | م 4% | الاسم 36% | الحالة 10% */
+    table.class-roster-table col.cr-col-no { width: 4%; }
+    table.class-roster-table col.cr-col-name { width: 36%; }
+    table.class-roster-table col.cr-col-status { width: 10%; }
     table.class-roster-table th {
       background: #1e3a5f !important;
       color: #fff !important;
       font-weight: 800;
-      padding: 2mm 1.5mm;
+      padding: 1.8mm 1mm;
       border: 1px solid #0f172a;
       text-align: center;
-      font-size: 10px;
+      font-size: 10.5px;
+      white-space: nowrap;
+    }
+    table.class-roster-table th.cr-name {
+      text-align: center;
     }
     table.class-roster-table td {
       border: 1px solid #94a3b8;
-      padding: 1.6mm 1.5mm;
+      padding: 1.4mm 1.2mm;
       vertical-align: middle;
       font-weight: 600;
       color: #0f172a;
     }
     table.class-roster-table tr:nth-child(even) td { background: #f8fafc !important; }
-    table.class-roster-table td.cr-no {
-      width: 7%;
+    table.class-roster-table td.cr-no,
+    table.class-roster-table th.cr-no {
+      width: 4%;
       text-align: center;
       font-weight: 800;
       color: #1e3a5f;
+      white-space: nowrap;
     }
     table.class-roster-table td.cr-name {
-      width: 33%;
+      width: 36%;
       text-align: right;
-      padding-right: 2mm;
+      padding: 1.4mm 2.5mm;
+      white-space: normal;
+      word-break: break-word;
+      overflow-wrap: anywhere;
+      line-height: 1.45;
+      font-size: 11px;
+      font-weight: 700;
     }
-    table.class-roster-table td.cr-status {
+    table.class-roster-table td.cr-status,
+    table.class-roster-table th.cr-status {
       width: 10%;
-      min-height: 6mm;
+      text-align: center;
       background: #fff !important;
+      min-height: 7mm;
     }
     table.class-roster-table th.cr-divider,
     table.class-roster-table td.cr-divider {
@@ -1742,7 +1761,7 @@
     .class-roster-legend {
       display: flex;
       justify-content: space-between;
-      margin: 2mm 0 2mm;
+      margin: 1mm 0 1.5mm;
       font-size: 11px;
       font-weight: 700;
       color: #1e3a5f;
@@ -1750,20 +1769,21 @@
     .class-roster-legend .girls { color: #be185d; }
     .class-roster-legend .boys { color: #1d4ed8; }
     .class-roster-footer {
-      margin-top: 5mm;
+      margin-top: 4mm;
       display: flex;
       justify-content: space-around;
       font-size: 10px;
       font-weight: 700;
       color: #334155;
+      page-break-inside: avoid;
     }
     .class-roster-footer .sign {
       text-align: center;
-      min-width: 40mm;
+      min-width: 38mm;
     }
     .class-roster-footer .sign .line {
       border-top: 1px solid #334155;
-      margin-top: 10mm;
+      margin-top: 8mm;
       padding-top: 1mm;
       font-size: 9px;
       font-weight: 500;
@@ -1772,14 +1792,22 @@
     @media print {
       .class-roster-page {
         page-break-after: always;
-        page-break-inside: avoid;
+        break-after: page;
       }
-      .class-roster-page:last-child { page-break-after: auto; }
+      .class-roster-page:last-child {
+        page-break-after: auto !important;
+        break-after: avoid-page !important;
+      }
       table.class-roster-table th {
         background: #1e3a5f !important;
         color: #fff !important;
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
+      }
+      table.class-roster-table td.cr-name {
+        white-space: normal !important;
+        word-break: break-word !important;
+        overflow-wrap: anywhere !important;
       }
     }
 
@@ -11397,6 +11425,14 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
             <span class="boys">♂ بنين (${hindi(boys.length)})</span>
           </div>
           <table class="class-roster-table">
+            <colgroup>
+              <col class="cr-col-no">
+              <col class="cr-col-name">
+              <col class="cr-col-status">
+              <col class="cr-col-no">
+              <col class="cr-col-name">
+              <col class="cr-col-status">
+            </colgroup>
             <thead>
               <tr>
                 <th class="cr-no">م</th>
