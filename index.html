@@ -11408,17 +11408,45 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
       const classLabel = (typeof classSectionLabel === 'function') ? classSectionLabel(classKey) : classKey;
       const parts = (typeof splitClassSectionKey === 'function')
         ? splitClassSectionKey(classKey)
-        : { cls: classKey, section: '' };
-      const sec = String(parts.section || '').toLowerCase();
-      // قسم لغات → تسميات إنجليزية (عدا اسم الطالب)
-      const isLang = (sec === 'languages' || sec === 'language' || sec === 'لغات' || /lang/i.test(sec));
+        : { cls: classKey || '', section: '' };
+      const sec = String(parts.section || '').toLowerCase().trim();
+      // كشف قسم لغات بقوة: من المفتاح / التسمية / عينة طالب / المرحلة الحالية
+      let isLang = (
+        sec === 'languages' || sec === 'language' || sec === 'لغات' ||
+        /lang/i.test(sec) ||
+        /لغات/.test(String(classKey || '')) ||
+        /لغات/.test(String(classLabel || '')) ||
+        /languages/i.test(String(classLabel || ''))
+      );
+      if (!isLang) {
+        try {
+          const sample = (db.students || []).find(s => {
+            const key = (typeof classSectionKey === 'function')
+              ? classSectionKey(s.class, s.section) : (s.class || '');
+            return key === classKey || s.class === classKey;
+          });
+          if (sample) {
+            const ss = String(sample.section || sample.entity || '').toLowerCase();
+            if (ss === 'languages' || ss === 'language' || ss === 'لغات' || /lang/i.test(ss)) isLang = true;
+          }
+        } catch (e) {}
+      }
+      if (!isLang) {
+        try {
+          if (typeof currentStage !== 'undefined' && currentStage) {
+            const stSec = String(currentStage.section || '').toLowerCase();
+            if (stSec === 'languages' || stSec === 'language' || /lang/i.test(stSec) || stSec === 'لغات') isLang = true;
+          }
+        } catch (e) {}
+      }
       const { girls, boys, total } = splitClassStudentsByGender(db, classKey);
       const maxRows = Math.max(girls.length, boys.length, 1);
       const hindi = (typeof toHindiDigits === 'function') ? toHindiDigits : (v) => String(v);
       const esc = (typeof escapeHtml === 'function') ? escapeHtml : (v) => String(v == null ? '' : v);
-      // أرقام القائمة: عربية هندية للقسم العربي، غربية للغات
+      // أرقام غربية للغات · هندية للعربي
       const num = isLang ? (v) => String(v) : hindi;
 
+      // لغات: تسميات إنجليزية مثل ملف الوورد (اسم الطالب يبقى عربياً)
       const L = isLang ? {
         title: 'Class List',
         classLbl: 'Class',
@@ -11426,8 +11454,8 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
         boys: 'Boys',
         total: 'Total',
         no: 'No',
-        girlName: "Girl's Name",
-        boyName: "Boy's Name",
+        girlName: "Kid's Name",
+        boyName: "Kid's Name",
         status: 'Status',
         sign1: 'Class Teacher',
         sign2: 'Social Worker',
