@@ -1201,7 +1201,7 @@
     }
     .lock-month-chip.is-locked .chip-status { background: #b91c1c; color: #fff; }
     .lock-month-chip.is-open .chip-status { background: #0b5e42; color: #fff; }
-    #printCardsArea, #printGradeSheetArea, #printAttendanceArea {
+    #printCardsArea, #printGradeSheetArea, #printAttendanceArea, #printClassRosterArea {
       display: none;
     }
     .grade-sheet-page {
@@ -1404,8 +1404,8 @@
          الكلي لعناصر الصفحة بصرف النظر عن رؤيتها)، وتظهر منطقة الطباعة الفعلية في الصفحة الأولى
          فقط بينما تبقى باقي الصفحات فارغة. display:none يزيل العنصر من التخطيط تماماً فلا يأخذ أي
          مساحة، فتُطبع فقط الصفحة/الصفحات التي تحتوي فعلياً على كشف الدرجات أو البطاقات. */
-      body > *:not(#printCardsArea):not(#printGradeSheetArea):not(#printAttendanceArea) { display: none !important; }
-      #printCardsArea, #printGradeSheetArea, #printAttendanceArea {
+      body > *:not(#printCardsArea):not(#printGradeSheetArea):not(#printAttendanceArea):not(#printClassRosterArea) { display: none !important; }
+      #printCardsArea, #printGradeSheetArea, #printAttendanceArea, #printClassRosterArea {
         display: block;
         width: 100%;
         margin: 0;
@@ -1675,6 +1675,114 @@
       display:flex; flex-wrap:wrap; justify-content:center; row-gap:1mm; column-gap:6mm;
     }
     .detailed-lh-meta-bar strong { color:#0f172a; }
+
+    /* ===== قائمة فصل (بنات / بنين) ===== */
+    .class-roster-page {
+      font-family: 'Cairo', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      direction: rtl;
+      color: #0f172a;
+      page-break-after: always;
+      page-break-inside: avoid;
+      padding: 0 1mm;
+    }
+    .class-roster-page:last-child { page-break-after: auto; }
+    .class-roster-title {
+      text-align: center;
+      font-size: 16px;
+      font-weight: 900;
+      color: #1e3a5f;
+      margin: 2mm 0 3mm;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+    table.class-roster-table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+      font-size: 10px;
+      border: 1.5px solid #1e3a5f;
+    }
+    table.class-roster-table th {
+      background: #1e3a5f !important;
+      color: #fff !important;
+      font-weight: 800;
+      padding: 2mm 1.5mm;
+      border: 1px solid #0f172a;
+      text-align: center;
+      font-size: 10px;
+    }
+    table.class-roster-table td {
+      border: 1px solid #94a3b8;
+      padding: 1.6mm 1.5mm;
+      vertical-align: middle;
+      font-weight: 600;
+      color: #0f172a;
+    }
+    table.class-roster-table tr:nth-child(even) td { background: #f8fafc !important; }
+    table.class-roster-table td.cr-no {
+      width: 7%;
+      text-align: center;
+      font-weight: 800;
+      color: #1e3a5f;
+    }
+    table.class-roster-table td.cr-name {
+      width: 33%;
+      text-align: right;
+      padding-right: 2mm;
+    }
+    table.class-roster-table td.cr-status {
+      width: 10%;
+      min-height: 6mm;
+      background: #fff !important;
+    }
+    table.class-roster-table th.cr-divider,
+    table.class-roster-table td.cr-divider {
+      border-left: 2.5px solid #1e3a5f;
+    }
+    .class-roster-legend {
+      display: flex;
+      justify-content: space-between;
+      margin: 2mm 0 2mm;
+      font-size: 11px;
+      font-weight: 700;
+      color: #1e3a5f;
+    }
+    .class-roster-legend .girls { color: #be185d; }
+    .class-roster-legend .boys { color: #1d4ed8; }
+    .class-roster-footer {
+      margin-top: 5mm;
+      display: flex;
+      justify-content: space-around;
+      font-size: 10px;
+      font-weight: 700;
+      color: #334155;
+    }
+    .class-roster-footer .sign {
+      text-align: center;
+      min-width: 40mm;
+    }
+    .class-roster-footer .sign .line {
+      border-top: 1px solid #334155;
+      margin-top: 10mm;
+      padding-top: 1mm;
+      font-size: 9px;
+      font-weight: 500;
+      color: #64748b;
+    }
+    @media print {
+      .class-roster-page {
+        page-break-after: always;
+        page-break-inside: avoid;
+      }
+      .class-roster-page:last-child { page-break-after: auto; }
+      table.class-roster-table th {
+        background: #1e3a5f !important;
+        color: #fff !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+    }
+
     table.detailed-weekly-table { width:100%; border-collapse:collapse; table-layout:fixed; font-size:8.6px; border:2px solid #3f7a57; }
     table.detailed-weekly-table th, table.detailed-weekly-table td {
       border:1px solid #94a3b8; padding:.7mm .12mm; text-align:center; overflow-wrap:break-word;
@@ -3927,6 +4035,30 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
           <button type="button" class="btn btn-outline" onclick="printTeacherPresenceSheet()">🖨️ حضور المعلمين</button>
           <button type="button" class="btn btn-outline" onclick="printTodaySkipSuspectsReport()">⚠️ خارج الفصول</button>
           <button type="button" class="btn btn-outline" onclick="printAbsenceConflictReport()">🖨️ تعارضات الغياب</button>
+        </div>
+      </div>
+
+      <!-- ===== قوائم الفصول (بنات / بنين) ===== -->
+      <div class="card pc-sec" data-pc-roles="superadmin,stageadmin,monitor" style="border:1px solid #c4b5fd">
+        <h2 style="color:#5b21b6">📋 قوائم الفصول (بنات / بنين)</h2>
+        <p style="color:#64748b;font-size:13px;margin-bottom:12px;line-height:1.7">
+          نفس شكل ملف الوورد: عمودان متجاوران — <strong style="color:#be185d">بنات</strong> و<strong style="color:#1d4ed8">بنين</strong> —
+          أعمدة: م · الاسم · الحالة · م · الاسم · الحالة. ترويسة المدرسة + توقيعات. صفحة لكل فصل.
+        </p>
+        <div class="flex justify-between items-center" style="margin-bottom:8px">
+          <strong style="font-size:14px">اختر الفصول</strong>
+          <span>
+            <button type="button" class="btn btn-outline btn-sm" onclick="pcToggleAll('pcRosterClassList', true)">تحديد الكل</button>
+            <button type="button" class="btn btn-outline btn-sm" onclick="pcToggleAll('pcRosterClassList', false)">مسح الكل</button>
+          </span>
+        </div>
+        <div id="pcRosterClassList" style="max-height:240px;overflow:auto;border:1px solid #e2e8f0;border-radius:10px;padding:10px;background:#f8fafc;margin-bottom:12px"></div>
+        <div class="flex flex-wrap gap-12 items-center">
+          <button type="button" class="btn btn-primary" onclick="printClassRosters()">🖨️ طباعة قوائم الفصول المحددة</button>
+          <label style="font-size:13px;font-weight:600;color:#475569;display:inline-flex;align-items:center;gap:6px;cursor:pointer">
+            <input type="checkbox" id="pcRosterEmptyStatus" checked style="width:16px;height:16px">
+            خانة «الحالة» فارغة للتعبئة اليدوية
+          </label>
         </div>
       </div>
 
@@ -11098,6 +11230,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
       try { pcFillMonthSelect('pcAttTerm', 'pcAttMonth'); } catch (e) {}
       try { pcRenderClassChecks('pcClassList'); } catch (e) {}
       try { pcRenderClassChecks('pcAttClassList'); } catch (e) {}
+      try { pcRenderClassChecks('pcRosterClassList'); } catch (e) {}
       try { pcRenderSubjectChecks('pcSubjectList'); } catch (e) {}
       try { pcRenderSubjectChecks('pcAttSubjectList'); } catch (e) {}
     }
@@ -11174,6 +11307,148 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
       if (teachers.length) return teachers.map(t => t.name || '').filter(Boolean).join('، ');
       return '';
     }
+
+    /** فرز طلاب الفصل: بنات (F) وبنين (M) أبجدياً */
+    function splitClassStudentsByGender(db, classKey) {
+      const students = (db.students || []).filter(s => {
+        const key = (typeof classSectionKey === 'function')
+          ? classSectionKey(s.class, s.section)
+          : (s.class || '');
+        return key === classKey || s.class === classKey;
+      });
+      const sortAr = (a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'ar');
+      const girls = students.filter(s => {
+        const g = String(s.gender || '').toUpperCase();
+        return g === 'F' || g === 'أنثى' || g === 'انثى' || g === 'بنت' || g === 'فتاة';
+      }).slice().sort(sortAr);
+      const boys = students.filter(s => {
+        const g = String(s.gender || '').toUpperCase();
+        return g === 'M' || g === 'ذكر' || g === 'ولد';
+      }).slice().sort(sortAr);
+      // من لم يُحدَّد جنسهم يُلحقون بالبنين إن وُجد رقم قومي، وإلا يُتركون خارج العمودين
+      const known = new Set([...girls, ...boys].map(s => s.id || s.nationalId || s.name));
+      const unknown = students.filter(s => !known.has(s.id || s.nationalId || s.name)).slice().sort(sortAr);
+      unknown.forEach(s => {
+        const idG = (typeof genderFromNationalId === 'function') ? genderFromNationalId(s.nationalId) : null;
+        if (idG === 'F') girls.push(s);
+        else boys.push(s);
+      });
+      girls.sort(sortAr);
+      boys.sort(sortAr);
+      return { girls, boys, total: students.length };
+    }
+
+    function buildClassRosterPageHtml(db, classKey, opts) {
+      opts = opts || {};
+      const emptyStatus = opts.emptyStatus !== false;
+      const info = db.schoolInfo || {};
+      const printedBy = (typeof resolvePrintedByName === 'function') ? resolvePrintedByName() : 'المستخدم';
+      const printDate = new Date().toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' });
+      const classLabel = (typeof classSectionLabel === 'function') ? classSectionLabel(classKey) : classKey;
+      const { girls, boys, total } = splitClassStudentsByGender(db, classKey);
+      const maxRows = Math.max(girls.length, boys.length, 1);
+      const hindi = (typeof toHindiDigits === 'function') ? toHindiDigits : (v) => String(v);
+      const esc = (typeof escapeHtml === 'function') ? escapeHtml : (v) => String(v == null ? '' : v);
+
+      let rowsHtml = '';
+      for (let i = 0; i < maxRows; i++) {
+        const g = girls[i];
+        const b = boys[i];
+        const gNo = g ? hindi(i + 1) : '';
+        const bNo = b ? hindi(i + 1) : '';
+        const gName = g ? esc(g.name || '') : '';
+        const bName = b ? esc(b.name || '') : '';
+        const statusCell = emptyStatus ? '' : '';
+        rowsHtml += `<tr>
+          <td class="cr-no">${gNo}</td>
+          <td class="cr-name">${gName}</td>
+          <td class="cr-status cr-divider">${statusCell}</td>
+          <td class="cr-no">${bNo}</td>
+          <td class="cr-name">${bName}</td>
+          <td class="cr-status">${statusCell}</td>
+        </tr>`;
+      }
+
+      const letterhead = (typeof buildUnifiedLetterhead === 'function')
+        ? buildUnifiedLetterhead({
+            title: 'قائمة فصل',
+            subtitleRight: classLabel,
+            subtitleLeft: '',
+            printedBy,
+            printDate,
+            governorate: info.governorate || '',
+            educationAdmin: info.educationAdmin || '',
+            schoolName: info.schoolName || '',
+            academicYear: info.academicYear || '',
+            metaBarHtml:
+              '<span><strong>الفصل:</strong> ' + esc(classLabel) + '</span>' +
+              '<span class="girls"><strong>بنات:</strong> ' + hindi(girls.length) + '</span>' +
+              '<span class="boys"><strong>بنين:</strong> ' + hindi(boys.length) + '</span>' +
+              '<span><strong>الإجمالي:</strong> ' + hindi(total) + '</span>'
+          })
+        : '';
+
+      return `
+        <div class="class-roster-page">
+          ${letterhead}
+          <div class="class-roster-title">${esc(classLabel)}</div>
+          <div class="class-roster-legend">
+            <span class="girls">♀ بنات (${hindi(girls.length)})</span>
+            <span class="boys">♂ بنين (${hindi(boys.length)})</span>
+          </div>
+          <table class="class-roster-table">
+            <thead>
+              <tr>
+                <th class="cr-no">م</th>
+                <th class="cr-name">اسم الطالبة</th>
+                <th class="cr-status cr-divider">الحالة</th>
+                <th class="cr-no">م</th>
+                <th class="cr-name">اسم الطالب</th>
+                <th class="cr-status">الحالة</th>
+              </tr>
+            </thead>
+            <tbody>${rowsHtml}</tbody>
+          </table>
+          <div class="class-roster-footer">
+            <div class="sign"><div>رائد / رائدة الفصل</div><div class="line">الاسم / التوقيع</div></div>
+            <div class="sign"><div>الأخصائي الاجتماعي</div><div class="line">الاسم / التوقيع</div></div>
+            <div class="sign"><div>وكيل / مدير المرحلة</div><div class="line">الاسم / التوقيع / الخاتم</div></div>
+          </div>
+        </div>`;
+    }
+
+    async function printClassRosters() {
+      if (!canAccessPrintCenter()) {
+        alert('مركز الطباعة متاح للإدارة ومدير المرحلة فقط.');
+        return;
+      }
+      const db = loadDB();
+      const classes = pcGetChecked('pcRosterClassList', 'data-class');
+      if (!classes.length) {
+        alert('يرجى تحديد فصل واحد على الأقل.');
+        return;
+      }
+      const emptyStatus = !!(document.getElementById('pcRosterEmptyStatus') || { checked: true }).checked;
+      const pages = classes.map(ck => buildClassRosterPageHtml(db, ck, { emptyStatus })).join('');
+      const area = document.getElementById('printClassRosterArea');
+      if (!area) {
+        alert('منطقة الطباعة غير متاحة.');
+        return;
+      }
+      if (typeof clearInactivePrintAreas === 'function') clearInactivePrintAreas('printClassRosterArea');
+      area.innerHTML = pages;
+      const prevTitle = document.title;
+      document.title = 'قوائم الفصول';
+      setTimeout(() => {
+        window.print();
+        setTimeout(() => {
+          document.title = prevTitle;
+          if (typeof clearAllPrintAreas === 'function') clearAllPrintAreas();
+        }, 600);
+      }, 80);
+    }
+    window.printClassRosters = printClassRosters;
+    window.buildClassRosterPageHtml = buildClassRosterPageHtml;
 
     // طباعة كشوف رصد فارغة: كل مجموعة (فصل × مادة) = صفحة واحدة بكل طلاب الفصل
     async function printBlankGradeSheetsBatch() {
@@ -16782,6 +17057,7 @@ function renderMonthlyExportButtons() {
   <div id="printCardsArea"></div>
   <div id="printGradeSheetArea"></div>
   <div id="printAttendanceArea"></div>
+  <div id="printClassRosterArea"></div>
 
 
 <style id="v20-ux-css">
@@ -18705,14 +18981,14 @@ function roundToHalf(n){ if (!Number.isFinite(n)) return 0; return Math.round(n 
 
   // قبل أي طباعة: فرّغ مناطق الطباعة الأخرى حتى لا يُطبع كشف سابق (درجات/بطاقات) مع الكشف الحالي
   function clearInactivePrintAreas(activeId) {
-    ['printCardsArea', 'printGradeSheetArea', 'printAttendanceArea'].forEach(id => {
+    ['printCardsArea', 'printGradeSheetArea', 'printAttendanceArea', 'printClassRosterArea'].forEach(id => {
       const el = document.getElementById(id);
       if (!el) return;
       if (id !== activeId) el.innerHTML = '';
     });
   }
   function clearAllPrintAreas() {
-    ['printCardsArea', 'printGradeSheetArea', 'printAttendanceArea'].forEach(id => {
+    ['printCardsArea', 'printGradeSheetArea', 'printAttendanceArea', 'printClassRosterArea'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.innerHTML = '';
     });
