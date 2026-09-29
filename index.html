@@ -1703,26 +1703,46 @@
       font-size: 11px;
       border: 1.5px solid #1e3a5f;
     }
-    /* نسب الأعمدة: م 4% | الاسم 36% | الحالة 10% | م 4% | الاسم 36% | الحالة 10% */
-    table.class-roster-table col.cr-col-no { width: 4%; }
-    table.class-roster-table col.cr-col-name { width: 36%; }
-    table.class-roster-table col.cr-col-status { width: 10%; }
+    /* نسب: م 3% | الاسم 39% | الحالة 5% | م 3% | الاسم 39% | الحالة 5% */
+    table.class-roster-table col.cr-col-no { width: 3%; }
+    table.class-roster-table col.cr-col-name { width: 39%; }
+    table.class-roster-table col.cr-col-status { width: 5%; }
     table.class-roster-table th {
       background: #1e3a5f !important;
       color: #fff !important;
       font-weight: 800;
-      padding: 1.8mm 1mm;
+      padding: 1.5mm 0.6mm;
       border: 1px solid #0f172a;
       text-align: center;
-      font-size: 10.5px;
-      white-space: nowrap;
+      font-size: 10px;
+      vertical-align: middle;
     }
     table.class-roster-table th.cr-name {
       text-align: center;
+      white-space: nowrap;
+      font-size: 10.5px;
+    }
+    /* عناوين م والحالة: نص رأسي لتضييق العمود */
+    table.class-roster-table th.cr-no,
+    table.class-roster-table th.cr-status {
+      padding: 2mm 0.4mm;
+      height: auto;
+    }
+    table.class-roster-table th.cr-no .cr-vert,
+    table.class-roster-table th.cr-status .cr-vert {
+      writing-mode: vertical-rl;
+      transform: rotate(180deg);
+      white-space: nowrap;
+      display: inline-block;
+      font-size: 9.5px;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+      line-height: 1.1;
+      max-height: 18mm;
     }
     table.class-roster-table td {
       border: 1px solid #94a3b8;
-      padding: 1.4mm 1.2mm;
+      padding: 1.2mm 1mm;
       vertical-align: middle;
       font-weight: 600;
       color: #0f172a;
@@ -1730,29 +1750,36 @@
     table.class-roster-table tr:nth-child(even) td { background: #f8fafc !important; }
     table.class-roster-table td.cr-no,
     table.class-roster-table th.cr-no {
-      width: 4%;
+      width: 3%;
       text-align: center;
       font-weight: 800;
       color: #1e3a5f;
       white-space: nowrap;
+      font-size: 10px;
+      padding-left: 0.4mm;
+      padding-right: 0.4mm;
     }
     table.class-roster-table td.cr-name {
-      width: 36%;
+      width: 39%;
       text-align: right;
-      padding: 1.4mm 2.5mm;
+      padding: 1.2mm 2mm;
       white-space: normal;
       word-break: break-word;
       overflow-wrap: anywhere;
-      line-height: 1.45;
+      line-height: 1.4;
       font-size: 11px;
       font-weight: 700;
     }
+    /* قسم لغات: اتجاه الاسم LTR طبيعي للأسماء العربية يبقى RTL للنص العربي */
+    table.class-roster-table.is-lang td.cr-name {
+      text-align: right;
+    }
     table.class-roster-table td.cr-status,
     table.class-roster-table th.cr-status {
-      width: 10%;
+      width: 5%;
       text-align: center;
       background: #fff !important;
-      min-height: 7mm;
+      padding: 1.2mm 0.3mm;
     }
     table.class-roster-table th.cr-divider,
     table.class-roster-table td.cr-divider {
@@ -1808,6 +1835,12 @@
         white-space: normal !important;
         word-break: break-word !important;
         overflow-wrap: anywhere !important;
+      }
+      table.class-roster-table th.cr-no .cr-vert,
+      table.class-roster-table th.cr-status .cr-vert {
+        writing-mode: vertical-rl !important;
+        transform: rotate(180deg) !important;
+        white-space: nowrap !important;
       }
     }
 
@@ -11373,33 +11406,70 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
       const printedBy = (typeof resolvePrintedByName === 'function') ? resolvePrintedByName() : 'المستخدم';
       const printDate = new Date().toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' });
       const classLabel = (typeof classSectionLabel === 'function') ? classSectionLabel(classKey) : classKey;
+      const parts = (typeof splitClassSectionKey === 'function')
+        ? splitClassSectionKey(classKey)
+        : { cls: classKey, section: '' };
+      const sec = String(parts.section || '').toLowerCase();
+      // قسم لغات → تسميات إنجليزية (عدا اسم الطالب)
+      const isLang = (sec === 'languages' || sec === 'language' || sec === 'لغات' || /lang/i.test(sec));
       const { girls, boys, total } = splitClassStudentsByGender(db, classKey);
       const maxRows = Math.max(girls.length, boys.length, 1);
       const hindi = (typeof toHindiDigits === 'function') ? toHindiDigits : (v) => String(v);
       const esc = (typeof escapeHtml === 'function') ? escapeHtml : (v) => String(v == null ? '' : v);
+      // أرقام القائمة: عربية هندية للقسم العربي، غربية للغات
+      const num = isLang ? (v) => String(v) : hindi;
+
+      const L = isLang ? {
+        title: 'Class List',
+        classLbl: 'Class',
+        girls: 'Girls',
+        boys: 'Boys',
+        total: 'Total',
+        no: 'No',
+        girlName: "Girl's Name",
+        boyName: "Boy's Name",
+        status: 'Status',
+        sign1: 'Class Teacher',
+        sign2: 'Social Worker',
+        sign3: 'Stage Principal',
+        signLine: 'Name / Signature'
+      } : {
+        title: 'قائمة فصل',
+        classLbl: 'الفصل',
+        girls: 'بنات',
+        boys: 'بنين',
+        total: 'الإجمالي',
+        no: 'م',
+        girlName: 'اسم الطالبة',
+        boyName: 'اسم الطالب',
+        status: 'الحالة',
+        sign1: 'رائد / رائدة الفصل',
+        sign2: 'الأخصائي الاجتماعي',
+        sign3: 'وكيل / مدير المرحلة',
+        signLine: 'الاسم / التوقيع'
+      };
 
       let rowsHtml = '';
       for (let i = 0; i < maxRows; i++) {
         const g = girls[i];
         const b = boys[i];
-        const gNo = g ? hindi(i + 1) : '';
-        const bNo = b ? hindi(i + 1) : '';
+        const gNo = g ? num(i + 1) : '';
+        const bNo = b ? num(i + 1) : '';
         const gName = g ? esc(g.name || '') : '';
         const bName = b ? esc(b.name || '') : '';
-        const statusCell = emptyStatus ? '' : '';
         rowsHtml += `<tr>
           <td class="cr-no">${gNo}</td>
           <td class="cr-name">${gName}</td>
-          <td class="cr-status cr-divider">${statusCell}</td>
+          <td class="cr-status cr-divider"></td>
           <td class="cr-no">${bNo}</td>
           <td class="cr-name">${bName}</td>
-          <td class="cr-status">${statusCell}</td>
+          <td class="cr-status"></td>
         </tr>`;
       }
 
       const letterhead = (typeof buildUnifiedLetterhead === 'function')
         ? buildUnifiedLetterhead({
-            title: 'قائمة فصل',
+            title: L.title,
             subtitleRight: classLabel,
             subtitleLeft: '',
             printedBy,
@@ -11409,22 +11479,24 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
             schoolName: info.schoolName || '',
             academicYear: info.academicYear || '',
             metaBarHtml:
-              '<span><strong>الفصل:</strong> ' + esc(classLabel) + '</span>' +
-              '<span class="girls"><strong>بنات:</strong> ' + hindi(girls.length) + '</span>' +
-              '<span class="boys"><strong>بنين:</strong> ' + hindi(boys.length) + '</span>' +
-              '<span><strong>الإجمالي:</strong> ' + hindi(total) + '</span>'
+              '<span><strong>' + L.classLbl + ':</strong> ' + esc(classLabel) + '</span>' +
+              '<span class="girls"><strong>' + L.girls + ':</strong> ' + num(girls.length) + '</span>' +
+              '<span class="boys"><strong>' + L.boys + ':</strong> ' + num(boys.length) + '</span>' +
+              '<span><strong>' + L.total + ':</strong> ' + num(total) + '</span>'
           })
         : '';
 
+      const tableClass = 'class-roster-table' + (isLang ? ' is-lang' : '');
+
       return `
-        <div class="class-roster-page">
+        <div class="class-roster-page${isLang ? ' is-lang' : ''}">
           ${letterhead}
           <div class="class-roster-title">${esc(classLabel)}</div>
           <div class="class-roster-legend">
-            <span class="girls">♀ بنات (${hindi(girls.length)})</span>
-            <span class="boys">♂ بنين (${hindi(boys.length)})</span>
+            <span class="girls">♀ ${L.girls} (${num(girls.length)})</span>
+            <span class="boys">♂ ${L.boys} (${num(boys.length)})</span>
           </div>
-          <table class="class-roster-table">
+          <table class="${tableClass}">
             <colgroup>
               <col class="cr-col-no">
               <col class="cr-col-name">
@@ -11435,20 +11507,20 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
             </colgroup>
             <thead>
               <tr>
-                <th class="cr-no">م</th>
-                <th class="cr-name">اسم الطالبة</th>
-                <th class="cr-status cr-divider">الحالة</th>
-                <th class="cr-no">م</th>
-                <th class="cr-name">اسم الطالب</th>
-                <th class="cr-status">الحالة</th>
+                <th class="cr-no"><span class="cr-vert">${esc(L.no)}</span></th>
+                <th class="cr-name">${esc(L.girlName)}</th>
+                <th class="cr-status cr-divider"><span class="cr-vert">${esc(L.status)}</span></th>
+                <th class="cr-no"><span class="cr-vert">${esc(L.no)}</span></th>
+                <th class="cr-name">${esc(L.boyName)}</th>
+                <th class="cr-status"><span class="cr-vert">${esc(L.status)}</span></th>
               </tr>
             </thead>
             <tbody>${rowsHtml}</tbody>
           </table>
           <div class="class-roster-footer">
-            <div class="sign"><div>رائد / رائدة الفصل</div><div class="line">الاسم / التوقيع</div></div>
-            <div class="sign"><div>الأخصائي الاجتماعي</div><div class="line">الاسم / التوقيع</div></div>
-            <div class="sign"><div>وكيل / مدير المرحلة</div><div class="line">الاسم / التوقيع / الخاتم</div></div>
+            <div class="sign"><div>${esc(L.sign1)}</div><div class="line">${esc(L.signLine)}</div></div>
+            <div class="sign"><div>${esc(L.sign2)}</div><div class="line">${esc(L.signLine)}</div></div>
+            <div class="sign"><div>${esc(L.sign3)}</div><div class="line">${esc(L.signLine)}</div></div>
           </div>
         </div>`;
     }
