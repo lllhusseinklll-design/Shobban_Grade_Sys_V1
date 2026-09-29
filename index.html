@@ -1785,12 +1785,19 @@
     table.class-roster-table.is-lang td.cr-name {
       text-align: right;
     }
-    table.class-roster-table td.cr-status,
-    table.class-roster-table th.cr-status {
+    table.class-roster-table td.cr-status {
       width: 5%;
       text-align: center;
       background: #fff !important;
       padding: 1.2mm 0.3mm;
+    }
+    /* رأس عمود الحالة يبقى بلون رأس الجدول (أخضر) وليس أبيض — وإلا يختفي النص الأبيض فوق خلفية بيضاء */
+    table.class-roster-table th.cr-status {
+      width: 5%;
+      text-align: center;
+      background: #3f7a57 !important;
+      color: #fff !important;
+      padding: 1.5mm 0.3mm;
     }
     table.class-roster-table th.cr-divider,
     table.class-roster-table td.cr-divider {
