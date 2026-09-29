@@ -1726,23 +1726,30 @@
       white-space: nowrap;
       font-size: 10.5px;
     }
-    /* عناوين م والحالة: نص رأسي لتضييق العمود */
+    /* عناوين م والحالة: نص أفقي مختصر يظهر بوضوح عند الطباعة
+       (النص الرأسي كان يُقص لأن ارتفاع صف الرأس يتحدد بعنوان الاسم الأفقي) */
     table.class-roster-table th.cr-no,
     table.class-roster-table th.cr-status {
-      padding: 2mm 0.4mm;
+      padding: 1.5mm 0.3mm;
       height: auto;
+      vertical-align: middle;
+      font-size: 9.5px;
+      font-weight: 800;
+      line-height: 1.25;
+      white-space: normal;
+      word-break: break-word;
     }
     table.class-roster-table th.cr-no .cr-vert,
     table.class-roster-table th.cr-status .cr-vert {
-      writing-mode: vertical-rl;
-      transform: rotate(180deg);
-      white-space: nowrap;
-      display: inline-block;
+      writing-mode: horizontal-tb;
+      transform: none;
+      white-space: normal;
+      display: inline;
       font-size: 9.5px;
       font-weight: 800;
-      letter-spacing: 0.02em;
-      line-height: 1.1;
-      max-height: 18mm;
+      letter-spacing: 0;
+      line-height: 1.25;
+      max-height: none;
     }
     table.class-roster-table td {
       border: 1px solid #94a3b8;
@@ -1845,9 +1852,9 @@
       }
       table.class-roster-table th.cr-no .cr-vert,
       table.class-roster-table th.cr-status .cr-vert {
-        writing-mode: vertical-rl !important;
-        transform: rotate(180deg) !important;
-        white-space: nowrap !important;
+        writing-mode: horizontal-tb !important;
+        transform: none !important;
+        white-space: normal !important;
       }
     }
 
