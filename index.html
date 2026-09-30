@@ -2075,8 +2075,16 @@
       font-size: 7.5px !important;
     }
 
-    .ml-cover-page .ml-cover-frame { border: 2px solid #3f7a57; border-radius: 8px; padding: 12px; }
-    .ml-cover-title { font-size: 22px; font-weight: 900; }
+    .ml-cover-sheet {
+      border: 3px solid #14532d; border-radius: 4px; padding: 16px 20px; text-align: center;
+      outline: 1px solid #86efac; outline-offset: 4px;
+    }
+    .ml-cover-headline {
+      font-size: 28px; font-weight: 900; color: #0a1f14; letter-spacing: 1px; margin: 8px 0;
+    }
+    .ml-cover-subhead { font-size: 15px; font-weight: 800; color: #166534; }
+    .ml-cover-line-school { font-size: 16px; font-weight: 900; }
+    .ml-cover-line-gov { font-weight: 800; color: #14532d; }
     .ml-protocol-title { background:#3f7a57; color:#fff; text-align:center; padding:8px; font-weight:900; }
 
     @media print {
@@ -3737,7 +3745,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
                 </select>
               </label>
               <label style="font-size:12.5px;color:#334155;display:flex;align-items:center;gap:6px" title="يُضاف غلاف رسمي + محضر فتح السجل في بداية الطباعة">
-                <input type="checkbox" id="mlIncludeCover" checked> غلاف + محضر فتح
+                <input type="checkbox" id="mlIncludeCover" checked> غلاف + محضر فتح <span style="color:#64748b;font-weight:600">(مع الفترة الأولى فقط)</span>
               </label>
             </div>
             <button class="btn btn-primary" onclick="printMinistryLandscapeSheet({blank:false})" title="كشف وزارة عرضي — أسبوع ثم مكوّنات — ببيانات">🖨️ كشف وزارة عرضي (ببيانات)</button>
@@ -14755,6 +14763,7 @@ function renderMonthlyExportButtons() {
     }
 
     /** غلاف سجل رصد الدرجات + محضر فتح */
+
     function buildMinistryCoverAndProtocolHtml(cfg) {
       const { db, subjectName, cls, term, blank } = cfg;
       const info = db.schoolInfo || {};
@@ -14766,6 +14775,7 @@ function renderMonthlyExportButtons() {
       const classLabel = (typeof formatClassSectionForPrint === 'function')
         ? formatClassSectionForPrint(classGradeLabel, clsSection, clsPlain)
         : escapeHtml(String(cls || ''));
+      const stageLabel = escapeHtml(classGradeLabel || info.grade || 'المرحلة');
       const assignedTeachers = (db.teachers || []).filter(t =>
         (t.assignments || []).some(a => a.subjectName === subjectName && (a.classes || []).includes(cls)));
       const teacherName = assignedTeachers.length
@@ -14773,27 +14783,38 @@ function renderMonthlyExportButtons() {
         : '';
       const printedBy = (typeof resolvePrintedByName === 'function') ? resolvePrintedByName() : '';
       const printDate = new Date().toLocaleDateString('ar-EG');
+      const gov = escapeHtml(info.governorate || '................');
+      const admin = escapeHtml(info.educationAdmin || 'إدارة ................ التعليمية');
+      const school = escapeHtml(info.schoolName || 'مدرسة ................');
 
       const cover = `
       <div class="ministry-landscape-page ml-cover-page">
-        <div class="ml-cover-frame">
-          <div class="ml-cover-top">
-            <div>مديرية التربية والتعليم${info.governorate ? ' بـ' + escapeHtml(info.governorate) : ''}</div>
-            <div>${escapeHtml(info.educationAdmin || 'إدارة ................ التعليمية')}</div>
-            <div>${escapeHtml(info.schoolName || 'مدرسة ................')}</div>
+        <div class="ml-cover-sheet">
+          <div class="ml-cover-ornament ml-cover-ornament-top"></div>
+          <div class="ml-cover-brand-row">
+            <div class="ml-cover-crest">🏫</div>
+            <div class="ml-cover-authority">
+              <div class="ml-cover-line-gov">مديرية التربية والتعليم بـ${gov}</div>
+              <div class="ml-cover-line-admin">${admin}</div>
+              <div class="ml-cover-line-school">${school}</div>
+            </div>
+            <div class="ml-cover-crest ml-cover-crest-fade">📜</div>
           </div>
-          <div class="ml-cover-title">سجل رصد درجات</div>
-          <div class="ml-cover-sub">للمرحلة الثانوية</div>
+          <div class="ml-cover-rule"></div>
+          <div class="ml-cover-headline">سجل رصد درجات</div>
+          <div class="ml-cover-subhead">أعمال السنة · ${stageLabel}</div>
+          <div class="ml-cover-rule ml-cover-rule-thin"></div>
           ${blank ? '<div class="ml-cover-badge">نموذج للتعبئة اليدوية</div>' : ''}
           <table class="ml-cover-meta">
-            <tr><td class="lbl">اسم المعلم</td><td class="val">${teacherName || ''}</td></tr>
+            <tr><td class="lbl">اسم المعلم</td><td class="val">${teacherName || '................................'}</td></tr>
             <tr><td class="lbl">المادة</td><td class="val">${escapeHtml(subjectName || '')}</td></tr>
-            <tr><td class="lbl">الصف</td><td class="val">${classLabel}</td></tr>
-            <tr><td class="lbl">الفصل</td><td class="val">${escapeHtml(clsSection || clsPlain || '')}</td></tr>
+            <tr><td class="lbl">الصف / الفصل</td><td class="val">${classLabel}</td></tr>
             <tr><td class="lbl">الفصل الدراسي</td><td class="val">${termLabel}</td></tr>
-            <tr><td class="lbl">العام الدراسي</td><td class="val">${year ? toHindiDigits(year) : ''}</td></tr>
+            <tr><td class="lbl">العام الدراسي</td><td class="val">${year ? toHindiDigits(year) : '........ / ........'}</td></tr>
           </table>
+          <div class="ml-cover-foot-note">يُعتمد هذا السجل للعمل به بعد محضر الفتح الرسمي</div>
           <div class="ml-cover-foot">طُبع بواسطة: ${escapeHtml(printedBy || '')} — ${toHindiDigits(printDate)}</div>
+          <div class="ml-cover-ornament ml-cover-ornament-bottom"></div>
         </div>
       </div>`;
 
@@ -14838,6 +14859,12 @@ function renderMonthlyExportButtons() {
       return cover + protocol;
     }
 
+    /** الغلاف والمحضر فقط مع الفترة الأولى (الأسابيع الأولى) — لا يتكرران مع كل شهر */
+    function mlShouldPrintCoverForMonths(monthsToPrint) {
+      if (!mlIncludeCover()) return false;
+      const arr = monthsToPrint || [];
+      return arr.some(m => Number(m) === 1);
+    }
 
     /**
      * طباعة كشف وزارة من فلاتر تبويب الدرجات
@@ -14897,8 +14924,8 @@ function renderMonthlyExportButtons() {
       }
 
       let allHtml = '';
-      // غلاف + محضر فتح (اختياري — مفعّل افتراضياً)
-      if (mlIncludeCover()) {
+      // غلاف + محضر فتح مرة واحدة فقط مع الفترة الأولى (الأسابيع الأولى)
+      if (mlShouldPrintCoverForMonths(monthsToPrint)) {
         allHtml += buildMinistryCoverAndProtocolHtml({ db, subjectName, cls, term, blank });
       }
       monthsToPrint.forEach((m, idx) => {
@@ -15436,20 +15463,76 @@ function renderMonthlyExportButtons() {
           .ministry-landscape-page .detailed-sheet-footer .gs-line { margin-top: 7mm; }
           .ministry-landscape-page .detailed-sheet-footer .gs-sign-caption { font-size: 8px; }
           .ml-cover-page, .ml-protocol-page { display:flex; align-items:center; justify-content:center; }
-          .ml-cover-frame {
-            border: 2.5px solid #3f7a57; border-radius: 8px; padding: 8mm 12mm;
-            width: 90%; max-width: 260mm; text-align: center;
+          .ml-cover-sheet {
+            position: relative;
+            border: 3px solid #14532d;
+            outline: 1px solid #86efac;
+            outline-offset: 2.5mm;
+            border-radius: 4px;
+            padding: 7mm 12mm 8mm;
+            width: 92%; max-width: 270mm;
+            text-align: center;
+            background: #fff;
           }
-          .ml-cover-top { font-size: 12px; color: #1e293b; line-height: 1.9; margin-bottom: 6mm; }
-          .ml-cover-title { font-size: 28px; font-weight: 900; color: #0f172a; margin: 3mm 0; }
-          .ml-cover-sub { font-size: 16px; font-weight: 700; color: #3f7a57; margin-bottom: 4mm; }
-          .ml-cover-badge { display:inline-block; background:#fff7ed; color:#c2410c; border:1px solid #fdba74;
-            padding:1mm 4mm; border-radius:6px; font-size:11px; font-weight:700; margin-bottom:4mm; }
-          .ml-cover-meta { width: 70%; margin: 4mm auto; border-collapse: collapse; font-size: 13px; }
-          .ml-cover-meta td { border: 1px solid #94a3b8; padding: 2.2mm 3mm; }
-          .ml-cover-meta td.lbl { width: 32%; background: #f0fdf4; font-weight: 700; text-align: center; }
-          .ml-cover-meta td.val { text-align: right; }
-          .ml-cover-foot { margin-top: 6mm; font-size: 10px; color: #64748b; }
+          .ml-cover-ornament-top, .ml-cover-ornament-bottom {
+            height: 2.2mm;
+            background: linear-gradient(90deg, transparent 0%, #14532d 15%, #22c55e 50%, #14532d 85%, transparent 100%);
+            margin: 0 auto 4mm;
+            border-radius: 99px;
+          }
+          .ml-cover-ornament-bottom { margin: 5mm auto 0; }
+          .ml-cover-brand-row {
+            display: flex; align-items: center; justify-content: space-between; gap: 4mm;
+            margin-bottom: 3mm;
+          }
+          .ml-cover-crest { font-size: 28px; line-height: 1; width: 14mm; }
+          .ml-cover-crest-fade { opacity: 0.35; }
+          .ml-cover-authority { flex: 1; text-align: center; }
+          .ml-cover-line-gov {
+            font-size: 13px; font-weight: 800; color: #14532d;
+            letter-spacing: 0.3px; line-height: 1.5;
+          }
+          .ml-cover-line-admin {
+            font-size: 12px; font-weight: 700; color: #166534; line-height: 1.5;
+          }
+          .ml-cover-line-school {
+            font-size: 15px; font-weight: 900; color: #0f172a; line-height: 1.55; margin-top: 1mm;
+          }
+          .ml-cover-rule {
+            height: 1.6mm; width: 72%; margin: 3mm auto;
+            background: linear-gradient(90deg, transparent, #14532d 20%, #14532d 80%, transparent);
+          }
+          .ml-cover-rule-thin {
+            height: 0.7mm; width: 48%;
+            background: linear-gradient(90deg, transparent, #86efac 20%, #86efac 80%, transparent);
+            margin: 2mm auto 4mm;
+          }
+          .ml-cover-headline {
+            font-size: 36px; font-weight: 900; color: #0a1f14;
+            letter-spacing: 1.2px; line-height: 1.15;
+            margin: 2mm 0 1.5mm;
+            text-shadow: 0 0.3mm 0 rgba(20,83,45,0.12);
+          }
+          .ml-cover-subhead {
+            font-size: 16px; font-weight: 800; color: #166534;
+            letter-spacing: 0.6px; margin-bottom: 2mm;
+          }
+          .ml-cover-badge {
+            display:inline-block; background:#fff7ed; color:#c2410c; border:1.5px solid #fdba74;
+            padding:1.2mm 5mm; border-radius:6px; font-size:12px; font-weight:800; margin-bottom:3mm;
+          }
+          .ml-cover-meta {
+            width: 72%; margin: 3mm auto 2mm; border-collapse: collapse; font-size: 13px;
+          }
+          .ml-cover-meta td { border: 1.5px solid #64748b; padding: 2.4mm 3mm; }
+          .ml-cover-meta td.lbl {
+            width: 30%; background: #ecfdf5; font-weight: 800; text-align: center; color: #14532d;
+          }
+          .ml-cover-meta td.val { text-align: right; font-weight: 700; color: #0f172a; }
+          .ml-cover-foot-note {
+            margin-top: 4mm; font-size: 11px; font-weight: 700; color: #3f6212;
+          }
+          .ml-cover-foot { margin-top: 2mm; font-size: 9.5px; color: #64748b; }
           .ml-protocol-box { width: 92%; max-width: 270mm; }
           .ml-protocol-title {
             text-align:center; font-size:18px; font-weight:900; color:#fff; background:#3f7a57;
@@ -15479,6 +15562,7 @@ function renderMonthlyExportButtons() {
         }, 500);
       }, 80);
     }
+
 
     async function printMinistryLandscapeBatch(opts) {
       opts = opts || {};
@@ -15539,7 +15623,8 @@ function renderMonthlyExportButtons() {
           monthsToPrint = [Math.min(Math.max(block || 1, 1), 4)];
         }
 
-        if (mlIncludeCover()) {
+        // غلاف + محضر مرة واحدة فقط إذا كانت الفترة الأولى ضمن الطباعة
+        if (mlShouldPrintCoverForMonths(monthsToPrint)) {
           allHtml += buildMinistryCoverAndProtocolHtml({
             db, subjectName: job.subjectName, cls: job.cls, term, blank
           });
@@ -15562,6 +15647,7 @@ function renderMonthlyExportButtons() {
       if (!allHtml) { alert('تعذّر بناء أي كشف.'); return; }
       printMinistryLandscapeHtml(allHtml);
     }
+
     window.printMinistryLandscapeBatch = printMinistryLandscapeBatch;
 
 
