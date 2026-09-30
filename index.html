@@ -23305,12 +23305,62 @@ function roundToHalf(n){ if (!Number.isFinite(n)) return 0; return Math.round(n 
     const att=document.getElementById('tab-attendance');
     if(att && !document.getElementById('gspWeeklyAttendanceBox')){
       const box=document.createElement('div');box.id='gspWeeklyAttendanceBox';box.className='att-week-register-wrap';
-      box.innerHTML='<div class="att-week-register-title">📋 سجل الغياب الأسبوعي — بنفس قالب الأسابيع</div><p class="att-week-register-note">يعرض الأسابيع وتواريخها من الروزنامة، ويقرأ حالة كل يوم من سجل الغياب المحفوظ فعلياً. لذلك يمكن طباعة سجل حقيقي بالغياب المسجل، أو نموذج فارغ للتعبئة.</p><div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn btn-primary btn-sm" onclick="gspPrintWeeklyAttendance(false)">🖨️ طباعة السجل بالغياب الفعلي</button><button type="button" class="btn btn-outline btn-sm" onclick="gspPrintWeeklyAttendance(true)">🖨️ طباعة نموذج أسبوعي فارغ</button></div>';
+      box.innerHTML='<div class="att-week-register-title">📋 كشف المواظبة القائم على الأسابيع</div><p class="att-week-register-note">هذا هو الكشف الأسبوعي الذي يجمع الأسابيع الأربعة مع تواريخها الفعلية، ويقرأ الحضور والغياب من سجل المواظبة المحفوظ لكل يوم.</p><div style="display:flex;align-items:end;gap:10px;flex-wrap:wrap;margin-bottom:10px;padding:10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px"><div class="form-group" style="margin:0;min-width:210px"><label style="font-size:12px">📅 تاريخ بداية الأسبوع الأول للشهر المحدد</label><input type="date" id="gspWeek1Date" style="width:100%;box-sizing:border-box;padding:7px 9px;border:1px solid #cbd5e1;border-radius:8px" onchange="gspSaveWeek1Date(this.value)"></div><div style="font-size:11.5px;color:#64748b;max-width:500px;line-height:1.7">يحدد هذا التاريخ الأسبوع الأول، ثم يحسب النظام الأسبوع الثاني والثالث والرابع تلقائياً بفاصل 7 أيام. وهو نفس التاريخ المستخدم في الروزنامة وكشوف الأسابيع.</div><button type="button" class="btn btn-outline btn-sm" onclick="activateTab(\'schoolinfo\');setTimeout(()=>{document.getElementById(\'siPeriodsEditor\')?.scrollIntoView({behavior:\'smooth\',block:\'start\'});},100)">⚙️ إعدادات الفترات</button></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn btn-primary btn-sm" onclick="gspPrintWeeklyAttendance(false)">🖨️ طباعة كشف المواظبة بالبيانات الفعلية</button><button type="button" class="btn btn-outline btn-sm" onclick="gspPrintWeeklyAttendance(true)">🖨️ طباعة كشف مواظبة فارغ</button></div><div id="gspWeek1Msg" style="font-size:12px;margin-top:7px;color:#166534"></div>';
       const grid=document.getElementById('attGridWrap'); if(grid&&grid.parentNode)grid.parentNode.insertBefore(box,grid); else att.appendChild(box);
     }
     updatePrintSummary();
   }
   function updatePrintSummary(){const e=document.getElementById('gspPrefsSummary');if(!e)return;const p=getPrintPrefs();e.textContent=`A4 ${p.orientation==='landscape'?'عرضي':'طولي'} · هوامش ${p.top}/${p.right}/${p.bottom}/${p.left} مم · ${p.scale}%`;}
+
+  window.gspRefreshWeek1Control=function(){
+    const input=document.getElementById('gspWeek1Date');
+    if(!input)return;
+    const term=document.getElementById('attTermSelect')?.value||'first';
+    const month=parseInt(document.getElementById('attMonthSelect')?.value||'1',10);
+    try{ input.value=(typeof getWeek1DateISO==='function'?getWeek1DateISO(term,month-1):'')||''; }catch(e){ input.value=''; }
+  };
+  window.gspSaveWeek1Date=function(value){
+    const term=document.getElementById('attTermSelect')?.value||'first';
+    const month=parseInt(document.getElementById('attMonthSelect')?.value||'1',10);
+    if(!value){return;}
+    const db=loadDB();
+    db.schoolInfo=db.schoolInfo||{};
+    db.schoolInfo.week1Dates=db.schoolInfo.week1Dates||{first:[],second:[]};
+    db.schoolInfo.week1Dates[term]=db.schoolInfo.week1Dates[term]||[];
+    db.schoolInfo.week1Dates[term][month-1]=value;
+    db.schoolInfo.recordingPeriods=db.schoolInfo.recordingPeriods||{first:[],second:[]};
+    db.schoolInfo.recordingPeriods[term]=db.schoolInfo.recordingPeriods[term]||[];
+    const periods=db.schoolInfo.recordingPeriods[term];
+    if(periods[month-1]) periods[month-1].week1=value;
+    if(typeof periodsToMonthsAndWeek1==='function'){
+      const sync=periodsToMonthsAndWeek1(migrateMonthsToPeriods(db.schoolInfo));
+      db.schoolInfo.months=sync.months; db.schoolInfo.week1Dates=sync.week1Dates;
+    }
+    saveDB(db);
+    try{
+      const root=typeof getRootDB==='function'?getRootDB():null;
+      if(root&&Array.isArray(root.stages)){
+        root.stages.forEach(st=>{
+          if(!st||!st.data) return;
+          st.data.schoolInfo=st.data.schoolInfo||{};
+          st.data.schoolInfo.week1Dates=JSON.parse(JSON.stringify(db.schoolInfo.week1Dates));
+          st.data.schoolInfo.months=JSON.parse(JSON.stringify(db.schoolInfo.months||{}));
+          st.data.schoolInfo.recordingPeriods=JSON.parse(JSON.stringify(db.schoolInfo.recordingPeriods||{}));
+        });
+        if(typeof persistRootDB==='function')persistRootDB(root);
+      }
+    }catch(e){console.warn('week1 propagation',e);}
+    const msg=document.getElementById('gspWeek1Msg'); if(msg)msg.textContent='✅ تم حفظ تاريخ الأسبوع الأول، وستُحدّث تواريخ الأسابيع تلقائياً.';
+    try{ if(typeof onAttendanceFilterChange==='function') onAttendanceFilterChange(); }catch(e){}
+  };
+
+  // إبقاء تاريخ الأسبوع الأول المعروض متزامناً مع المادة/الشهر المختارين.
+  const _gspOldAttendanceFilter=window.onAttendanceFilterChange;
+  window.onAttendanceFilterChange=function(){
+    const r=typeof _gspOldAttendanceFilter==='function'?_gspOldAttendanceFilter.apply(this,arguments):undefined;
+    setTimeout(()=>{try{gspRefreshWeek1Control();}catch(e){}},0);
+    return r;
+  };
 
   window.gspPrintWeeklyAttendance=function(blank){
     const db=loadDB();const att=ensureAttendance(db);const f=typeof getFilterState==='function'?getFilterState():null;
@@ -23336,8 +23386,11 @@ function roundToHalf(n){ if (!Number.isFinite(n)) return 0; return Math.round(n 
       const letter=(typeof buildUnifiedLetterhead==='function')?buildUnifiedLetterhead({title:'سجل الغياب الأسبوعي',subtitleRight:monthName,subtitleLeft:f.term==='first'?'الفصل الدراسي الأول':'الفصل الدراسي الثاني',printedBy:typeof resolvePrintedByName==='function'?resolvePrintedByName():'المستخدم',printDate:new Date().toLocaleDateString('ar-EG'),governorate:info.governorate||'',educationAdmin:info.educationAdmin||'',schoolName:info.schoolName||'',academicYear:info.academicYear||'',metaBarHtml:`<span><strong>الفصل:</strong> ${escFn(classLabel)}</span><span><strong>المادة:</strong> ${escFn(f.subjectName)}${teacherName?' — <strong>المعلم:</strong> '+escFn(teacherName):''}</span>`}):'';
       pages+=`<div class="att-print-page detailed-sheet-page gsp-weekly-att-page">${letter}<table class="att-print-table gsp-weekly-att-table"><thead>${head}</thead><tbody>${body}</tbody></table><div style="text-align:center;font-size:9px;color:#64748b;margin-top:3mm">✓ حضور · غ غياب · ع عذر · إج إجازة. التاريخ مأخوذ من روزنامة النظام، والبيانات من سجل الغياب المحفوظ.</div></div>`;
     }
-    area.innerHTML=pages;gspApplyPrintPreferences('attendance');try{fitPrintPageFillHeight(area,'.gsp-weekly-att-page');}catch(e){}
-    const prev=document.title;document.title='سجل الغياب الأسبوعي';setTimeout(()=>{window.print();setTimeout(()=>{document.title=prev;if(typeof clearAllPrintAreas==='function')clearAllPrintAreas();},800);},60);
+    area.innerHTML=pages;gspApplyPrintPreferences('attendance');
+    // لا نفرض ارتفاعاً ثابتاً على الجدول؛ ذلك قد يجعل Chrome يعيد الترويسة وحدها في صفحة ثانية.
+    // نستخدم ملاءمة A4 على مستوى الصفحة كاملة، مع الحفاظ على كل صفوف الجدول متصلة قدر الإمكان.
+    try{ if(typeof fitPrintPagesToA4==='function') fitPrintPagesToA4(area,'.gsp-weekly-att-page'); }catch(e){ console.warn(e); }
+    const prev=document.title;document.title='كشف المواظبة الأسبوعي';setTimeout(()=>{window.print();setTimeout(()=>{document.title=prev;if(typeof clearAllPrintAreas==='function')clearAllPrintAreas();},800);},60);
   };
 
   // حفظ خيارات مركز الطباعة الموجودة بالفعل، دون تغيير منطق النظام.
@@ -23347,7 +23400,7 @@ function roundToHalf(n){ if (!Number.isFinite(n)) return 0; return Math.round(n 
   const origPrintMin=window.printMinistryLandscapeSheet; if(typeof origPrintMin==='function')window.printMinistryLandscapeSheet=function(){gspApplyPrintPreferences('ministry');return origPrintMin.apply(this,arguments);};
 
   document.addEventListener('DOMContentLoaded',function(){
-    installPrintSettingsUI();hookCenterPersistence();gspApplyPrintPreferences();
+    installPrintSettingsUI();hookCenterPersistence();gspApplyPrintPreferences();try{gspRefreshWeek1Control();}catch(e){}
     const cp=getCenterPrefs();Object.keys(cp).forEach(id=>{const e=document.getElementById(id);if(e&&cp[id]!=null)e.value=cp[id];});updatePrintSummary();
     // إعادة تطبيق الإعدادات قبل أي طباعة حتى لو غيّر المستخدم إعداداً من مركز الطباعة.
     window.addEventListener('beforeprint',function(){gspApplyPrintPreferences();});
