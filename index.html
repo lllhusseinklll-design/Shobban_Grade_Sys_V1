@@ -23328,6 +23328,18 @@ function roundToHalf(n){ if (!Number.isFinite(n)) return 0; return Math.round(n 
 
 </script>
 
+
+<style id="termCalendarCheckboxFix">
+#termCalendarEditor input[type="checkbox"]{
+  width:18px;height:18px;min-width:18px;min-height:18px;
+  accent-color:#3f7a57;
+  cursor:pointer;
+  flex-shrink:0;
+}
+#termCalendarEditor label{
+  user-select:none;
+}
+</style>
 <style id="gspPrintAndAttendanceUpgradeStyles">
 /* ===== سجل الغياب الأسبوعي + مركز إعدادات الطباعة ===== */
 .att-week-register-wrap{margin-top:14px;border:1px solid #bbf7d0;border-radius:14px;background:linear-gradient(180deg,#f0fdf4,#fff);padding:14px}
@@ -23589,10 +23601,15 @@ function roundToHalf(n){ if (!Number.isFinite(n)) return 0; return Math.round(n 
   function renderCalendar(){
     const box=document.getElementById('termCalendarEditor'); if(!box)return;
     const term=document.getElementById('siCalendarTerm')?.value||'first';
-    let c;
-    try { c=calLoad(term); } catch(err){ console.warn('calLoad',err); box.innerHTML='<div style="color:#b91c1c">تعذّر تحميل الروزنامة. حدّث الصفحة بعد تسجيل الدخول.</div>'; return; }
     window._termCalendarDraft=window._termCalendarDraft||{};
-    window._termCalendarDraft[term]=c;
+    let c;
+    // استخدم المسودة إن وُجدت حتى لا تُمسح خيارات مثل «يوجد اختبار شهر» قبل الحفظ
+    if (window._termCalendarDraft[term] && window._termCalendarDraft[term].months) {
+      c = window._termCalendarDraft[term];
+    } else {
+      try { c=calLoad(term); } catch(err){ console.warn('calLoad',err); box.innerHTML='<div style="color:#b91c1c">تعذّر تحميل الروزنامة. حدّث الصفحة بعد تسجيل الدخول.</div>'; return; }
+      window._termCalendarDraft[term]=c;
+    }
     const canEdit=calCanEdit();
     const dis=canEdit?'':'disabled';
     const weekOpts=Array.from({length:Math.max(1,Number(c.totalWeeks)||16)},(_,i)=>`<option value="${i+1}">الأسبوع ${AR_WEEKS[i]||(i+1)}</option>`).join('');
@@ -23645,7 +23662,7 @@ function roundToHalf(n){ if (!Number.isFinite(n)) return 0; return Math.round(n 
       if(ea) ea.value=String(Number(m.examAfterWeek)||0 || m.endWeek||0);
     });
   }
-  window.termCalField=function(i,f,v){const term=document.getElementById('siCalendarTerm')?.value||'first';const c=window._termCalendarDraft?.[term]||calLoad(term);if(f==='name')c.months[i].name=v;else if(f==='hasExam'){c.months[i].hasExam=!!v;if(c.months[i].hasExam&&!Number(c.months[i].examAfterWeek))c.months[i].examAfterWeek=c.months[i].endWeek;}else if(f==='examAfterWeek'){const n=parseInt(v,10)||0;c.months[i].examAfterWeek=n>0?Math.max(1,Math.min(c.totalWeeks,n)):0;}else c.months[i][f]=Math.max(1,Math.min(c.totalWeeks,parseInt(v,10)||1)); if(f==='startWeek'&&c.months[i].endWeek<c.months[i].startWeek)c.months[i].endWeek=c.months[i].startWeek; if(f==='endWeek'&&c.months[i].endWeek<c.months[i].startWeek)c.months[i].startWeek=c.months[i].endWeek; if((f==='endWeek'||f==='startWeek')&&c.months[i].hasExam){const ea=Number(c.months[i].examAfterWeek)||0;if(ea&&(ea<c.months[i].startWeek||ea>c.months[i].endWeek))c.months[i].examAfterWeek=c.months[i].endWeek;} window._termCalendarDraft[term]=c;renderCalendar();};
+  window.termCalField=function(i,f,v){const term=document.getElementById('siCalendarTerm')?.value||'first';const c=window._termCalendarDraft?.[term]||calLoad(term);if(f==='name')c.months[i].name=v;else if(f==='hasExam'){c.months[i].hasExam=(v===true||v===false)?!!v:(v==='true'||v===true||v===1||v==='on');if(c.months[i].hasExam&&!Number(c.months[i].examAfterWeek))c.months[i].examAfterWeek=c.months[i].endWeek;}else if(f==='examAfterWeek'){const n=parseInt(v,10)||0;c.months[i].examAfterWeek=n>0?Math.max(1,Math.min(c.totalWeeks,n)):0;}else c.months[i][f]=Math.max(1,Math.min(c.totalWeeks,parseInt(v,10)||1)); if(f==='startWeek'&&c.months[i].endWeek<c.months[i].startWeek)c.months[i].endWeek=c.months[i].startWeek; if(f==='endWeek'&&c.months[i].endWeek<c.months[i].startWeek)c.months[i].startWeek=c.months[i].endWeek; if((f==='endWeek'||f==='startWeek')&&c.months[i].hasExam){const ea=Number(c.months[i].examAfterWeek)||0;if(ea&&(ea<c.months[i].startWeek||ea>c.months[i].endWeek))c.months[i].examAfterWeek=c.months[i].endWeek;} window._termCalendarDraft[term]=c;renderCalendar();};
   window.termCalBaseField=function(f,v){const term=document.getElementById('siCalendarTerm')?.value||'first';const c=window._termCalendarDraft?.[term]||calLoad(term);if(f==='startDate')c.startDate=v;else c.totalWeeks=Math.max(1,Math.min(40,parseInt(v,10)||1)); c.months.forEach(m=>{m.startWeek=Math.min(m.startWeek,c.totalWeeks);m.endWeek=Math.min(m.endWeek,c.totalWeeks);if(m.endWeek<m.startWeek)m.endWeek=m.startWeek;});window._termCalendarDraft[term]=c;renderCalendar();};
   window.termCalAddMonth=function(){const term=document.getElementById('siCalendarTerm')?.value||'first';const c=window._termCalendarDraft?.[term]||calLoad(term);const last=c.months[c.months.length-1];const sw=Math.min(c.totalWeeks,(last?last.endWeek+1:1));c.months.push({name:'الشهر '+(c.months.length+1),startWeek:sw,endWeek:c.totalWeeks});window._termCalendarDraft[term]=c;renderCalendar();};
   window.termCalRemoveMonth=function(i){const term=document.getElementById('siCalendarTerm')?.value||'first';const c=window._termCalendarDraft?.[term]||calLoad(term);if(c.months.length<=2)return;c.months.splice(i,1);window._termCalendarDraft[term]=c;renderCalendar();};
