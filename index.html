@@ -2074,6 +2074,25 @@
       color: #0c4a6e !important;
       font-size: 7.5px !important;
     }
+    .ministry-landscape-page th.ml-week-sum-head {
+      vertical-align: middle !important;
+      padding: 0.3mm 0.2mm !important;
+      line-height: 1.15 !important;
+    }
+    .ministry-landscape-page th.ml-week-sum-head .week-sum-label {
+      display: block;
+      writing-mode: horizontal-tb !important;
+      transform: none !important;
+      font-size: 6.5px !important;
+      font-weight: 800;
+      line-height: 1.15;
+      white-space: normal;
+      word-break: keep-all;
+      max-width: 100%;
+      text-align: center;
+      color: #0c4a6e;
+    }
+
 
     .ml-cover-sheet {
       border: 3px solid #14532d; border-radius: 4px; padding: 16px 20px; text-align: center;
@@ -15062,8 +15081,8 @@ function renderMonthlyExportButtons() {
           const shortN = escapeHtml(x.comp.name || '');
           compHeaderRow += `<th${sep}><span class="c-vert">${shortN}</span></th>`;
         });
-        // تسمية مختصرة: «م.أ» = مجموع الأسبوع — لتمييزها عن «المجموع الكلي»
-        compHeaderRow += `<th class="avg-col${out}" title="مجموع درجات هذا الأسبوع"><span class="c-vert">م.أ</span></th>`;
+        // مجموع الأسبوع أفقياً على سطرين بخط صغير لا يتجاوز عرض العمود
+        compHeaderRow += `<th class="avg-col ml-week-sum-head${out}" title="مجموع درجات هذا الأسبوع"><span class="week-sum-label">مجموع<br>الأسبوع</span></th>`;
       }
 
       // --- صف 3: الدرجات القصوى (بدون خلايا للامتحان/الكلي لأن rowspan=3) ---
@@ -15462,6 +15481,17 @@ function renderMonthlyExportButtons() {
           .ministry-landscape-page .detailed-sheet-footer { margin-top: 3mm; }
           .ministry-landscape-page .detailed-sheet-footer .gs-line { margin-top: 7mm; }
           .ministry-landscape-page .detailed-sheet-footer .gs-sign-caption { font-size: 8px; }
+          .ministry-landscape-page th.ml-week-sum-head .week-sum-label {
+            display: block !important;
+            writing-mode: horizontal-tb !important;
+            transform: none !important;
+            font-size: 6.5px !important;
+            font-weight: 800 !important;
+            line-height: 1.12 !important;
+            white-space: normal !important;
+            text-align: center !important;
+          }
+
           .ml-cover-page, .ml-protocol-page { display:flex; align-items:center; justify-content:center; }
           .ml-cover-sheet {
             position: relative;
