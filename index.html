@@ -2025,6 +2025,28 @@
       margin-top: 8mm;
       border-top: 1px dotted #64748b;
     }
+
+    .ministry-landscape-page .ml-week-head {
+      background: #3f7a57;
+      color: #fff;
+      font-weight: 800;
+    }
+    .ministry-landscape-page .ml-week-head .w-name { font-size: 9px; }
+    .ministry-landscape-page .ml-week-head .w-date { font-size: 7.5px; font-weight: 600; opacity: 0.95; }
+    .ministry-landscape-page .ml-week-first-table .c-vert {
+      display: inline-block;
+      max-width: 100%;
+      line-height: 1.15;
+      font-size: 7.5px;
+    }
+    .ministry-landscape-page th.week-sep-left,
+    .ministry-landscape-page td.week-sep-left {
+      border-right: 2px solid #1e3a2f !important;
+    }
+    .ml-cover-page .ml-cover-frame { border: 2px solid #3f7a57; border-radius: 8px; padding: 12px; }
+    .ml-cover-title { font-size: 22px; font-weight: 900; }
+    .ml-protocol-title { background:#3f7a57; color:#fff; text-align:center; padding:8px; font-weight:900; }
+
     @media print {
       .ministry-landscape-page {
         page: ministry-landscape;
@@ -3662,8 +3684,30 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
             <button class="btn btn-success" onclick="saveAllGrades()">💾 حفظ جميع الدرجات</button>
             <button class="btn btn-outline" onclick="printGradeSheet()">🖨️ طباعة كشف الدرجات (A4)</button>
             <button class="btn btn-outline" onclick="printDetailedGradeSheet()" title="يطبع كشفاً تفصيلياً يفرد الدرجة المرصودة على أربعة أسابيع بحيث يكون متوسطها مساوياً للدرجة الأصلية، مع تواريخ الأسابيع المحددة من بيانات المدرسة">🖨️ طباعة كشف رصد درجات تفصيلي (A4)</button>
-            <button class="btn btn-primary" onclick="printMinistryLandscapeSheet({blank:false})" title="كشف عرضي متوافق مع نموذج الوزارة — يقسم الفصل على ورقتين A4 landscape مع توزيع الأسابيع وتذييل التوقيعات الرسمي">🖨️ كشف وزارة عرضي (ببيانات)</button>
-            <button class="btn btn-outline" onclick="printMinistryLandscapeSheet({blank:true})" title="نفس شكل كشف الوزارة العرضي لكن بخانات فارغة للتعبئة اليدوية">🖨️ كشف وزارة عرضي (فارغ)</button>
+            <div style="width:100%;display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:4px">
+              <label style="font-size:12.5px;color:#334155;display:flex;align-items:center;gap:6px">نطاق الأسابيع
+                <select id="mlWeekScope" style="min-width:160px">
+                  <option value="current">الشهر الحالي فقط (4 أسابيع)</option>
+                  <option value="full">الفصل كاملاً (كل الكتل + ملخص)</option>
+                  <option value="1">الأسابيع 1–4</option>
+                  <option value="2">الأسابيع 5–8</option>
+                  <option value="3">الأسابيع 9–12</option>
+                  <option value="4">الأسابيع 13–16</option>
+                </select>
+              </label>
+              <label style="font-size:12.5px;color:#334155;display:flex;align-items:center;gap:6px">عمود اختبار الشهر في كتلة الأسابيع
+                <select id="mlExamColMode" style="min-width:140px">
+                  <option value="auto">تلقائي (إن وُجد امتحان للشهر)</option>
+                  <option value="always">إظهار دائماً</option>
+                  <option value="never">إخفاء من كتل الأسابيع</option>
+                </select>
+              </label>
+              <label style="font-size:12.5px;color:#334155;display:flex;align-items:center;gap:6px" title="يُضاف غلاف رسمي + محضر فتح السجل في بداية الطباعة">
+                <input type="checkbox" id="mlIncludeCover" checked> غلاف + محضر فتح
+              </label>
+            </div>
+            <button class="btn btn-primary" onclick="printMinistryLandscapeSheet({blank:false})" title="كشف وزارة عرضي — أسبوع ثم مكوّنات — ببيانات">🖨️ كشف وزارة عرضي (ببيانات)</button>
+            <button class="btn btn-outline" onclick="printMinistryLandscapeSheet({blank:true})" title="كشف وزارة عرضي فارغ">🖨️ كشف وزارة عرضي (فارغ)</button>
             <button class="btn btn-outline" onclick="toggleMissingGradesReport()" title="يعرض قائمة كاملة بكل الخانات التي لم تُرصد بعد لهذه المادة/الفصل عبر كل شهور الفصل الدراسي - يمكنك مراجعتها في أي وقت دون الحاجة لمحاولة الطباعة أولاً">📋 تقرير الدرجات الناقصة (كل شهور الفصل)</button>
             <button class="btn btn-outline" onclick="toggleGradesTabPerformancePanel()" title="يعرض توزيع مستويات الطلاب ومتوسط الأداء الشهري لنفس المادة/الفصل المختارين أعلاه - متاح هنا لأن المعلم لا يصل لتبويب الإحصائيات">📊 أداء هذا الفصل</button>
           </div>
@@ -4090,7 +4134,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
           <button type="button" class="btn btn-outline" onclick="printMinistryLandscapeSheet({blank:true})">🖨️ كشف وزارة عرضي (فارغ)</button>
           <button type="button" class="btn btn-outline" onclick="printTermAverageSheet()">🖨️ متوسط الفصل الدراسي</button>
         </div>
-        <p class="up-hint" style="margin-top:10px">اختر المادة والفصل والشهر من تبويب الدرجات أولاً، ثم ارجع هنا للطباعة إن رغبت. كشف الوزارة العرضي: ورقة A4 أفقية وتقسيم الفصل على ورقتين.</p>
+        <p class="up-hint" style="margin-top:10px">اختر المادة والفصل من تبويب الدرجات، وحدّد نطاق الأسابيع وعمود الامتحان من خيارات كشف الوزارة هناك. الفصل كاملاً = كتل 4 أسابيع متتالية + ورقة ملخص (امتحانان + مجموع).</p>
       </div>
 
       <!-- ===== كشوف فارغة للرصد ===== -->
@@ -14539,10 +14583,184 @@ function renderMonthlyExportButtons() {
 
 
 
+
+    // ============================================================
+    //  كشف وزارة عرضي — أسبوع أولاً ثم مكوّنات + مجموع
+    //  كتل 4 أسابيع · امتحان حقيقي · ملخص نهاية الفصل · تذييل مسميات فقط
+    // ============================================================
+
+    function mlGetExamColMode() {
+      const el = document.getElementById('mlExamColMode');
+      const v = el ? el.value : 'auto';
+      return (v === 'always' || v === 'never') ? v : 'auto';
+    }
+
+    function mlGetWeekScope() {
+      const el = document.getElementById('mlWeekScope');
+      return el ? (el.value || 'current') : 'current';
+    }
+
+    function mlMonthCount(term) {
+      try {
+        const labels = (typeof getMonthLabels === 'function') ? getMonthLabels(term) : [];
+        return Math.max(1, Math.min(4, labels.length || 2));
+      } catch (e) { return 2; }
+    }
+
+    /** أرقام الأسابيع العالمية لشهر (1-based month) داخل الفصل */
+    function mlGlobalWeekNumbers(month) {
+      const base = (month - 1) * 4;
+      return [base + 1, base + 2, base + 3, base + 4];
+    }
+
+    function mlWeekArabicName(n) {
+      const map = {
+        1: 'الأول', 2: 'الثاني', 3: 'الثالث', 4: 'الرابع',
+        5: 'الخامس', 6: 'السادس', 7: 'السابع', 8: 'الثامن',
+        9: 'التاسع', 10: 'العاشر', 11: 'الحادي عشر', 12: 'الثاني عشر',
+        13: 'الثالث عشر', 14: 'الرابع عشر', 15: 'الخامس عشر', 16: 'السادس عشر'
+      };
+      return 'الأسبوع ' + (map[n] || String(n));
+    }
+
+    function mlShouldShowExamCol(term, month, mode) {
+      if (mode === 'never') return false;
+      if (mode === 'always') return true;
+      // auto
+      try {
+        if (typeof periodHasMonthlyExam === 'function') return !!periodHasMonthlyExam(term, month - 1);
+      } catch (e) {}
+      return true;
+    }
+
+    function mlIncludeCover() {
+      const el = document.getElementById('mlIncludeCover');
+      return el ? !!el.checked : true;
+    }
+
+    /** عدد أيام الغياب للطالب في مادة واحدة خلال فصل دراسي واحد */
+    function mlCountAbsentDaysForTerm(db, studentId, subjectName, term) {
+      try {
+        if (!studentId) return '';
+        const att = (typeof ensureAttendance === 'function') ? ensureAttendance(db) : (db.attendance || null);
+        if (!att) return '';
+        const student = (db.students || []).find(x => x.id === studentId);
+        if (!student) return '';
+        const classKey = (typeof classSectionKey === 'function')
+          ? classSectionKey(student.class, student.section)
+          : (student.class || '');
+        const labels = (typeof getMonthLabels === 'function') ? getMonthLabels(term) : ['الشهر 1', 'الشهر 2'];
+        let absent = 0;
+        let hasData = false;
+        labels.forEach((_, mi) => {
+          const month = mi + 1;
+          const columns = (typeof getMonthCalendarDays === 'function') ? getMonthCalendarDays(term, month) : [];
+          if (!columns.length) return;
+          const studyDays = (typeof getSubjectStudyDays === 'function')
+            ? getSubjectStudyDays(att, subjectName, classKey)
+            : [0, 1, 2, 3, 4];
+          if (typeof computeStudentAttendanceScore === 'function') {
+            const calc = computeStudentAttendanceScore(att, studentId, subjectName, term, month, columns, studyDays, 10);
+            if (calc && typeof calc.absent === 'number') {
+              absent += calc.absent;
+              if (calc.expected > 0 || calc.absent > 0) hasData = true;
+            }
+          }
+        });
+        return hasData ? absent : '';
+      } catch (e) {
+        return '';
+      }
+    }
+
+    /** غلاف سجل رصد الدرجات + محضر فتح */
+    function buildMinistryCoverAndProtocolHtml(cfg) {
+      const { db, subjectName, cls, term, blank } = cfg;
+      const info = db.schoolInfo || {};
+      const termLabel = term === 'first' ? 'الفصل الدراسي الأول' : 'الفصل الدراسي الثاني';
+      const year = info.academicYear || '';
+      const { cls: clsPlain, section: clsSection } = (typeof splitClassSectionKey === 'function')
+        ? splitClassSectionKey(cls) : { cls: cls, section: '' };
+      const classGradeLabel = (db.classGrade && db.classGrade[cls]) || info.grade || clsPlain || '';
+      const classLabel = (typeof formatClassSectionForPrint === 'function')
+        ? formatClassSectionForPrint(classGradeLabel, clsSection, clsPlain)
+        : escapeHtml(String(cls || ''));
+      const assignedTeachers = (db.teachers || []).filter(t =>
+        (t.assignments || []).some(a => a.subjectName === subjectName && (a.classes || []).includes(cls)));
+      const teacherName = assignedTeachers.length
+        ? assignedTeachers.map(t => escapeHtml(t.name)).join('، ')
+        : '';
+      const printedBy = (typeof resolvePrintedByName === 'function') ? resolvePrintedByName() : '';
+      const printDate = new Date().toLocaleDateString('ar-EG');
+
+      const cover = `
+      <div class="ministry-landscape-page ml-cover-page">
+        <div class="ml-cover-frame">
+          <div class="ml-cover-top">
+            <div>مديرية التربية والتعليم${info.governorate ? ' بـ' + escapeHtml(info.governorate) : ''}</div>
+            <div>${escapeHtml(info.educationAdmin || 'إدارة ................ التعليمية')}</div>
+            <div>${escapeHtml(info.schoolName || 'مدرسة ................')}</div>
+          </div>
+          <div class="ml-cover-title">سجل رصد درجات</div>
+          <div class="ml-cover-sub">للمرحلة الثانوية</div>
+          ${blank ? '<div class="ml-cover-badge">نموذج للتعبئة اليدوية</div>' : ''}
+          <table class="ml-cover-meta">
+            <tr><td class="lbl">اسم المعلم</td><td class="val">${teacherName || ''}</td></tr>
+            <tr><td class="lbl">المادة</td><td class="val">${escapeHtml(subjectName || '')}</td></tr>
+            <tr><td class="lbl">الصف</td><td class="val">${classLabel}</td></tr>
+            <tr><td class="lbl">الفصل</td><td class="val">${escapeHtml(clsSection || clsPlain || '')}</td></tr>
+            <tr><td class="lbl">الفصل الدراسي</td><td class="val">${termLabel}</td></tr>
+            <tr><td class="lbl">العام الدراسي</td><td class="val">${year ? toHindiDigits(year) : ''}</td></tr>
+          </table>
+          <div class="ml-cover-foot">طُبع بواسطة: ${escapeHtml(printedBy || '')} — ${toHindiDigits(printDate)}</div>
+        </div>
+      </div>`;
+
+      const protocol = `
+      <div class="ministry-landscape-page ml-protocol-page">
+        <div class="ml-protocol-box">
+          <div class="ml-protocol-title">محضر فتح سجل</div>
+          <p class="ml-protocol-text">
+            إنه في يوم .......... الموافق ........ / ........ / ${toHindiDigits(String(new Date().getFullYear()))} م
+            وبمعرفة اللجنة المشكلة لهذا الغرض تم اعتماد السجل للعام الدراسي
+            ${year ? toHindiDigits(year) : '........ / ........'} م،
+            وذلك بعد التأكد من صلاحيته وجاهزيته للعمل به من تاريخه.
+          </p>
+          <p class="ml-protocol-text">
+            والذي يبدأ العمل به من ص (${toHindiDigits('1')}) وينتهي العمل به عند ص (........)
+            وقد تم ترقيمه وختمه بخاتم المدرسة.
+          </p>
+          <div class="ml-protocol-meta">
+            <span><strong>المادة:</strong> ${escapeHtml(subjectName || '')}</span>
+            <span><strong>الصف/الفصل:</strong> ${classLabel}</span>
+            <span><strong>${termLabel}</strong></span>
+          </div>
+          <table class="ml-protocol-committee">
+            <thead>
+              <tr><th>م</th><th>الاسم</th><th>الوظيفة</th><th>التوقيع</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>${toHindiDigits('1')}</td><td></td><td></td><td></td></tr>
+              <tr><td>${toHindiDigits('2')}</td><td></td><td></td><td></td></tr>
+              <tr><td>${toHindiDigits('3')}</td><td></td><td></td><td></td></tr>
+            </tbody>
+          </table>
+          <div class="ml-protocol-signs">
+            <div class="sg"><div class="cap">معلم المادة</div><div class="ln"></div></div>
+            <div class="sg"><div class="cap">موجه المادة</div><div class="ln"></div></div>
+            <div class="sg"><div class="cap">وكيل المدرسة</div><div class="ln"></div></div>
+            <div class="sg"><div class="cap">مدير المدرسة</div><div class="ln"></div></div>
+          </div>
+        </div>
+      </div>`;
+
+      return cover + protocol;
+    }
+
+
     /**
-     * كشف رصد درجات متوافق مع نموذج الوزارة (عرضي A4 – تقسيم الفصل على ورقتين)
-     * opts: { blank?: boolean, cls?, subjectName?, term?, month? }
-     * إن لم تُمرَّر cls/subject تُؤخذ من فلاتر تبويب الدرجات.
+     * طباعة كشف وزارة من فلاتر تبويب الدرجات
+     * opts: { blank?, subjectName?, cls?, term?, month?, weekScope?, examColMode? }
      */
     async function printMinistryLandscapeSheet(opts) {
       opts = opts || {};
@@ -14551,7 +14769,11 @@ function renderMonthlyExportButtons() {
       const subjectName = opts.subjectName || document.getElementById('gradeSubjectSelect').value;
       const cls = opts.cls || document.getElementById('gradeClassSelect').value;
       const term = opts.term || document.getElementById('gradeTermSelect').value;
-      const month = opts.month != null ? parseInt(opts.month, 10) : parseInt(document.getElementById('gradeMonthSelect').value, 10);
+      const monthFromFilter = opts.month != null
+        ? parseInt(opts.month, 10)
+        : parseInt(document.getElementById('gradeMonthSelect').value, 10);
+      const weekScope = opts.weekScope || mlGetWeekScope();
+      const examColMode = opts.examColMode || mlGetExamColMode();
 
       if (!subjectName || !cls) { alert('يرجى اختيار المادة والفصل أولاً من قائمة الفلاتر.'); return; }
       const subject = db.subjects.find(s => s.name === subjectName);
@@ -14563,98 +14785,151 @@ function renderMonthlyExportButtons() {
       if (students.length === 0 && !blank) { alert('لا يوجد طلاب في هذا الفصل.'); return; }
       students.sort((a, b) => a.gender !== b.gender ? (a.gender === 'F' ? -1 : 1) : a.name.localeCompare(b.name));
 
-      if (!blank) {
-        const printGradeCells = buildCellsForCheck(students, subjectName,
-          subject.components.map((c, ci) => ({ index: ci, name: c.name })), term, [month]);
-        if (!(await confirmProceedDespiteMissingGrades(db, printGradeCells))) return;
+      const monthCount = mlMonthCount(term);
+      let monthsToPrint = [];
+      if (weekScope === 'full') {
+        for (let m = 1; m <= monthCount; m++) monthsToPrint.push(m);
+      } else if (weekScope === 'current') {
+        monthsToPrint = [monthFromFilter || 1];
+      } else {
+        const block = parseInt(weekScope, 10);
+        if (block >= 1 && block <= 4) {
+          if (block > monthCount && !blank) {
+            alert('هذا النطاق من الأسابيع يتجاوز عدد شهور الفصل الدراسي المحدّد في النظام (' + monthCount + ').');
+            return;
+          }
+          monthsToPrint = [Math.min(block, Math.max(monthCount, 1))];
+          // إن طلب المستخدم كتلة أسابيع أعلى من عدد الشهور في وضع فارغ: اطبع ببيانات هيكل فقط للشهر الأخير
+          if (blank && block > monthCount) monthsToPrint = [block]; // يسمح بعرض نموذج حتى لو لم يُفعَّل الشهر
+        } else {
+          monthsToPrint = [monthFromFilter || 1];
+        }
       }
 
-      const pagesHtml = buildMinistryLandscapePagesHtml({
-        db, subject, subjectName, cls, term, month, students, blank
+      if (!blank) {
+        const checkMonths = monthsToPrint.filter(m => m >= 1 && m <= monthCount);
+        if (checkMonths.length) {
+          const printGradeCells = buildCellsForCheck(students, subjectName,
+            subject.components.map((c, ci) => ({ index: ci, name: c.name })), term, checkMonths);
+          if (!(await confirmProceedDespiteMissingGrades(db, printGradeCells))) return;
+        }
+      }
+
+      let allHtml = '';
+      // غلاف + محضر فتح (اختياري — مفعّل افتراضياً)
+      if (mlIncludeCover()) {
+        allHtml += buildMinistryCoverAndProtocolHtml({ db, subjectName, cls, term, blank });
+      }
+      monthsToPrint.forEach((m, idx) => {
+        const pages = buildMinistryLandscapePagesHtml({
+          db, subject, subjectName, cls, term, month: m, students, blank,
+          examColMode,
+          blockIndex: idx,
+          totalBlocks: monthsToPrint.length + (weekScope === 'full' ? 1 : 0)
+        });
+        if (pages) allHtml += pages;
       });
-      if (!pagesHtml) return;
-      printMinistryLandscapeHtml(pagesHtml);
+
+      // ورقة الملخص عند طباعة الفصل كاملاً
+      if (weekScope === 'full') {
+        const summary = buildMinistrySummaryPagesHtml({
+          db, subject, subjectName, cls, term, students, blank, monthCount
+        });
+        if (summary) allHtml += summary;
+      }
+
+      if (!allHtml) { alert('تعذّر بناء الكشف.'); return; }
+      printMinistryLandscapeHtml(allHtml);
     }
     window.printMinistryLandscapeSheet = printMinistryLandscapeSheet;
 
-    /** بناء HTML صفحات الكشف العرضي (صفحة أو أكثر) لمادة/فصل واحد */
+    /**
+     * بناء صفحات كتلة 4 أسابيع — هيكل: أسبوع → تاريخ → مكوّنات + مجموع
+     */
     function buildMinistryLandscapePagesHtml(cfg) {
-      const { db, subject, subjectName, cls, term, month, blank } = cfg;
-      let students = cfg.students || [];
-      const week1 = (typeof getWeek1DateISO === 'function') ? getWeek1DateISO(term, month - 1) : '';
-      // لا نوقف عند غياب التاريخ في الدفعة؛ نكمل بدون تواريخ
+      const { db, subject, subjectName, cls, term, month, blank, examColMode } = cfg;
+      let students = (cfg.students || []).slice();
       const weekCount = 4;
+      const globalWeeks = mlGlobalWeekNumbers(month);
       const weekDates = (typeof getFourWeekDates === 'function') ? getFourWeekDates(term, month - 1) : ['', '', '', ''];
       const scopeWeeks = (typeof getPeriodWeekCount === 'function') ? getPeriodWeekCount(term, month - 1) : 4;
-      const weekNames = ['الأسبوع 1', 'الأسبوع 2', 'الأسبوع 3', 'الأسبوع 4'];
-      const periodExam = (typeof periodHasMonthlyExam === 'function') ? periodHasMonthlyExam(term, month - 1) : true;
       const weekOutCls = (wi) => (typeof isWeekExcluded === 'function' ? isWeekExcluded(term, month - 1, wi) : (wi >= scopeWeeks)) ? ' week-out-of-scope' : '';
+      const isWeekOut = (wi) => (typeof isWeekExcluded === 'function' ? isWeekExcluded(term, month - 1, wi) : (wi >= scopeWeeks));
+      const showExam = mlShouldShowExamCol(term, month, examColMode || 'auto');
 
-      const weeklyComps = [];
-      let attendanceComp = null, monthlyComp = null;
+      const underWeekComps = [];
+      let monthlyComp = null;
       (subject.components || []).forEach((c, ci) => {
-        if (c.type === 'attendance') attendanceComp = { comp: c, ci };
-        else if (c.isMonthlyGrade) monthlyComp = { comp: c, ci };
-        else weeklyComps.push({ comp: c, ci });
+        if (c.isMonthlyGrade) monthlyComp = { comp: c, ci };
+        else underWeekComps.push({ comp: c, ci });
       });
-      if (!periodExam) monthlyComp = null;
-      if (!weeklyComps.length && !attendanceComp && !monthlyComp) return '';
+      // إن لم يُطلب إظهار عمود الامتحان في هذه الكتلة لا نضيفه للجدول (يبقى في الملخص)
+      const examComp = (showExam && monthlyComp) ? monthlyComp : null;
+      if (!underWeekComps.length && !examComp) return '';
 
-      const colsPerComp = 5;
-      const extraCols = (attendanceComp ? 1 : 0) + (monthlyComp ? 1 : 0) + 1;
-      const totalDataCols = (weeklyComps.length * colsPerComp) + extraCols;
-      const namePct = 16, serialPct = 3;
+      const colsPerWeek = underWeekComps.length + 1;
+      const extraCols = (examComp ? 1 : 0) + 1;
+      const totalDataCols = (weekCount * colsPerWeek) + extraCols;
+      const namePct = 13;
+      const serialPct = 2.6;
       const restPct = 100 - namePct - serialPct;
       const colPct = totalDataCols > 0 ? (restPct / totalDataCols) : 3;
       let colgroupHtml = `<col style="width:${serialPct}%"><col style="width:${namePct}%">`;
       for (let i = 0; i < totalDataCols; i++) colgroupHtml += `<col style="width:${colPct}%">`;
 
-      let compGroupRow = `<th rowspan="3" class="serial-col">م</th><th rowspan="3">اسم الطالب</th>`;
-      weeklyComps.forEach((x, i) => {
-        const sep = i === 0 ? 'week-sep-left' : '';
-        compGroupRow += `<th colspan="5" class="${sep}">${escapeHtml(x.comp.name)}</th>`;
-      });
-      if (attendanceComp) compGroupRow += `<th rowspan="2" class="attendance-col month-sep">${escapeHtml(attendanceComp.comp.name)}</th>`;
-      if (monthlyComp) compGroupRow += `<th rowspan="2" class="month-eval-col">${escapeHtml(monthlyComp.comp.name)}</th>`;
-      compGroupRow += `<th rowspan="2" class="grand-total-col">المجموع الكلي</th>`;
+      let weekHeaderRow = `<th rowspan="3" class="serial-col">م</th><th rowspan="3">اسم الطالب</th>`;
+      for (let wi = 0; wi < weekCount; wi++) {
+        const d = weekDates[wi] ? (typeof formatWeekDateAr === 'function' ? formatWeekDateAr(weekDates[wi]) : weekDates[wi]) : '—';
+        const out = weekOutCls(wi);
+        const gwn = globalWeeks[wi];
+        weekHeaderRow += `<th colspan="${colsPerWeek}" class="ml-week-head${out}"><div class="w-name">${mlWeekArabicName(gwn)}</div><div class="w-date">${d}</div></th>`;
+      }
+      if (examComp) {
+        weekHeaderRow += `<th rowspan="2" class="month-eval-col">${escapeHtml(examComp.comp.name || 'اختبار الشهر')}</th>`;
+      }
+      weekHeaderRow += `<th rowspan="2" class="grand-total-col">المجموع الكلي</th>`;
 
-      let weekRow = '';
-      weeklyComps.forEach((x, i) => {
-        weekNames.forEach((wn, wi) => {
-          const d = weekDates[wi] ? (typeof formatWeekDateAr === 'function' ? formatWeekDateAr(weekDates[wi]) : weekDates[wi]) : '—';
-          const out = weekOutCls(wi);
-          const sep = (i === 0 && wi === 0) ? (' class="week-sep-left' + out + '"') : (out ? (' class="' + out.trim() + '"') : '');
-          weekRow += `<th${sep}><div class="w-name">${wn.replace('الأسبوع ', 'أ')}</div><div class="w-date">${d}</div></th>`;
+      let compHeaderRow = '';
+      for (let wi = 0; wi < weekCount; wi++) {
+        const out = weekOutCls(wi);
+        underWeekComps.forEach((x, ci) => {
+          const sep = (ci === 0) ? (' class="week-sep-left' + out + '"') : (out ? (' class="' + out.trim() + '"') : '');
+          compHeaderRow += `<th${sep}><span class="c-vert">${escapeHtml(x.comp.name || '')}</span></th>`;
         });
-        weekRow += '<th class="avg-col">متوسط</th>';
-      });
+        compHeaderRow += `<th class="avg-col${out}">مجموع</th>`;
+      }
 
-      const weekliesMaxSum = weeklyComps.reduce((s, x) => s + (Number(x.comp.maxScore) || 0), 0);
-      const attMax = attendanceComp ? (Number(attendanceComp.comp.maxScore) || 0) : 0;
-      const monMax = monthlyComp ? (Number(monthlyComp.comp.maxScore) || 0) : 0;
-      const grandMax = weekliesMaxSum + attMax + monMax;
       let maxRow = '';
-      weeklyComps.forEach((x, i) => {
-        const mx = x.comp.maxScore == null ? '—' : toHindiDigits(x.comp.maxScore);
-        for (let wi = 0; wi < weekCount; wi++) {
-          const out = weekOutCls(wi);
-          const sep = (i === 0 && wi === 0) ? (' class="week-sep-left' + out + '"') : (out ? (' class="' + out.trim() + '"') : '');
-          const excluded = (typeof isWeekExcluded === 'function' ? isWeekExcluded(term, month - 1, wi) : (wi >= scopeWeeks));
+      let underWeekMaxSum = 0;
+      underWeekComps.forEach(x => { underWeekMaxSum += Number(x.comp.maxScore) || 0; });
+      for (let wi = 0; wi < weekCount; wi++) {
+        const out = weekOutCls(wi);
+        const excluded = isWeekOut(wi);
+        underWeekComps.forEach((x, ci) => {
+          const mx = x.comp.maxScore == null ? '—' : toHindiDigits(x.comp.maxScore);
+          const sep = (ci === 0) ? (' class="week-sep-left' + out + '"') : (out ? (' class="' + out.trim() + '"') : '');
           maxRow += `<th${sep}>${excluded ? '—' : mx}</th>`;
-        }
-        maxRow += `<th class="avg-col">${mx}</th>`;
-      });
-      if (attendanceComp) maxRow += `<th class="attendance-col month-sep">${attendanceComp.comp.maxScore == null ? '—' : toHindiDigits(attendanceComp.comp.maxScore)}</th>`;
-      if (monthlyComp) maxRow += `<th class="month-eval-col">${monthlyComp.comp.maxScore == null ? '—' : toHindiDigits(monthlyComp.comp.maxScore)}</th>`;
+        });
+        maxRow += `<th class="avg-col${out}">${excluded ? '—' : toHindiDigits(underWeekMaxSum)}</th>`;
+      }
+      const monMax = examComp ? (Number(examComp.comp.maxScore) || 0) : 0;
+      // المجموع الكلي في كتلة الأسابيع = مكوّنات الأسبوع (+ امتحان إن ظهر في الكتلة)
+      const grandMax = underWeekMaxSum + monMax;
+      if (examComp) {
+        maxRow += `<th class="month-eval-col">${examComp.comp.maxScore == null ? '—' : toHindiDigits(examComp.comp.maxScore)}</th>`;
+      }
       maxRow += `<th class="grand-total-col">${toHindiDigits(grandMax)}</th>`;
-      const theadHtml = `<tr class="comp-row">${compGroupRow}</tr><tr class="week-row">${weekRow}</tr><tr class="max-row">${maxRow}</tr>`;
+
+      const theadHtml = `<tr class="week-row">${weekHeaderRow}</tr><tr class="comp-row">${compHeaderRow}</tr><tr class="max-row">${maxRow}</tr>`;
 
       const formatScoreExact = (v) => {
         if (v === '' || v === undefined || v === null) return '';
-        if (isAbsentMark(v)) return ABSENT_MARK;
+        if (typeof isAbsentMark === 'function' && isAbsentMark(v)) return (typeof ABSENT_MARK !== 'undefined' ? ABSENT_MARK : 'غ');
         if (typeof v === 'number' && Number.isFinite(v)) return toHindiDigits(String(parseFloat(v.toPrecision(12))));
         const n = Number(v);
-        if (v !== '' && Number.isFinite(n) && String(v).trim() !== '' && !isAbsentMark(v)) return toHindiDigits(String(parseFloat(n.toPrecision(12))));
+        if (v !== '' && Number.isFinite(n) && String(v).trim() !== '' && !(typeof isAbsentMark === 'function' && isAbsentMark(v))) {
+          return toHindiDigits(String(parseFloat(n.toPrecision(12))));
+        }
         return toHindiDigits(v);
       };
       const cell = (v, cls) => `<td class="${(cls ? cls + ' ' : '')}gs-score">${formatScoreExact(v)}</td>`;
@@ -14663,55 +14938,73 @@ function renderMonthlyExportButtons() {
       function buildBodyHtml(studentSlice, startIdx) {
         let bodyHtml = '';
         const formMode = (typeof getGradingFormMode === 'function') ? getGradingFormMode(db, term, month) : 'monthly';
-        const completedWeeks = (!blank && formMode === 'weekly_form' && typeof countCompletedFormWeeks === 'function') ? countCompletedFormWeeks(term, month, new Date()) : 4;
+        const completedWeeks = (!blank && formMode === 'weekly_form' && typeof countCompletedFormWeeks === 'function')
+          ? countCompletedFormWeeks(term, month, new Date()) : 4;
         const list = studentSlice.length ? studentSlice : [{ id: '', name: '' }];
+
         list.forEach((s, localIdx) => {
           const idx = startIdx + localIdx;
           if (blank) {
             let row = `<td class="serial-col">${toHindiDigits(idx + 1)}</td><td class="gs-name">${escapeHtml(s.name || '')}</td>`;
-            weeklyComps.forEach(() => {
-              for (let wi = 0; wi < weekCount; wi++) {
-                const excluded = (typeof isWeekExcluded === 'function' ? isWeekExcluded(term, month - 1, wi) : (wi >= scopeWeeks));
-                row += emptyCell((excluded ? 'week-out-of-scope' : '') + (wi === 0 ? ' week-sep-left' : ''));
-              }
-              row += emptyCell('avg-col');
-            });
-            if (attendanceComp) row += emptyCell('attendance-col month-sep');
-            if (monthlyComp) row += emptyCell('month-eval-col');
+            for (let wi = 0; wi < weekCount; wi++) {
+              const out = weekOutCls(wi);
+              underWeekComps.forEach((_, ci) => {
+                row += emptyCell(((ci === 0 ? 'week-sep-left' : '') + out).trim());
+              });
+              row += emptyCell(('avg-col' + out).trim());
+            }
+            if (examComp) row += emptyCell('month-eval-col');
             row += emptyCell('grand-total-col');
             bodyHtml += `<tr>${row}</tr>`;
             return;
           }
+
           const getScore = (ci) => {
-            if (ci < 0) return '';
-            const existing = db.grades.find(g => g.studentId === s.id && g.subjectName === subjectName && g.term === term && g.month === month && g.componentIndex === ci);
+            if (ci < 0 || !s.id) return '';
+            const existing = db.grades.find(g =>
+              g.studentId === s.id && g.subjectName === subjectName &&
+              g.term === term && g.month === month && g.componentIndex === ci);
             return existing ? existing.score : '';
           };
-          const weeklyScores = weeklyComps.map(x => getScore(x.ci));
-          const attScore = attendanceComp ? getScore(attendanceComp.ci) : '';
-          const monScore = monthlyComp ? getScore(monthlyComp.ci) : '';
+
+          const compScores = underWeekComps.map(x => getScore(x.ci));
+          const monScore = examComp ? getScore(examComp.ci) : '';
+
           let grand = '';
           {
-            const parts = weeklyScores.concat([attScore, monScore]);
+            const parts = compScores.concat(examComp ? [monScore] : []);
             let hasAny = false, hasNum = false, sum = 0;
             parts.forEach(v => {
               if (v === '' || v === undefined || v === null) return;
               hasAny = true;
-              if (!isAbsentMark(v)) { sum += Number(v) || 0; hasNum = true; }
+              if (!(typeof isAbsentMark === 'function' && isAbsentMark(v))) {
+                sum += Number(v) || 0;
+                hasNum = true;
+              }
             });
-            if (hasAny) grand = hasNum ? sum : ABSENT_MARK;
+            if (hasAny) grand = hasNum ? sum : (typeof ABSENT_MARK !== 'undefined' ? ABSENT_MARK : 'غ');
           }
-          let row = `<td class="serial-col">${toHindiDigits(idx + 1)}</td><td class="gs-name">${escapeHtml(s.name)}</td>`;
-          weeklyScores.forEach((v, i) => {
-            for (let wi = 0; wi < weekCount; wi++) {
-              const show = (typeof isWeekExcluded === 'function' ? isWeekExcluded(term, month - 1, wi) : (wi >= scopeWeeks)) ? '' : ((v === '' || v === undefined || v === null) ? '' : (wi < completedWeeks ? v : ''));
-              const cls = ((i === 0 && wi === 0) ? 'week-sep-left' : '') + weekOutCls(wi);
-              row += cell(show, cls.trim());
-            }
-            row += cell(v, 'avg-col');
-          });
-          if (attendanceComp) row += cell(attScore, 'attendance-col month-sep');
-          if (monthlyComp) row += cell(monScore, 'month-eval-col');
+
+          let row = `<td class="serial-col">${toHindiDigits(idx + 1)}</td><td class="gs-name">${escapeHtml(s.name || '')}</td>`;
+          for (let wi = 0; wi < weekCount; wi++) {
+            const out = weekOutCls(wi);
+            const showWeek = !isWeekOut(wi) && wi < completedWeeks;
+            let weekSum = null;
+            let weekHas = false;
+            underWeekComps.forEach((x, ci) => {
+              const v = showWeek ? compScores[ci] : '';
+              row += cell(v, ((ci === 0 ? 'week-sep-left' : '') + out).trim());
+              if (v !== '' && v !== undefined && v !== null) {
+                weekHas = true;
+                if (!(typeof isAbsentMark === 'function' && isAbsentMark(v))) {
+                  weekSum = (weekSum == null ? 0 : weekSum) + (Number(v) || 0);
+                }
+              }
+            });
+            const weekTotalDisp = !showWeek ? '' : (weekHas ? (weekSum == null ? (typeof ABSENT_MARK !== 'undefined' ? ABSENT_MARK : 'غ') : weekSum) : '');
+            row += cell(weekTotalDisp, ('avg-col' + out).trim());
+          }
+          if (examComp) row += cell(monScore, 'month-eval-col'); // حقيقي
           row += cell(grand, 'grand-total-col');
           bodyHtml += `<tr>${row}</tr>`;
         });
@@ -14720,40 +15013,34 @@ function renderMonthlyExportButtons() {
 
       const { cls: clsPlain, section: clsSection } = splitClassSectionKey(cls);
       const info = db.schoolInfo || {};
-      const monthLabels = getMonthLabels(term);
-      const monthLabel = monthLabels[month - 1] || `الشهر ${month}`;
+      const monthLabels = (typeof getMonthLabels === 'function') ? getMonthLabels(term) : [];
+      const monthLabel = monthLabels[month - 1] || (`الشهر ${month}`);
       const termLabel = term === 'first' ? 'الفصل الدراسي الأول' : 'الفصل الدراسي الثاني';
-      const assignedTeachers = (db.teachers || []).filter(t => (t.assignments || []).some(a => a.subjectName === subjectName && (a.classes || []).includes(cls)));
-      const teacherName = assignedTeachers.length ?
-        assignedTeachers.map(t => { const lt = teacherLanguageTypeForSubject(t, subjectName, cls); return lt ? `${escapeHtml(t.name)} (${escapeHtml(lt)})` : escapeHtml(t.name); }).join('، ') :
-        (currentRole === 'teacher' && currentTeacher ? escapeHtml(currentTeacher.name) : '');
-      const teacherNamePlain = assignedTeachers.length
+      const assignedTeachers = (db.teachers || []).filter(t =>
+        (t.assignments || []).some(a => a.subjectName === subjectName && (a.classes || []).includes(cls)));
+      const teacherName = assignedTeachers.length
         ? assignedTeachers.map(t => {
-            const lt = teacherLanguageTypeForSubject(t, subjectName, cls);
-            return lt ? (t.name + ' (' + lt + ')') : t.name;
+            const lt = (typeof teacherLanguageTypeForSubject === 'function') ? teacherLanguageTypeForSubject(t, subjectName, cls) : '';
+            return lt ? `${escapeHtml(t.name)} (${escapeHtml(lt)})` : escapeHtml(t.name);
           }).join('، ')
-        : (currentRole === 'teacher' && currentTeacher ? currentTeacher.name : '');
-      const printedBy = (typeof resolvePrintedByName === 'function') ? resolvePrintedByName() :
-        (currentRole === 'admin' ? 'مدير النظام' : ((currentTeacher && currentTeacher.name) || 'المعلم'));
+        : '';
+      const printedBy = (typeof resolvePrintedByName === 'function') ? resolvePrintedByName() : 'المستخدم';
       const printDate = new Date().toLocaleDateString('ar-EG');
       const classGradeLabelForPrint = (db.classGrade && db.classGrade[cls]) || info.grade || '';
+      const weekRangeLbl = mlWeekArabicName(globalWeeks[0]) + ' — ' + mlWeekArabicName(globalWeeks[3]);
       const metaBarHtmlDet = [
-        `<span>${formatClassSectionForPrint(classGradeLabelForPrint, clsSection, clsPlain)}</span>`,
+        `<span>${(typeof formatClassSectionForPrint === 'function') ? formatClassSectionForPrint(classGradeLabelForPrint, clsSection, clsPlain) : escapeHtml(cls)}</span>`,
         `<span><strong>المادة:</strong> ${escapeHtml(subjectName)}${teacherName ? ' — <strong>المعلم:</strong> ' + teacherName : ''}</span>`,
+        `<span><strong>${escapeHtml(weekRangeLbl)}</strong> · ${escapeHtml(monthLabel)}</span>`,
         blank ? '<span style="color:#b45309;font-weight:700">نموذج للتعبئة اليدوية</span>' : ''
       ].filter(Boolean).join('');
 
-      const ministryFooter = buildUnifiedFooter({
-        captions: [
-          'معلم المادة' + (teacherNamePlain ? ': ' + teacherNamePlain : ''),
-          'مشرف المادة',
-          'وكيل المرحلة',
-          'موجه المادة',
-          'مدير المدرسة'
-        ]
-      });
+      const ministryFooter = (typeof buildUnifiedFooter === 'function')
+        ? buildUnifiedFooter({
+            captions: ['معلم المادة', 'مشرف المادة', 'وكيل المرحلة', 'موجه المادة', 'مدير المدرسة']
+          })
+        : '';
 
-      // ضمان صفوف كافية في النموذج الفارغ حتى لو لم يُسجَّل طلاب بعد
       if (blank && students.length === 0) {
         students = Array.from({ length: 20 }, () => ({ id: '', name: '' }));
       }
@@ -14767,15 +15054,13 @@ function renderMonthlyExportButtons() {
       let pagesHtml = '';
       chunks.forEach((chunk, pageIdx) => {
         const bodyHtml = buildBodyHtml(chunk, pageIdx * perPage);
-        const pageLabel = totalPages > 1
-          ? `<div class="ml-page-label">ورقة ${toHindiDigits(pageIdx + 1)} من ${toHindiDigits(totalPages)}</div>`
-          : '';
+        const pageLabel = `<div class="ml-page-label">ورقة ${toHindiDigits(pageIdx + 1)} من ${toHindiDigits(totalPages)} · ${escapeHtml(weekRangeLbl)} · ${escapeHtml(monthLabel)}</div>`;
         pagesHtml += `
         <div class="ministry-landscape-page detailed-sheet-page ds-scope">
           ${pageLabel}
-          ${buildUnifiedLetterhead({
+          ${typeof buildUnifiedLetterhead === 'function' ? buildUnifiedLetterhead({
             title: (blank ? 'سجل رصد درجات (نموذج) — ' : 'سجل رصد درجات — ') + subjectName,
-            subtitleRight: 'درجات (' + monthLabel + ')',
+            subtitleRight: weekRangeLbl,
             subtitleLeft: termLabel,
             printedBy,
             printDate,
@@ -14784,13 +15069,204 @@ function renderMonthlyExportButtons() {
             schoolName: info.schoolName || '',
             academicYear: info.academicYear || '',
             metaBarHtml: metaBarHtmlDet
-          })}
-          <table class="detailed-weekly-table">
+          }) : ''}
+          <table class="detailed-weekly-table ml-week-first-table">
             <colgroup>${colgroupHtml}</colgroup>
             <thead>${theadHtml}</thead>
             <tbody>${bodyHtml}</tbody>
           </table>
           ${ministryFooter}
+        </div>`;
+      });
+      return pagesHtml;
+    }
+
+    /**
+     * ورقة الملخص النهائية: متوسطات المكوّنات + امتحانات الشهور + المجموع (+ أيام غياب إن أمكن)
+     */
+    function buildMinistrySummaryPagesHtml(cfg) {
+      const { db, subject, subjectName, cls, term, blank, monthCount } = cfg;
+      let students = (cfg.students || []).slice();
+      if (blank && students.length === 0) {
+        students = Array.from({ length: 20 }, () => ({ id: '', name: '' }));
+      }
+      if (!students.length) return '';
+
+      const underWeekComps = [];
+      let monthlyComp = null;
+      (subject.components || []).forEach((c, ci) => {
+        if (c.isMonthlyGrade) monthlyComp = { comp: c, ci };
+        else underWeekComps.push({ comp: c, ci });
+      });
+
+      const months = [];
+      for (let m = 1; m <= monthCount; m++) months.push(m);
+      const monthLabels = (typeof getMonthLabels === 'function') ? getMonthLabels(term) : months.map(m => 'ش' + m);
+
+      // أعمدة: م | اسم | متوسط كل مكوّن أسبوعي الشكل | امتحان كل شهر | مجموع المكوّنات | مجموع الامتحانات | المجموع الكلي | أيام الغياب
+      const fmt = (v) => {
+        if (v === '' || v === undefined || v === null) return '';
+        if (typeof isAbsentMark === 'function' && isAbsentMark(v)) return (typeof ABSENT_MARK !== 'undefined' ? ABSENT_MARK : 'غ');
+        if (typeof v === 'number' && Number.isFinite(v)) return toHindiDigits(String(parseFloat(v.toPrecision(12))));
+        const n = Number(v);
+        if (Number.isFinite(n) && String(v).trim() !== '') return toHindiDigits(String(parseFloat(n.toPrecision(12))));
+        return toHindiDigits(v);
+      };
+
+      function getScore(studentId, ci, month) {
+        if (!studentId || ci < 0) return '';
+        const g = db.grades.find(x =>
+          x.studentId === studentId && x.subjectName === subjectName &&
+          x.term === term && x.month === month && x.componentIndex === ci);
+        return g ? g.score : '';
+      }
+
+      function avgNumeric(vals) {
+        let sum = 0, n = 0, anyAbsent = false, any = false;
+        vals.forEach(v => {
+          if (v === '' || v === undefined || v === null) return;
+          any = true;
+          if (typeof isAbsentMark === 'function' && isAbsentMark(v)) { anyAbsent = true; return; }
+          sum += Number(v) || 0; n++;
+        });
+        if (!any) return '';
+        if (n === 0) return (typeof ABSENT_MARK !== 'undefined' ? ABSENT_MARK : 'غ');
+        return parseFloat((sum / n).toPrecision(12));
+      }
+
+      function sumNumeric(vals) {
+        let sum = 0, n = 0, any = false;
+        vals.forEach(v => {
+          if (v === '' || v === undefined || v === null) return;
+          any = true;
+          if (typeof isAbsentMark === 'function' && isAbsentMark(v)) return;
+          sum += Number(v) || 0; n++;
+        });
+        if (!any) return '';
+        if (n === 0) return (typeof ABSENT_MARK !== 'undefined' ? ABSENT_MARK : 'غ');
+        return sum;
+      }
+
+      // ترويسة
+      let groupRow = `<th rowspan="2" class="serial-col">م</th><th rowspan="2">اسم الطالب</th>`;
+      underWeekComps.forEach(x => {
+        groupRow += `<th rowspan="2">${escapeHtml(x.comp.name || '')}<div style="font-weight:600;font-size:8px">متوسط</div></th>`;
+      });
+      if (monthlyComp) {
+        groupRow += `<th colspan="${months.length}">${escapeHtml(monthlyComp.comp.name || 'اختبار الشهر')}</th>`;
+      }
+      groupRow += `<th rowspan="2">مجموع المكوّنات</th>`;
+      if (monthlyComp) groupRow += `<th rowspan="2">مجموع الاختبارات</th>`;
+      groupRow += `<th rowspan="2" class="grand-total-col">المجموع الكلي</th>`;
+      groupRow += `<th rowspan="2">أيام الغياب</th>`;
+
+      let subRow = '';
+      if (monthlyComp) {
+        months.forEach((m, i) => {
+          subRow += `<th>${escapeHtml(monthLabels[i] || ('ش' + m))}</th>`;
+        });
+      }
+
+      const theadHtml = subRow
+        ? `<tr>${groupRow}</tr><tr>${subRow}</tr>`
+        : `<tr>${groupRow}</tr>`;
+
+      function buildBody(slice, startIdx) {
+        let html = '';
+        const list = slice.length ? slice : [{ id: '', name: '' }];
+        list.forEach((s, li) => {
+          const idx = startIdx + li;
+          if (blank) {
+            let row = `<td class="serial-col">${toHindiDigits(idx + 1)}</td><td class="gs-name">${escapeHtml(s.name || '')}</td>`;
+            underWeekComps.forEach(() => { row += `<td class="blank-cell"></td>`; });
+            if (monthlyComp) months.forEach(() => { row += `<td class="blank-cell"></td>`; });
+            row += `<td class="blank-cell"></td>`;
+            if (monthlyComp) row += `<td class="blank-cell"></td>`;
+            row += `<td class="blank-cell grand-total-col"></td><td class="blank-cell"></td>`;
+            html += `<tr>${row}</tr>`;
+            return;
+          }
+          const compAvgs = underWeekComps.map(x => {
+            const vals = months.map(m => getScore(s.id, x.ci, m));
+            return avgNumeric(vals);
+          });
+          const examScores = monthlyComp ? months.map(m => getScore(s.id, monthlyComp.ci, m)) : [];
+          const compsSum = sumNumeric(compAvgs);
+          const examsSum = monthlyComp ? sumNumeric(examScores) : '';
+          let grand = '';
+          {
+            const parts = compAvgs.concat(examScores);
+            grand = sumNumeric(parts);
+          }
+          // أيام الغياب من سجل المواظبة لنفس المادة والفصل الدراسي
+          let absentDays = '';
+          try {
+            const n = mlCountAbsentDaysForTerm(db, s.id, subjectName, term);
+            if (n !== '' && n != null) absentDays = n;
+          } catch (e) {}
+
+          let row = `<td class="serial-col">${toHindiDigits(idx + 1)}</td><td class="gs-name">${escapeHtml(s.name || '')}</td>`;
+          compAvgs.forEach(v => { row += `<td class="gs-score">${fmt(v)}</td>`; });
+          if (monthlyComp) examScores.forEach(v => { row += `<td class="gs-score">${fmt(v)}</td>`; });
+          row += `<td class="gs-score">${fmt(compsSum)}</td>`;
+          if (monthlyComp) row += `<td class="gs-score">${fmt(examsSum)}</td>`;
+          row += `<td class="gs-score grand-total-col">${fmt(grand)}</td>`;
+          row += `<td class="gs-score">${absentDays === '' || absentDays == null ? '' : toHindiDigits(String(absentDays))}</td>`;
+          html += `<tr>${row}</tr>`;
+        });
+        return html;
+      }
+
+      const { cls: clsPlain, section: clsSection } = splitClassSectionKey(cls);
+      const info = db.schoolInfo || {};
+      const termLabel = term === 'first' ? 'الفصل الدراسي الأول' : 'الفصل الدراسي الثاني';
+      const assignedTeachers = (db.teachers || []).filter(t =>
+        (t.assignments || []).some(a => a.subjectName === subjectName && (a.classes || []).includes(cls)));
+      const teacherName = assignedTeachers.length
+        ? assignedTeachers.map(t => escapeHtml(t.name)).join('، ') : '';
+      const printedBy = (typeof resolvePrintedByName === 'function') ? resolvePrintedByName() : 'المستخدم';
+      const printDate = new Date().toLocaleDateString('ar-EG');
+      const classGradeLabelForPrint = (db.classGrade && db.classGrade[cls]) || info.grade || '';
+      const metaBarHtmlDet = [
+        `<span>${(typeof formatClassSectionForPrint === 'function') ? formatClassSectionForPrint(classGradeLabelForPrint, clsSection, clsPlain) : escapeHtml(cls)}</span>`,
+        `<span><strong>المادة:</strong> ${escapeHtml(subjectName)}${teacherName ? ' — <strong>المعلم:</strong> ' + teacherName : ''}</span>`,
+        `<span><strong>ملخص أعمال السنة — ${termLabel}</strong></span>`,
+        blank ? '<span style="color:#b45309;font-weight:700">نموذج فارغ</span>' : ''
+      ].filter(Boolean).join('');
+
+      const footer = (typeof buildUnifiedFooter === 'function')
+        ? buildUnifiedFooter({
+            captions: ['معلم المادة', 'مشرف المادة', 'وكيل المرحلة', 'موجه المادة', 'مدير المدرسة']
+          })
+        : '';
+
+      const perPage = students.length <= 28 ? Math.max(students.length, 1) : Math.ceil(students.length / 2);
+      const chunks = [];
+      for (let i = 0; i < students.length; i += perPage) chunks.push(students.slice(i, i + perPage));
+      if (!chunks.length) chunks.push([]);
+
+      let pagesHtml = '';
+      chunks.forEach((chunk, pageIdx) => {
+        pagesHtml += `
+        <div class="ministry-landscape-page detailed-sheet-page ds-scope">
+          <div class="ml-page-label">ورقة الملخص · ${toHindiDigits(pageIdx + 1)} / ${toHindiDigits(chunks.length)}</div>
+          ${typeof buildUnifiedLetterhead === 'function' ? buildUnifiedLetterhead({
+            title: (blank ? 'ملخص أعمال السنة (نموذج) — ' : 'ملخص أعمال السنة — ') + subjectName,
+            subtitleRight: 'متوسطات + اختبارات الشهور',
+            subtitleLeft: termLabel,
+            printedBy,
+            printDate,
+            governorate: info.governorate || '',
+            educationAdmin: info.educationAdmin || '',
+            schoolName: info.schoolName || '',
+            academicYear: info.academicYear || '',
+            metaBarHtml: metaBarHtmlDet
+          }) : ''}
+          <table class="detailed-weekly-table ml-week-first-table">
+            <thead>${theadHtml}</thead>
+            <tbody>${buildBody(chunk, pageIdx * perPage)}</tbody>
+          </table>
+          ${footer}
         </div>`;
       });
       return pagesHtml;
@@ -14804,7 +15280,7 @@ function renderMonthlyExportButtons() {
       forceStyle.id = 'ministryLandscapeForceStyle';
       forceStyle.textContent = `
         @media print {
-          @page { size: A4 landscape !important; margin: 6mm 7mm !important; }
+          @page { size: A4 landscape !important; margin: 5mm 6mm !important; }
           body { padding: 0 !important; }
           body > *:not(#printGradeSheetArea) { display: none !important; }
           #printGradeSheetArea { display: block !important; width: 100% !important; margin: 0 !important; padding: 0 !important; }
@@ -14816,7 +15292,46 @@ function renderMonthlyExportButtons() {
             overflow: hidden !important;
           }
           .ministry-landscape-page:last-child { page-break-after: auto !important; }
-          .ministry-landscape-page .blank-cell { min-height: 4.5mm; }
+          .ministry-landscape-page .blank-cell { min-height: 4.2mm; }
+          .ministry-landscape-page .ml-week-head { background: #3f7a57 !important; color: #fff !important; }
+          .ministry-landscape-page .detailed-weekly-table th,
+          .ministry-landscape-page .detailed-weekly-table td { font-size: 8px; padding: 0.45mm 0.3mm; }
+          .ministry-landscape-page .detailed-weekly-table td.gs-name { font-size: 8.5px; text-align: right; padding-right: 1mm; }
+          .ministry-landscape-page .detailed-sheet-footer { margin-top: 3mm; }
+          .ministry-landscape-page .detailed-sheet-footer .gs-line { margin-top: 7mm; }
+          .ministry-landscape-page .detailed-sheet-footer .gs-sign-caption { font-size: 8px; }
+          .ml-cover-page, .ml-protocol-page { display:flex; align-items:center; justify-content:center; }
+          .ml-cover-frame {
+            border: 2.5px solid #3f7a57; border-radius: 8px; padding: 8mm 12mm;
+            width: 90%; max-width: 260mm; text-align: center;
+          }
+          .ml-cover-top { font-size: 12px; color: #1e293b; line-height: 1.9; margin-bottom: 6mm; }
+          .ml-cover-title { font-size: 28px; font-weight: 900; color: #0f172a; margin: 3mm 0; }
+          .ml-cover-sub { font-size: 16px; font-weight: 700; color: #3f7a57; margin-bottom: 4mm; }
+          .ml-cover-badge { display:inline-block; background:#fff7ed; color:#c2410c; border:1px solid #fdba74;
+            padding:1mm 4mm; border-radius:6px; font-size:11px; font-weight:700; margin-bottom:4mm; }
+          .ml-cover-meta { width: 70%; margin: 4mm auto; border-collapse: collapse; font-size: 13px; }
+          .ml-cover-meta td { border: 1px solid #94a3b8; padding: 2.2mm 3mm; }
+          .ml-cover-meta td.lbl { width: 32%; background: #f0fdf4; font-weight: 700; text-align: center; }
+          .ml-cover-meta td.val { text-align: right; }
+          .ml-cover-foot { margin-top: 6mm; font-size: 10px; color: #64748b; }
+          .ml-protocol-box { width: 92%; max-width: 270mm; }
+          .ml-protocol-title {
+            text-align:center; font-size:18px; font-weight:900; color:#fff; background:#3f7a57;
+            padding:2.5mm; border-radius:6px; margin-bottom:4mm;
+          }
+          .ml-protocol-text { font-size:12px; line-height:1.95; color:#0f172a; margin: 2mm 0 3mm; text-align:justify; }
+          .ml-protocol-meta { display:flex; flex-wrap:wrap; gap:4mm; justify-content:center; font-size:11px; margin:3mm 0; }
+          .ml-protocol-committee { width:100%; border-collapse:collapse; font-size:11px; margin:3mm 0; }
+          .ml-protocol-committee th, .ml-protocol-committee td {
+            border:1px solid #64748b; padding:2.5mm 2mm; text-align:center;
+          }
+          .ml-protocol-committee th { background:#3f7a57; color:#fff; }
+          .ml-protocol-committee td { height: 9mm; }
+          .ml-protocol-signs { display:flex; justify-content:space-between; gap:3mm; margin-top:5mm; }
+          .ml-protocol-signs .sg { flex:1; text-align:center; font-size:10px; }
+          .ml-protocol-signs .cap { font-weight:700; }
+          .ml-protocol-signs .ln { margin-top:8mm; border-top:1px dotted #64748b; }
         }
       `;
       if (!forceStyle.parentNode) document.head.appendChild(forceStyle);
@@ -14830,10 +15345,6 @@ function renderMonthlyExportButtons() {
       }, 80);
     }
 
-    /**
-     * دفعة من مركز الطباعة: كشف وزارة عرضي لكل توليفة (فصل × مادة) حسب النطاق
-     * opts.blank = true → خانات فارغة | false → بالدرجات المرصودة
-     */
     async function printMinistryLandscapeBatch(opts) {
       opts = opts || {};
       const blank = !!opts.blank;
@@ -14841,9 +15352,8 @@ function renderMonthlyExportButtons() {
         alert('مركز الطباعة متاح للإدارة ومدير المرحلة فقط.');
         return;
       }
-      // المعلمون: يطبعون من فلاتر الدرجات فقط (ليس الدفعة الإدارية)
       if (currentAccountType === 'teacher') {
-        alert('دفعة مركز الطباعة متاحة للإدارة ومدير المرحلة. يمكنك طباعة كشف فصلك من تبويب الدرجات.');
+        alert('دفعة مركز الطباعة متاحة للإدارة ومدير المرحلة.');
         return;
       }
       const db = loadDB();
@@ -14852,10 +15362,12 @@ function renderMonthlyExportButtons() {
       const term = (document.getElementById('pcBlankTerm') || {}).value || 'first';
       const month = parseInt((document.getElementById('pcBlankMonth') || {}).value || '1', 10);
       if (!classes.length || !subjectNames.length) {
-        alert('يرجى تحديد فصل واحد على الأقل ومادة واحدة على الأقل من قائمة النطاق أعلاه.');
+        alert('يرجى تحديد فصل واحد على الأقل ومادة واحدة على الأقل.');
         return;
       }
       const printOrder = (document.getElementById('pcBlankPrintOrder') || {}).value || 'class-first';
+      const weekScope = mlGetWeekScope();
+      const examColMode = mlGetExamColMode();
       const jobs = [];
       function pushJob(cls, sn) {
         const subj = (db.subjects || []).find(s => s.name === sn);
@@ -14869,42 +15381,55 @@ function renderMonthlyExportButtons() {
         classes.forEach(cls => { subjectNames.forEach(sn => pushJob(cls, sn)); });
       }
       if (!jobs.length) {
-        alert('لا توجد توليفات صالحة من الفصول والمواد المحددة.');
+        alert('لا توجد توليفات صالحة.');
         return;
       }
-      const modeLabel = blank ? 'فارغة' : 'ببيانات';
-      if (jobs.length > 20) {
-        if (!confirm('سيتم طباعة ' + jobs.length + ' كشف وزارة عرضي (' + modeLabel + '). قد ينتج عن ذلك صفحات كثيرة. هل تريد المتابعة؟')) return;
-      } else if (jobs.length > 1) {
-        if (!confirm('سيتم طباعة ' + jobs.length + ' كشف وزارة عرضي (' + modeLabel + '). هل تريد المتابعة؟')) return;
-      }
+      if (jobs.length > 1 && !confirm('طباعة ' + jobs.length + ' كشف وزارة عرضي (' + (blank ? 'فارغ' : 'ببيانات') + ')؟')) return;
 
       let allHtml = '';
       for (const job of jobs) {
         let students = db.students.filter(s => classSectionKey(s.class, s.section) === job.cls);
         students = (typeof filterStudentsForTeacherLanguage === 'function')
-          ? filterStudentsForTeacherLanguage(students, job.subjectName, job.cls)
-          : students;
+          ? filterStudentsForTeacherLanguage(students, job.subjectName, job.cls) : students;
         students.sort((a, b) => a.gender !== b.gender ? (a.gender === 'F' ? -1 : 1) : a.name.localeCompare(b.name));
-        const pages = buildMinistryLandscapePagesHtml({
-          db,
-          subject: job.subj,
-          subjectName: job.subjectName,
-          cls: job.cls,
-          term,
-          month,
-          students,
-          blank
+
+        const monthCount = mlMonthCount(term);
+        let monthsToPrint = [];
+        if (weekScope === 'full') {
+          for (let m = 1; m <= monthCount; m++) monthsToPrint.push(m);
+        } else if (weekScope === 'current' || !weekScope) {
+          monthsToPrint = [month];
+        } else {
+          const block = parseInt(weekScope, 10);
+          monthsToPrint = [Math.min(Math.max(block || 1, 1), 4)];
+        }
+
+        if (mlIncludeCover()) {
+          allHtml += buildMinistryCoverAndProtocolHtml({
+            db, subjectName: job.subjectName, cls: job.cls, term, blank
+          });
+        }
+        monthsToPrint.forEach(m => {
+          const pages = buildMinistryLandscapePagesHtml({
+            db, subject: job.subj, subjectName: job.subjectName, cls: job.cls,
+            term, month: m, students, blank, examColMode
+          });
+          if (pages) allHtml += pages;
         });
-        if (pages) allHtml += pages;
+        if (weekScope === 'full') {
+          const summary = buildMinistrySummaryPagesHtml({
+            db, subject: job.subj, subjectName: job.subjectName, cls: job.cls,
+            term, students, blank, monthCount
+          });
+          if (summary) allHtml += summary;
+        }
       }
-      if (!allHtml) {
-        alert('تعذّر بناء أي كشف من التوليفات المحددة.');
-        return;
-      }
+      if (!allHtml) { alert('تعذّر بناء أي كشف.'); return; }
       printMinistryLandscapeHtml(allHtml);
     }
     window.printMinistryLandscapeBatch = printMinistryLandscapeBatch;
+
+
 
 
     async function printTermAverageSheet() {
@@ -22664,6 +23189,171 @@ function roundToHalf(n){ if (!Number.isFinite(n)) return 0; return Math.round(n 
     }
   });
 })();
+
+
+<style id="gspPrintAndAttendanceUpgradeStyles">
+/* ===== سجل الغياب الأسبوعي + مركز إعدادات الطباعة ===== */
+.att-week-register-wrap{margin-top:14px;border:1px solid #bbf7d0;border-radius:14px;background:linear-gradient(180deg,#f0fdf4,#fff);padding:14px}
+.att-week-register-title{font-size:15px;font-weight:900;color:#166534;margin:0 0 5px}
+.att-week-register-note{font-size:12.5px;color:#64748b;line-height:1.75;margin:0 0 10px}
+.gsp-print-settings{border:1px solid #dbeafe;border-radius:14px;background:linear-gradient(180deg,#eff6ff,#fff);padding:14px;margin-top:14px}
+.gsp-print-settings h3{margin:0 0 6px;color:#1e3a8a;font-size:15px}
+.gsp-print-grid{display:grid;grid-template-columns:repeat(4,minmax(120px,1fr));gap:9px}
+.gsp-print-field label{display:block;font-size:11.5px;font-weight:800;color:#334155;margin-bottom:4px}
+.gsp-print-field input,.gsp-print-field select{width:100%;box-sizing:border-box;padding:7px 9px;border:1px solid #cbd5e1;border-radius:8px;background:#fff}
+.gsp-calibration{margin-top:10px;padding:9px 10px;border:1px dashed #93c5fd;border-radius:10px;background:#f8fbff;color:#475569;font-size:12px;line-height:1.7}
+.gsp-cover-brand{display:flex;align-items:center;justify-content:center;gap:4mm;margin-bottom:5mm}
+.gsp-cover-brand img{width:22mm;height:22mm;object-fit:contain;border-radius:5mm}
+.gsp-cover-brand-name{font-size:14px;font-weight:900;color:#166534;letter-spacing:.2px}
+.gsp-cover-accent{height:2.5mm;width:48mm;background:linear-gradient(90deg,#166534,#22c55e,#166534);border-radius:999px;margin:2mm auto 5mm}
+@media(max-width:800px){.gsp-print-grid{grid-template-columns:repeat(2,minmax(120px,1fr))}}
+@media print{
+  .gsp-print-calibration-page{page-break-after:always;break-inside:avoid;min-height:100vh;box-sizing:border-box;position:relative;background:#fff}
+  .gsp-cal-box{position:absolute;inset:0;border:1px solid #111;box-sizing:border-box}
+  .gsp-cal-inner{position:absolute;inset:10mm;border:1px dashed #555;box-sizing:border-box;display:flex;align-items:center;justify-content:center;text-align:center}
+}
+</style>
+
+<style id="gspProfessionalCoverStyle">
+@media print{
+  .ml-cover-frame{position:relative;overflow:hidden;background:linear-gradient(180deg,#ffffff 0%,#fbfffc 100%);box-shadow:inset 0 0 0 1px rgba(22,101,52,.08);}
+  .ml-cover-frame::before{content:"";display:block;width:25mm;height:25mm;margin:0 auto 3mm;background:url("icons/rasd-icon-192.png") center/contain no-repeat;}
+  .ml-cover-frame::after{content:"";display:block;height:1.2mm;width:70mm;max-width:70%;margin:5mm auto 0;background:linear-gradient(90deg,transparent,#166534,#22c55e,#166534,transparent);border-radius:999px;}
+  .ml-cover-title{letter-spacing:.2px;color:#0f3d27 !important;}
+  .ml-cover-sub{font-size:15px !important;color:#166534 !important;}
+  .ml-cover-meta{width:76% !important;margin:5mm auto !important;border:1.5px solid #166534 !important;}
+  .ml-cover-meta td{border:1px solid #b7cdbd !important;padding:2.6mm 3.2mm !important;}
+  .ml-cover-meta td.lbl{background:#eef8f1 !important;color:#14532d;}
+  .ml-cover-meta td.val{background:#fff !important;}
+  .ml-cover-foot{margin-top:5mm !important;color:#64748b !important;}
+}
+</style>
+
+<script>
+(function(){
+  'use strict';
+  const PRINT_PREFS_KEY='gsp_print_preferences_v1';
+  const PRINT_CENTER_PREFS_KEY='gsp_print_center_preferences_v1';
+  const defaultPrintPrefs={paper:'A4',orientation:'portrait',top:10,right:10,bottom:10,left:10,scale:100};
+  const defaultCenterPrefs={pcAttTerm:'first',pcAttMonth:'1',pcAttPrintOrder:'class-first'};
+
+  function num(v,d){ const n=Number(v); return Number.isFinite(n)?Math.max(0,Math.min(30,n)):d; }
+  function getPrintPrefs(){ try{return Object.assign({},defaultPrintPrefs,JSON.parse(localStorage.getItem(PRINT_PREFS_KEY)||'{}'));}catch(e){return Object.assign({},defaultPrintPrefs);} }
+  function savePrintPrefs(p){ try{localStorage.setItem(PRINT_PREFS_KEY,JSON.stringify(Object.assign({},defaultPrintPrefs,p)));}catch(e){} }
+  function getCenterPrefs(){ try{return Object.assign({},defaultCenterPrefs,JSON.parse(localStorage.getItem(PRINT_CENTER_PREFS_KEY)||'{}'));}catch(e){return Object.assign({},defaultCenterPrefs);} }
+  function saveCenterPrefs(){
+    const ids=['pcAttTerm','pcAttMonth','pcAttPrintOrder']; const p={}; ids.forEach(id=>{const e=document.getElementById(id);if(e)p[id]=e.value;});
+    try{localStorage.setItem(PRINT_CENTER_PREFS_KEY,JSON.stringify(p));}catch(e){}
+  }
+  window.gspGetPrintPrefs=getPrintPrefs;
+  window.gspApplyPrintPreferences=function(kind){
+    const p=getPrintPrefs();
+    const paper=p.paper==='Letter'?'Letter':'A4';
+    const orientation=p.orientation==='landscape'?'landscape':'portrait';
+    const css=`@media print{\n      @page{size:${paper} ${orientation};margin:${num(p.top,10)}mm ${num(p.right,10)}mm ${num(p.bottom,10)}mm ${num(p.left,10)}mm;}\n      @page ministry-landscape{size:A4 landscape;margin:${num(p.top,6)}mm ${num(p.right,7)}mm ${num(p.bottom,6)}mm ${num(p.left,7)}mm;}\n      body{--gsp-print-scale:${Math.max(70,Math.min(110,Number(p.scale)||100))/100};}\n    }`;
+    let st=document.getElementById('gspDynamicPrintPrefs'); if(!st){st=document.createElement('style');st.id='gspDynamicPrintPrefs';document.head.appendChild(st);} st.textContent=css;
+    return p;
+  };
+
+  window.gspOpenPrintSettings=function(){
+    const old=document.getElementById('gspPrintSettingsModal'); if(old){old.remove();return;}
+    const p=getPrintPrefs();
+    const ov=document.createElement('div'); ov.id='gspPrintSettingsModal'; ov.className='mg-modal-overlay';
+    ov.innerHTML=`<div class="mg-modal-box" style="max-width:720px;width:calc(100% - 24px)">
+      <div class="mg-modal-header ui-modal-header ui-type-info" style="display:flex;justify-content:space-between;align-items:center"><span>🖨️ إعدادات الطباعة المحفوظة</span><button type="button" class="btn btn-outline btn-sm" data-close>إغلاق</button></div>
+      <div class="mg-modal-body" style="padding:16px">
+        <div class="gsp-print-grid">
+          <div class="gsp-print-field"><label>مقاس الورق</label><select id="gspPaper"><option value="A4">A4</option><option value="Letter">Letter</option></select></div>
+          <div class="gsp-print-field"><label>الاتجاه</label><select id="gspOrientation"><option value="portrait">طولي</option><option value="landscape">عرضي</option></select></div>
+          <div class="gsp-print-field"><label>الهامش العلوي (مم)</label><input id="gspTop" type="number" min="0" max="30" step="0.5"></div>
+          <div class="gsp-print-field"><label>الهامش الأيمن (مم)</label><input id="gspRight" type="number" min="0" max="30" step="0.5"></div>
+          <div class="gsp-print-field"><label>الهامش السفلي (مم)</label><input id="gspBottom" type="number" min="0" max="30" step="0.5"></div>
+          <div class="gsp-print-field"><label>الهامش الأيسر (مم)</label><input id="gspLeft" type="number" min="0" max="30" step="0.5"></div>
+          <div class="gsp-print-field"><label>مقياس المحتوى (%)</label><input id="gspScale" type="number" min="70" max="110" step="1"></div>
+        </div>
+        <div class="gsp-calibration"><strong>المعايرة العملية:</strong> اطبع صفحة المعايرة مرة واحدة، ثم قِس المسافة بين حافة الورقة والإطار المطبوع. إذا كان الإطار قريباً/بعيداً عن الحافة، عدّل الهامش المقابل بالملليمتر وأعد الطباعة. بهذه الطريقة نضبط النظام على <strong>الطابعة الفعلية</strong> وليس على معاينة المتصفح فقط.</div>
+        <div id="gspPrintSettingsMsg" style="margin-top:9px;font-size:12.5px;color:#166534"></div>
+      </div>
+      <div class="mg-modal-footer" style="display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap"><div><button type="button" class="btn btn-outline" id="gspCalibrationBtn">📏 طباعة صفحة معايرة</button></div><div><button type="button" class="btn btn-outline" id="gspResetBtn">↺ الافتراضي</button><button type="button" class="btn btn-primary" id="gspSaveBtn">💾 حفظ الخيارات</button></div></div>
+    </div>`;
+    document.body.appendChild(ov);
+    const set=(id,v)=>{const e=document.getElementById(id);if(e)e.value=v;};
+    set('gspPaper',p.paper);set('gspOrientation',p.orientation);set('gspTop',p.top);set('gspRight',p.right);set('gspBottom',p.bottom);set('gspLeft',p.left);set('gspScale',p.scale);
+    const close=()=>ov.remove(); ov.querySelectorAll('[data-close]').forEach(b=>b.onclick=close); ov.addEventListener('click',e=>{if(e.target===ov)close();});
+    document.getElementById('gspResetBtn').onclick=()=>{Object.assign(p,defaultPrintPrefs);set('gspPaper',p.paper);set('gspOrientation',p.orientation);set('gspTop',p.top);set('gspRight',p.right);set('gspBottom',p.bottom);set('gspLeft',p.left);set('gspScale',p.scale);};
+    document.getElementById('gspSaveBtn').onclick=()=>{
+      const q={paper:document.getElementById('gspPaper').value,orientation:document.getElementById('gspOrientation').value,top:num(document.getElementById('gspTop').value,10),right:num(document.getElementById('gspRight').value,10),bottom:num(document.getElementById('gspBottom').value,10),left:num(document.getElementById('gspLeft').value,10),scale:num(document.getElementById('gspScale').value,100)};
+      savePrintPrefs(q); gspApplyPrintPreferences(); document.getElementById('gspPrintSettingsMsg').textContent='✓ تم حفظ الإعدادات، وستُستخدم في الطباعة التالية.';
+    };
+    document.getElementById('gspCalibrationBtn').onclick=()=>{savePrintPrefs({paper:document.getElementById('gspPaper').value,orientation:document.getElementById('gspOrientation').value,top:num(document.getElementById('gspTop').value,10),right:num(document.getElementById('gspRight').value,10),bottom:num(document.getElementById('gspBottom').value,10),left:num(document.getElementById('gspLeft').value,10),scale:num(document.getElementById('gspScale').value,100)});gspPrintCalibration();};
+  };
+
+  window.gspPrintCalibration=function(){
+    const area=document.getElementById('printGradeSheetArea')||document.getElementById('printAttendanceArea'); if(!area)return;
+    if(typeof clearInactivePrintAreas==='function')clearInactivePrintAreas(area.id);
+    gspApplyPrintPreferences('calibration');
+    area.innerHTML=`<div class="gsp-calibration-page gsp-print-calibration-page" style="direction:rtl;font-family:Cairo,Arial,sans-serif"><div class="gsp-cal-box"></div><div class="gsp-cal-inner"><div><div style="font-size:22px;font-weight:900;margin-bottom:5mm">صفحة معايرة الطباعة</div><div style="font-size:13px">الهامش العلوي: ${getPrintPrefs().top} مم — الأيمن: ${getPrintPrefs().right} مم — السفلي: ${getPrintPrefs().bottom} مم — الأيسر: ${getPrintPrefs().left} مم</div><div style="margin-top:4mm;color:#64748b">قِس المسافات من حافة الورقة إلى الإطار ثم عدّل الإعدادات إذا لزم.</div></div></div></div>`;
+    const prev=document.title;document.title='معايرة الطباعة';window.print();setTimeout(()=>{document.title=prev;if(typeof clearAllPrintAreas==='function')clearAllPrintAreas();},800);
+  };
+
+  function installPrintSettingsUI(){
+    const pc=document.getElementById('tab-printcenter'); if(pc && !document.getElementById('gspPrintSettingsCard')){
+      const card=document.createElement('div');card.id='gspPrintSettingsCard';card.className='card gsp-print-settings';
+      card.innerHTML='<h3>⚙️ إعدادات الطباعة وحفظ الخيارات</h3><p style="font-size:12.5px;color:#64748b;margin:0 0 9px;line-height:1.7">يتم حفظ آخر اختيار لمقاس الورق والاتجاه والهوامش وترتيب بعض كشوف الطباعة على هذا الجهاز. استخدم صفحة المعايرة بعد تجربة طباعة فعلية.</p><button type="button" class="btn btn-primary btn-sm" onclick="gspOpenPrintSettings()">🖨️ فتح إعدادات الطباعة</button><span id="gspPrefsSummary" style="margin-right:10px;font-size:12px;color:#64748b"></span>';
+      pc.insertBefore(card,pc.firstElementChild);
+    }
+    const att=document.getElementById('tab-attendance');
+    if(att && !document.getElementById('gspWeeklyAttendanceBox')){
+      const box=document.createElement('div');box.id='gspWeeklyAttendanceBox';box.className='att-week-register-wrap';
+      box.innerHTML='<div class="att-week-register-title">📋 سجل الغياب الأسبوعي — بنفس قالب الأسابيع</div><p class="att-week-register-note">يعرض الأسابيع وتواريخها من الروزنامة، ويقرأ حالة كل يوم من سجل الغياب المحفوظ فعلياً. لذلك يمكن طباعة سجل حقيقي بالغياب المسجل، أو نموذج فارغ للتعبئة.</p><div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn btn-primary btn-sm" onclick="gspPrintWeeklyAttendance(false)">🖨️ طباعة السجل بالغياب الفعلي</button><button type="button" class="btn btn-outline btn-sm" onclick="gspPrintWeeklyAttendance(true)">🖨️ طباعة نموذج أسبوعي فارغ</button></div>';
+      const grid=document.getElementById('attGridWrap'); if(grid&&grid.parentNode)grid.parentNode.insertBefore(box,grid); else att.appendChild(box);
+    }
+    updatePrintSummary();
+  }
+  function updatePrintSummary(){const e=document.getElementById('gspPrefsSummary');if(!e)return;const p=getPrintPrefs();e.textContent=`A4 ${p.orientation==='landscape'?'عرضي':'طولي'} · هوامش ${p.top}/${p.right}/${p.bottom}/${p.left} مم · ${p.scale}%`;}
+
+  window.gspPrintWeeklyAttendance=function(blank){
+    const db=loadDB();const att=ensureAttendance(db);const f=typeof getFilterState==='function'?getFilterState():null;
+    if(!f||!f.subjectName||!f.classKey){alert('اختر المادة والفصل أولاً من تبويب الغياب والمواظبة.');return;}
+    const area=document.getElementById('printAttendanceArea');if(!area)return;
+    if(typeof clearInactivePrintAreas==='function')clearInactivePrintAreas('printAttendanceArea');
+    const columns=getMonthCalendarDays(f.term,f.month);const daysPerWeek=getActiveDayIndices(att).length;const studyDays=getSubjectStudyDays(att,f.subjectName,f.classKey);const weekNames=['الأول','الثاني','الثالث','الرابع'];
+    const students=(db.students||[]).filter(st=>{const k=typeof classSectionKey==='function'?classSectionKey(st.class,st.section):(st.class||'');return k===f.classKey&&(typeof canAccessStudentGrade!=='function'||canAccessStudentGrade(f.subjectName,st));});
+    const info=db.schoolInfo||{};const labels=getMonthLabels(f.term)||[];const monthName=labels[f.month-1]||('الشهر '+f.month);const classLabel=typeof classSectionLabel==='function'?classSectionLabel(f.classKey):f.classKey;
+    const teacher=(db.teachers||[]).find(t=>(t.assignments||[]).some(a=>a.subjectName===f.subjectName&&(a.classes||[]).includes(f.classKey)));
+    const teacherName=teacher?teacher.name:'';const escFn=typeof esc==='function'?esc:(s=>String(s??''));
+    let pages='';
+    const chunk=students.length?students:[{}];
+    for(let start=0;start<chunk.length;start+=35){
+      const rows=chunk.slice(start,start+35);let head='<tr><th rowspan="3">م</th><th rowspan="3">رقم الجلوس</th><th rowspan="3" class="gs-name">اسم الطالب</th>';
+      for(let w=0;w<4;w++){const out=typeof isWeekExcluded==='function'&&isWeekExcluded(f.term,f.month-1,w);head+=`<th colspan="${daysPerWeek}" class="${out?'week-out-of-scope':''}">الأسبوع ${weekNames[w]}${out?' — خارج الرصد':''}</th><th rowspan="3" class="gsp-week-total ${out?'week-out-of-scope':''}">غياب<br>الأسبوع</th>`;}
+      head+='<th rowspan="3">إجمالي<br>الغياب</th><th rowspan="3">نسبة<br>الحضور %</th></tr><tr>';
+      for(let w=0;w<4;w++)for(let di=0;di<daysPerWeek;di++){const c=columns[w*daysPerWeek+di];head+=`<th class="${c&&c.outOfScope?'week-out-of-scope':''}">${c?escFn(c.label):'—'}</th>`;}head+='</tr><tr>';
+      for(let w=0;w<4;w++)for(let di=0;di<daysPerWeek;di++){const c=columns[w*daysPerWeek+di];head+=`<th class="${c&&c.outOfScope?'week-out-of-scope':''}">${c?escFn(c.dateLabel||'—'):'—'}</th>`;}head+='</tr>';
+      let body='';rows.forEach((st,ri)=>{const serial=start+ri+1;if(!st.id){body+=`<tr><td>${serial}</td><td></td><td class="gs-name"></td>${columns.map(c=>`<td class="${c&&c.outOfScope?'week-out-of-scope':''}"></td>`).join('')}${[1,2,3,4].map(()=>'<td></td>').join('')}<td></td><td></td></tr>`;return;}
+        let total=0,expected=0;let row=`<tr><td>${serial}</td><td>${escFn(st.seat||'')}</td><td class="gs-name">${escFn(st.name||'')}</td>`;
+        for(let w=1;w<=4;w++){let wa=0,we=0;for(let di=0;di<daysPerWeek;di++){const c=columns[(w-1)*daysPerWeek+di];let cell='';if(!c||!isColumnStudyDay(c,studyDays))cell='';else if(c.isHoliday)cell='إج';else if(c.outOfScope)cell='';else{we++;if(!blank){const v=att.records[recordKey(st.id,f.subjectName,f.term,f.month,c.dateISO)]||'';cell=v==='غ'?'غ':(v==='ع'?'ع':'✓');if(v==='غ')wa++;}else cell='';}row+=`<td class="${c&&c.outOfScope?'week-out-of-scope':''}">${cell}</td>`;}if(!blank){total+=wa;expected+=we;}row+=`<td class="gsp-week-total ${typeof isWeekExcluded==='function'&&isWeekExcluded(f.term,f.month-1,w-1)?'week-out-of-scope':''}">${blank?'':wa}</td>`;}const rate=(!blank&&expected>0)?Math.round(((expected-total)/expected)*1000)/10:'';row+=`<td>${blank?'':total}</td><td>${rate===''?'':rate}</td></tr>`;body+=row;});
+      const letter=(typeof buildUnifiedLetterhead==='function')?buildUnifiedLetterhead({title:'سجل الغياب الأسبوعي',subtitleRight:monthName,subtitleLeft:f.term==='first'?'الفصل الدراسي الأول':'الفصل الدراسي الثاني',printedBy:typeof resolvePrintedByName==='function'?resolvePrintedByName():'المستخدم',printDate:new Date().toLocaleDateString('ar-EG'),governorate:info.governorate||'',educationAdmin:info.educationAdmin||'',schoolName:info.schoolName||'',academicYear:info.academicYear||'',metaBarHtml:`<span><strong>الفصل:</strong> ${escFn(classLabel)}</span><span><strong>المادة:</strong> ${escFn(f.subjectName)}${teacherName?' — <strong>المعلم:</strong> '+escFn(teacherName):''}</span>`}):'';
+      pages+=`<div class="att-print-page detailed-sheet-page gsp-weekly-att-page">${letter}<table class="att-print-table gsp-weekly-att-table"><thead>${head}</thead><tbody>${body}</tbody></table><div style="text-align:center;font-size:9px;color:#64748b;margin-top:3mm">✓ حضور · غ غياب · ع عذر · إج إجازة. التاريخ مأخوذ من روزنامة النظام، والبيانات من سجل الغياب المحفوظ.</div></div>`;
+    }
+    area.innerHTML=pages;gspApplyPrintPreferences('attendance');try{fitPrintPageFillHeight(area,'.gsp-weekly-att-page');}catch(e){}
+    const prev=document.title;document.title='سجل الغياب الأسبوعي';setTimeout(()=>{window.print();setTimeout(()=>{document.title=prev;if(typeof clearAllPrintAreas==='function')clearAllPrintAreas();},800);},60);
+  };
+
+  // حفظ خيارات مركز الطباعة الموجودة بالفعل، دون تغيير منطق النظام.
+  function hookCenterPersistence(){['pcAttTerm','pcAttMonth','pcAttPrintOrder'].forEach(id=>{const e=document.getElementById(id);if(e&&!e.dataset.gspHook){e.dataset.gspHook='1';e.addEventListener('change',saveCenterPrefs);}});}
+  const origPrintAttendance=window.printAttendanceSheet; if(typeof origPrintAttendance==='function')window.printAttendanceSheet=function(){gspApplyPrintPreferences('attendance');return origPrintAttendance.apply(this,arguments);};
+  const origPrintWeekly=window.printDetailedGradeSheet; if(typeof origPrintWeekly==='function')window.printDetailedGradeSheet=function(){gspApplyPrintPreferences('weekly');return origPrintWeekly.apply(this,arguments);};
+  const origPrintMin=window.printMinistryLandscapeSheet; if(typeof origPrintMin==='function')window.printMinistryLandscapeSheet=function(){gspApplyPrintPreferences('ministry');return origPrintMin.apply(this,arguments);};
+
+  document.addEventListener('DOMContentLoaded',function(){
+    installPrintSettingsUI();hookCenterPersistence();gspApplyPrintPreferences();
+    const cp=getCenterPrefs();Object.keys(cp).forEach(id=>{const e=document.getElementById(id);if(e&&cp[id]!=null)e.value=cp[id];});updatePrintSummary();
+    // إعادة تطبيق الإعدادات قبل أي طباعة حتى لو غيّر المستخدم إعداداً من مركز الطباعة.
+    window.addEventListener('beforeprint',function(){gspApplyPrintPreferences();});
+  });
+})();
+</script>
 </script>
   <!-- PWA: تسجيل Service Worker وزر التثبيت -->
   <script src="pwa-register.js"></script>
