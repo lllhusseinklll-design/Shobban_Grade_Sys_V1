@@ -1951,6 +1951,99 @@
     .detailed-sheet-footer .gs-sign-caption { font-weight:600; }
     .detailed-sheet-footer .gs-line { margin-top:12mm; border-top:1px dotted #64748b; }
 
+    /* ==================== كشف وزارة عرضي (ورقتين A4 landscape) ==================== */
+    .ministry-landscape-page {
+      font-family: 'Cairo', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      direction: rtl;
+      color: #0f172a;
+      box-sizing: border-box;
+      width: 100%;
+      page-break-after: always;
+    }
+    .ministry-landscape-page:last-child {
+      page-break-after: auto !important;
+      break-after: avoid-page !important;
+    }
+    .ministry-landscape-page .ml-page-label {
+      text-align: left;
+      font-size: 9px;
+      color: #64748b;
+      margin: 0 0 1mm 0;
+    }
+    .ministry-landscape-page .detailed-weekly-table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+      font-size: 9px;
+    }
+    .ministry-landscape-page .detailed-weekly-table th,
+    .ministry-landscape-page .detailed-weekly-table td {
+      border: 1px solid #334155;
+      padding: 0.6mm 0.4mm;
+      text-align: center;
+      vertical-align: middle;
+    }
+    .ministry-landscape-page .detailed-weekly-table thead th {
+      background: #3f7a57 !important;
+      color: #fff !important;
+      font-weight: 700;
+      font-size: 8px;
+    }
+    .ministry-landscape-page .detailed-weekly-table td.gs-name {
+      text-align: right;
+      padding-right: 1.5mm;
+      font-size: 9px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .ministry-landscape-page .detailed-weekly-table td.serial-col,
+    .ministry-landscape-page .detailed-weekly-table th.serial-col {
+      width: 6mm;
+      font-size: 8px;
+    }
+    .ministry-landscape-page .detailed-sheet-footer {
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: nowrap;
+      gap: 2mm;
+      margin-top: 4mm;
+      font-size: 9px;
+      color: #1e293b;
+    }
+    .ministry-landscape-page .detailed-sheet-footer .gs-sign {
+      text-align: center;
+      flex: 1 1 0;
+      min-width: 0;
+    }
+    .ministry-landscape-page .detailed-sheet-footer .gs-sign-caption {
+      font-weight: 700;
+      font-size: 8.5px;
+      white-space: nowrap;
+    }
+    .ministry-landscape-page .detailed-sheet-footer .gs-line {
+      margin-top: 8mm;
+      border-top: 1px dotted #64748b;
+    }
+    @media print {
+      .ministry-landscape-page {
+        page: ministry-landscape;
+        page-break-after: always;
+        page-break-inside: avoid;
+        break-inside: avoid;
+        padding: 0 1mm;
+        overflow: hidden;
+      }
+      .ministry-landscape-page:last-child {
+        page-break-after: auto !important;
+      }
+      @page ministry-landscape {
+        size: A4 landscape;
+        margin: 6mm 7mm;
+      }
+    }
+
+
     /* كشف أعمال السنة المتتالي — مقاس آمن داخل هوامش A4 الافتراضية للمتصفح
        ورقة A4 = 210×297mm · هامش المتصفح الافتراضي ≈ 10–12mm من كل جانب
        منطقة المحتوى الآمنة ≈ 186×273mm */
@@ -3569,6 +3662,8 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
             <button class="btn btn-success" onclick="saveAllGrades()">💾 حفظ جميع الدرجات</button>
             <button class="btn btn-outline" onclick="printGradeSheet()">🖨️ طباعة كشف الدرجات (A4)</button>
             <button class="btn btn-outline" onclick="printDetailedGradeSheet()" title="يطبع كشفاً تفصيلياً يفرد الدرجة المرصودة على أربعة أسابيع بحيث يكون متوسطها مساوياً للدرجة الأصلية، مع تواريخ الأسابيع المحددة من بيانات المدرسة">🖨️ طباعة كشف رصد درجات تفصيلي (A4)</button>
+            <button class="btn btn-primary" onclick="printMinistryLandscapeSheet({blank:false})" title="كشف عرضي متوافق مع نموذج الوزارة — يقسم الفصل على ورقتين A4 landscape مع توزيع الأسابيع وتذييل التوقيعات الرسمي">🖨️ كشف وزارة عرضي (ببيانات)</button>
+            <button class="btn btn-outline" onclick="printMinistryLandscapeSheet({blank:true})" title="نفس شكل كشف الوزارة العرضي لكن بخانات فارغة للتعبئة اليدوية">🖨️ كشف وزارة عرضي (فارغ)</button>
             <button class="btn btn-outline" onclick="toggleMissingGradesReport()" title="يعرض قائمة كاملة بكل الخانات التي لم تُرصد بعد لهذه المادة/الفصل عبر كل شهور الفصل الدراسي - يمكنك مراجعتها في أي وقت دون الحاجة لمحاولة الطباعة أولاً">📋 تقرير الدرجات الناقصة (كل شهور الفصل)</button>
             <button class="btn btn-outline" onclick="toggleGradesTabPerformancePanel()" title="يعرض توزيع مستويات الطلاب ومتوسط الأداء الشهري لنفس المادة/الفصل المختارين أعلاه - متاح هنا لأن المعلم لا يصل لتبويب الإحصائيات">📊 أداء هذا الفصل</button>
           </div>
@@ -3991,9 +4086,11 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
         <div class="flex flex-wrap gap-12">
           <button type="button" class="btn btn-primary" onclick="printGradeSheet()">🖨️ كشف الرصد (مختصر)</button>
           <button type="button" class="btn btn-primary" onclick="printDetailedGradeSheet()">🖨️ كشف الرصد التفصيلي (4 أسابيع + امتحان)</button>
+          <button type="button" class="btn btn-primary" onclick="printMinistryLandscapeSheet({blank:false})">🖨️ كشف وزارة عرضي (ببيانات)</button>
+          <button type="button" class="btn btn-outline" onclick="printMinistryLandscapeSheet({blank:true})">🖨️ كشف وزارة عرضي (فارغ)</button>
           <button type="button" class="btn btn-outline" onclick="printTermAverageSheet()">🖨️ متوسط الفصل الدراسي</button>
         </div>
-        <p class="up-hint" style="margin-top:10px">اختر المادة والفصل والشهر من تبويب الدرجات أولاً، ثم ارجع هنا للطباعة إن رغبت.</p>
+        <p class="up-hint" style="margin-top:10px">اختر المادة والفصل والشهر من تبويب الدرجات أولاً، ثم ارجع هنا للطباعة إن رغبت. كشف الوزارة العرضي: ورقة A4 أفقية وتقسيم الفصل على ورقتين.</p>
       </div>
 
       <!-- ===== كشوف فارغة للرصد ===== -->
@@ -4048,9 +4145,12 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
             <strong>مواد:</strong> مناسب لتسليمها لرؤساء الأقسام.
           </p>
         </div>
-        <div class="mt-16">
-          <button type="button" class="btn btn-primary" onclick="printBlankGradeSheetsBatch()">🖨️ طباعة كشوف الرصد المحددة</button>
+        <div class="mt-16 flex flex-wrap gap-12">
+          <button type="button" class="btn btn-primary" onclick="printBlankGradeSheetsBatch()">🖨️ طباعة كشوف الرصد المحددة (طولي)</button>
+          <button type="button" class="btn btn-success" onclick="printMinistryLandscapeBatch({blank:true})" title="كشف وزارة عرضي فارغ — لكل توليفة فصل×مادة حسب النطاق المحدد أعلاه">🖨️ كشوف وزارة عرضي فارغة (دفعة)</button>
+          <button type="button" class="btn btn-success" onclick="printMinistryLandscapeBatch({blank:false})" title="كشف وزارة عرضي بالدرجات المرصودة — لكل توليفة فصل×مادة حسب النطاق">🖨️ كشوف وزارة عرضي ببيانات (دفعة)</button>
         </div>
+        <p class="up-hint" style="margin-top:8px">دفعة الوزارة العرضية تستخدم نفس نطاق الفصول والمواد والشهر أعلاه، وتقسم كل فصل على ورقتين A4 أفقية مع تذييل التوقيعات الخمسة.</p>
       </div>
 
       <!-- ===== أعمال السنة ===== -->
@@ -14436,6 +14536,376 @@ function renderMonthlyExportButtons() {
 
       printDetailedAndFitOnePage(pageHtml);
     }
+
+
+
+    /**
+     * كشف رصد درجات متوافق مع نموذج الوزارة (عرضي A4 – تقسيم الفصل على ورقتين)
+     * opts: { blank?: boolean, cls?, subjectName?, term?, month? }
+     * إن لم تُمرَّر cls/subject تُؤخذ من فلاتر تبويب الدرجات.
+     */
+    async function printMinistryLandscapeSheet(opts) {
+      opts = opts || {};
+      const blank = !!opts.blank;
+      const db = loadDB();
+      const subjectName = opts.subjectName || document.getElementById('gradeSubjectSelect').value;
+      const cls = opts.cls || document.getElementById('gradeClassSelect').value;
+      const term = opts.term || document.getElementById('gradeTermSelect').value;
+      const month = opts.month != null ? parseInt(opts.month, 10) : parseInt(document.getElementById('gradeMonthSelect').value, 10);
+
+      if (!subjectName || !cls) { alert('يرجى اختيار المادة والفصل أولاً من قائمة الفلاتر.'); return; }
+      const subject = db.subjects.find(s => s.name === subjectName);
+      if (!subject) { alert('المادة غير موجودة.'); return; }
+      if (!canAccessGrade(subjectName, cls)) { alert('غير مصرح لك بطباعة كشف درجات هذه المادة/الفصل.'); return; }
+
+      let students = db.students.filter(s => classSectionKey(s.class, s.section) === cls);
+      students = filterStudentsForTeacherLanguage(students, subjectName, cls);
+      if (students.length === 0 && !blank) { alert('لا يوجد طلاب في هذا الفصل.'); return; }
+      students.sort((a, b) => a.gender !== b.gender ? (a.gender === 'F' ? -1 : 1) : a.name.localeCompare(b.name));
+
+      if (!blank) {
+        const printGradeCells = buildCellsForCheck(students, subjectName,
+          subject.components.map((c, ci) => ({ index: ci, name: c.name })), term, [month]);
+        if (!(await confirmProceedDespiteMissingGrades(db, printGradeCells))) return;
+      }
+
+      const pagesHtml = buildMinistryLandscapePagesHtml({
+        db, subject, subjectName, cls, term, month, students, blank
+      });
+      if (!pagesHtml) return;
+      printMinistryLandscapeHtml(pagesHtml);
+    }
+    window.printMinistryLandscapeSheet = printMinistryLandscapeSheet;
+
+    /** بناء HTML صفحات الكشف العرضي (صفحة أو أكثر) لمادة/فصل واحد */
+    function buildMinistryLandscapePagesHtml(cfg) {
+      const { db, subject, subjectName, cls, term, month, blank } = cfg;
+      let students = cfg.students || [];
+      const week1 = (typeof getWeek1DateISO === 'function') ? getWeek1DateISO(term, month - 1) : '';
+      // لا نوقف عند غياب التاريخ في الدفعة؛ نكمل بدون تواريخ
+      const weekCount = 4;
+      const weekDates = (typeof getFourWeekDates === 'function') ? getFourWeekDates(term, month - 1) : ['', '', '', ''];
+      const scopeWeeks = (typeof getPeriodWeekCount === 'function') ? getPeriodWeekCount(term, month - 1) : 4;
+      const weekNames = ['الأسبوع 1', 'الأسبوع 2', 'الأسبوع 3', 'الأسبوع 4'];
+      const periodExam = (typeof periodHasMonthlyExam === 'function') ? periodHasMonthlyExam(term, month - 1) : true;
+      const weekOutCls = (wi) => (typeof isWeekExcluded === 'function' ? isWeekExcluded(term, month - 1, wi) : (wi >= scopeWeeks)) ? ' week-out-of-scope' : '';
+
+      const weeklyComps = [];
+      let attendanceComp = null, monthlyComp = null;
+      (subject.components || []).forEach((c, ci) => {
+        if (c.type === 'attendance') attendanceComp = { comp: c, ci };
+        else if (c.isMonthlyGrade) monthlyComp = { comp: c, ci };
+        else weeklyComps.push({ comp: c, ci });
+      });
+      if (!periodExam) monthlyComp = null;
+      if (!weeklyComps.length && !attendanceComp && !monthlyComp) return '';
+
+      const colsPerComp = 5;
+      const extraCols = (attendanceComp ? 1 : 0) + (monthlyComp ? 1 : 0) + 1;
+      const totalDataCols = (weeklyComps.length * colsPerComp) + extraCols;
+      const namePct = 16, serialPct = 3;
+      const restPct = 100 - namePct - serialPct;
+      const colPct = totalDataCols > 0 ? (restPct / totalDataCols) : 3;
+      let colgroupHtml = `<col style="width:${serialPct}%"><col style="width:${namePct}%">`;
+      for (let i = 0; i < totalDataCols; i++) colgroupHtml += `<col style="width:${colPct}%">`;
+
+      let compGroupRow = `<th rowspan="3" class="serial-col">م</th><th rowspan="3">اسم الطالب</th>`;
+      weeklyComps.forEach((x, i) => {
+        const sep = i === 0 ? 'week-sep-left' : '';
+        compGroupRow += `<th colspan="5" class="${sep}">${escapeHtml(x.comp.name)}</th>`;
+      });
+      if (attendanceComp) compGroupRow += `<th rowspan="2" class="attendance-col month-sep">${escapeHtml(attendanceComp.comp.name)}</th>`;
+      if (monthlyComp) compGroupRow += `<th rowspan="2" class="month-eval-col">${escapeHtml(monthlyComp.comp.name)}</th>`;
+      compGroupRow += `<th rowspan="2" class="grand-total-col">المجموع الكلي</th>`;
+
+      let weekRow = '';
+      weeklyComps.forEach((x, i) => {
+        weekNames.forEach((wn, wi) => {
+          const d = weekDates[wi] ? (typeof formatWeekDateAr === 'function' ? formatWeekDateAr(weekDates[wi]) : weekDates[wi]) : '—';
+          const out = weekOutCls(wi);
+          const sep = (i === 0 && wi === 0) ? (' class="week-sep-left' + out + '"') : (out ? (' class="' + out.trim() + '"') : '');
+          weekRow += `<th${sep}><div class="w-name">${wn.replace('الأسبوع ', 'أ')}</div><div class="w-date">${d}</div></th>`;
+        });
+        weekRow += '<th class="avg-col">متوسط</th>';
+      });
+
+      const weekliesMaxSum = weeklyComps.reduce((s, x) => s + (Number(x.comp.maxScore) || 0), 0);
+      const attMax = attendanceComp ? (Number(attendanceComp.comp.maxScore) || 0) : 0;
+      const monMax = monthlyComp ? (Number(monthlyComp.comp.maxScore) || 0) : 0;
+      const grandMax = weekliesMaxSum + attMax + monMax;
+      let maxRow = '';
+      weeklyComps.forEach((x, i) => {
+        const mx = x.comp.maxScore == null ? '—' : toHindiDigits(x.comp.maxScore);
+        for (let wi = 0; wi < weekCount; wi++) {
+          const out = weekOutCls(wi);
+          const sep = (i === 0 && wi === 0) ? (' class="week-sep-left' + out + '"') : (out ? (' class="' + out.trim() + '"') : '');
+          const excluded = (typeof isWeekExcluded === 'function' ? isWeekExcluded(term, month - 1, wi) : (wi >= scopeWeeks));
+          maxRow += `<th${sep}>${excluded ? '—' : mx}</th>`;
+        }
+        maxRow += `<th class="avg-col">${mx}</th>`;
+      });
+      if (attendanceComp) maxRow += `<th class="attendance-col month-sep">${attendanceComp.comp.maxScore == null ? '—' : toHindiDigits(attendanceComp.comp.maxScore)}</th>`;
+      if (monthlyComp) maxRow += `<th class="month-eval-col">${monthlyComp.comp.maxScore == null ? '—' : toHindiDigits(monthlyComp.comp.maxScore)}</th>`;
+      maxRow += `<th class="grand-total-col">${toHindiDigits(grandMax)}</th>`;
+      const theadHtml = `<tr class="comp-row">${compGroupRow}</tr><tr class="week-row">${weekRow}</tr><tr class="max-row">${maxRow}</tr>`;
+
+      const formatScoreExact = (v) => {
+        if (v === '' || v === undefined || v === null) return '';
+        if (isAbsentMark(v)) return ABSENT_MARK;
+        if (typeof v === 'number' && Number.isFinite(v)) return toHindiDigits(String(parseFloat(v.toPrecision(12))));
+        const n = Number(v);
+        if (v !== '' && Number.isFinite(n) && String(v).trim() !== '' && !isAbsentMark(v)) return toHindiDigits(String(parseFloat(n.toPrecision(12))));
+        return toHindiDigits(v);
+      };
+      const cell = (v, cls) => `<td class="${(cls ? cls + ' ' : '')}gs-score">${formatScoreExact(v)}</td>`;
+      const emptyCell = (cls) => `<td class="${(cls ? cls + ' ' : '')}blank-cell"></td>`;
+
+      function buildBodyHtml(studentSlice, startIdx) {
+        let bodyHtml = '';
+        const formMode = (typeof getGradingFormMode === 'function') ? getGradingFormMode(db, term, month) : 'monthly';
+        const completedWeeks = (!blank && formMode === 'weekly_form' && typeof countCompletedFormWeeks === 'function') ? countCompletedFormWeeks(term, month, new Date()) : 4;
+        const list = studentSlice.length ? studentSlice : [{ id: '', name: '' }];
+        list.forEach((s, localIdx) => {
+          const idx = startIdx + localIdx;
+          if (blank) {
+            let row = `<td class="serial-col">${toHindiDigits(idx + 1)}</td><td class="gs-name">${escapeHtml(s.name || '')}</td>`;
+            weeklyComps.forEach(() => {
+              for (let wi = 0; wi < weekCount; wi++) {
+                const excluded = (typeof isWeekExcluded === 'function' ? isWeekExcluded(term, month - 1, wi) : (wi >= scopeWeeks));
+                row += emptyCell((excluded ? 'week-out-of-scope' : '') + (wi === 0 ? ' week-sep-left' : ''));
+              }
+              row += emptyCell('avg-col');
+            });
+            if (attendanceComp) row += emptyCell('attendance-col month-sep');
+            if (monthlyComp) row += emptyCell('month-eval-col');
+            row += emptyCell('grand-total-col');
+            bodyHtml += `<tr>${row}</tr>`;
+            return;
+          }
+          const getScore = (ci) => {
+            if (ci < 0) return '';
+            const existing = db.grades.find(g => g.studentId === s.id && g.subjectName === subjectName && g.term === term && g.month === month && g.componentIndex === ci);
+            return existing ? existing.score : '';
+          };
+          const weeklyScores = weeklyComps.map(x => getScore(x.ci));
+          const attScore = attendanceComp ? getScore(attendanceComp.ci) : '';
+          const monScore = monthlyComp ? getScore(monthlyComp.ci) : '';
+          let grand = '';
+          {
+            const parts = weeklyScores.concat([attScore, monScore]);
+            let hasAny = false, hasNum = false, sum = 0;
+            parts.forEach(v => {
+              if (v === '' || v === undefined || v === null) return;
+              hasAny = true;
+              if (!isAbsentMark(v)) { sum += Number(v) || 0; hasNum = true; }
+            });
+            if (hasAny) grand = hasNum ? sum : ABSENT_MARK;
+          }
+          let row = `<td class="serial-col">${toHindiDigits(idx + 1)}</td><td class="gs-name">${escapeHtml(s.name)}</td>`;
+          weeklyScores.forEach((v, i) => {
+            for (let wi = 0; wi < weekCount; wi++) {
+              const show = (typeof isWeekExcluded === 'function' ? isWeekExcluded(term, month - 1, wi) : (wi >= scopeWeeks)) ? '' : ((v === '' || v === undefined || v === null) ? '' : (wi < completedWeeks ? v : ''));
+              const cls = ((i === 0 && wi === 0) ? 'week-sep-left' : '') + weekOutCls(wi);
+              row += cell(show, cls.trim());
+            }
+            row += cell(v, 'avg-col');
+          });
+          if (attendanceComp) row += cell(attScore, 'attendance-col month-sep');
+          if (monthlyComp) row += cell(monScore, 'month-eval-col');
+          row += cell(grand, 'grand-total-col');
+          bodyHtml += `<tr>${row}</tr>`;
+        });
+        return bodyHtml;
+      }
+
+      const { cls: clsPlain, section: clsSection } = splitClassSectionKey(cls);
+      const info = db.schoolInfo || {};
+      const monthLabels = getMonthLabels(term);
+      const monthLabel = monthLabels[month - 1] || `الشهر ${month}`;
+      const termLabel = term === 'first' ? 'الفصل الدراسي الأول' : 'الفصل الدراسي الثاني';
+      const assignedTeachers = (db.teachers || []).filter(t => (t.assignments || []).some(a => a.subjectName === subjectName && (a.classes || []).includes(cls)));
+      const teacherName = assignedTeachers.length ?
+        assignedTeachers.map(t => { const lt = teacherLanguageTypeForSubject(t, subjectName, cls); return lt ? `${escapeHtml(t.name)} (${escapeHtml(lt)})` : escapeHtml(t.name); }).join('، ') :
+        (currentRole === 'teacher' && currentTeacher ? escapeHtml(currentTeacher.name) : '');
+      const teacherNamePlain = assignedTeachers.length
+        ? assignedTeachers.map(t => {
+            const lt = teacherLanguageTypeForSubject(t, subjectName, cls);
+            return lt ? (t.name + ' (' + lt + ')') : t.name;
+          }).join('، ')
+        : (currentRole === 'teacher' && currentTeacher ? currentTeacher.name : '');
+      const printedBy = (typeof resolvePrintedByName === 'function') ? resolvePrintedByName() :
+        (currentRole === 'admin' ? 'مدير النظام' : ((currentTeacher && currentTeacher.name) || 'المعلم'));
+      const printDate = new Date().toLocaleDateString('ar-EG');
+      const classGradeLabelForPrint = (db.classGrade && db.classGrade[cls]) || info.grade || '';
+      const metaBarHtmlDet = [
+        `<span>${formatClassSectionForPrint(classGradeLabelForPrint, clsSection, clsPlain)}</span>`,
+        `<span><strong>المادة:</strong> ${escapeHtml(subjectName)}${teacherName ? ' — <strong>المعلم:</strong> ' + teacherName : ''}</span>`,
+        blank ? '<span style="color:#b45309;font-weight:700">نموذج للتعبئة اليدوية</span>' : ''
+      ].filter(Boolean).join('');
+
+      const ministryFooter = buildUnifiedFooter({
+        captions: [
+          'معلم المادة' + (teacherNamePlain ? ': ' + teacherNamePlain : ''),
+          'مشرف المادة',
+          'وكيل المرحلة',
+          'موجه المادة',
+          'مدير المدرسة'
+        ]
+      });
+
+      // ضمان صفوف كافية في النموذج الفارغ حتى لو لم يُسجَّل طلاب بعد
+      if (blank && students.length === 0) {
+        students = Array.from({ length: 20 }, () => ({ id: '', name: '' }));
+      }
+
+      const perPage = students.length <= 22 ? Math.max(students.length, 1) : Math.ceil(students.length / 2);
+      const chunks = [];
+      for (let i = 0; i < students.length; i += perPage) chunks.push(students.slice(i, i + perPage));
+      if (!chunks.length) chunks.push([]);
+      const totalPages = chunks.length;
+
+      let pagesHtml = '';
+      chunks.forEach((chunk, pageIdx) => {
+        const bodyHtml = buildBodyHtml(chunk, pageIdx * perPage);
+        const pageLabel = totalPages > 1
+          ? `<div class="ml-page-label">ورقة ${toHindiDigits(pageIdx + 1)} من ${toHindiDigits(totalPages)}</div>`
+          : '';
+        pagesHtml += `
+        <div class="ministry-landscape-page detailed-sheet-page ds-scope">
+          ${pageLabel}
+          ${buildUnifiedLetterhead({
+            title: (blank ? 'سجل رصد درجات (نموذج) — ' : 'سجل رصد درجات — ') + subjectName,
+            subtitleRight: 'درجات (' + monthLabel + ')',
+            subtitleLeft: termLabel,
+            printedBy,
+            printDate,
+            governorate: info.governorate || '',
+            educationAdmin: info.educationAdmin || '',
+            schoolName: info.schoolName || '',
+            academicYear: info.academicYear || '',
+            metaBarHtml: metaBarHtmlDet
+          })}
+          <table class="detailed-weekly-table">
+            <colgroup>${colgroupHtml}</colgroup>
+            <thead>${theadHtml}</thead>
+            <tbody>${bodyHtml}</tbody>
+          </table>
+          ${ministryFooter}
+        </div>`;
+      });
+      return pagesHtml;
+    }
+
+    function printMinistryLandscapeHtml(pagesHtml) {
+      const area = document.getElementById('printGradeSheetArea');
+      if (!area) { alert('منطقة الطباعة غير موجودة.'); return; }
+      if (typeof clearInactivePrintAreas === 'function') clearInactivePrintAreas('printGradeSheetArea');
+      const forceStyle = document.getElementById('ministryLandscapeForceStyle') || document.createElement('style');
+      forceStyle.id = 'ministryLandscapeForceStyle';
+      forceStyle.textContent = `
+        @media print {
+          @page { size: A4 landscape !important; margin: 6mm 7mm !important; }
+          body { padding: 0 !important; }
+          body > *:not(#printGradeSheetArea) { display: none !important; }
+          #printGradeSheetArea { display: block !important; width: 100% !important; margin: 0 !important; padding: 0 !important; }
+          .ministry-landscape-page {
+            page-break-after: always !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+            width: 100% !important;
+            overflow: hidden !important;
+          }
+          .ministry-landscape-page:last-child { page-break-after: auto !important; }
+          .ministry-landscape-page .blank-cell { min-height: 4.5mm; }
+        }
+      `;
+      if (!forceStyle.parentNode) document.head.appendChild(forceStyle);
+      area.innerHTML = pagesHtml;
+      area.style.display = 'block';
+      setTimeout(() => {
+        window.print();
+        setTimeout(() => {
+          if (forceStyle.parentNode) forceStyle.parentNode.removeChild(forceStyle);
+        }, 500);
+      }, 80);
+    }
+
+    /**
+     * دفعة من مركز الطباعة: كشف وزارة عرضي لكل توليفة (فصل × مادة) حسب النطاق
+     * opts.blank = true → خانات فارغة | false → بالدرجات المرصودة
+     */
+    async function printMinistryLandscapeBatch(opts) {
+      opts = opts || {};
+      const blank = !!opts.blank;
+      if (!canAccessPrintCenter()) {
+        alert('مركز الطباعة متاح للإدارة ومدير المرحلة فقط.');
+        return;
+      }
+      // المعلمون: يطبعون من فلاتر الدرجات فقط (ليس الدفعة الإدارية)
+      if (currentAccountType === 'teacher') {
+        alert('دفعة مركز الطباعة متاحة للإدارة ومدير المرحلة. يمكنك طباعة كشف فصلك من تبويب الدرجات.');
+        return;
+      }
+      const db = loadDB();
+      const classes = (typeof pcGetChecked === 'function') ? pcGetChecked('pcClassList', 'data-class') : [];
+      const subjectNames = (typeof pcGetChecked === 'function') ? pcGetChecked('pcSubjectList', 'data-subject') : [];
+      const term = (document.getElementById('pcBlankTerm') || {}).value || 'first';
+      const month = parseInt((document.getElementById('pcBlankMonth') || {}).value || '1', 10);
+      if (!classes.length || !subjectNames.length) {
+        alert('يرجى تحديد فصل واحد على الأقل ومادة واحدة على الأقل من قائمة النطاق أعلاه.');
+        return;
+      }
+      const printOrder = (document.getElementById('pcBlankPrintOrder') || {}).value || 'class-first';
+      const jobs = [];
+      function pushJob(cls, sn) {
+        const subj = (db.subjects || []).find(s => s.name === sn);
+        if (!subj) return;
+        if (typeof subjectAppliesToClass === 'function' && !subjectAppliesToClass(subj, cls, db)) return;
+        jobs.push({ cls, subj, subjectName: sn });
+      }
+      if (printOrder === 'subject-first') {
+        subjectNames.forEach(sn => { classes.forEach(cls => pushJob(cls, sn)); });
+      } else {
+        classes.forEach(cls => { subjectNames.forEach(sn => pushJob(cls, sn)); });
+      }
+      if (!jobs.length) {
+        alert('لا توجد توليفات صالحة من الفصول والمواد المحددة.');
+        return;
+      }
+      const modeLabel = blank ? 'فارغة' : 'ببيانات';
+      if (jobs.length > 20) {
+        if (!confirm('سيتم طباعة ' + jobs.length + ' كشف وزارة عرضي (' + modeLabel + '). قد ينتج عن ذلك صفحات كثيرة. هل تريد المتابعة؟')) return;
+      } else if (jobs.length > 1) {
+        if (!confirm('سيتم طباعة ' + jobs.length + ' كشف وزارة عرضي (' + modeLabel + '). هل تريد المتابعة؟')) return;
+      }
+
+      let allHtml = '';
+      for (const job of jobs) {
+        let students = db.students.filter(s => classSectionKey(s.class, s.section) === job.cls);
+        students = (typeof filterStudentsForTeacherLanguage === 'function')
+          ? filterStudentsForTeacherLanguage(students, job.subjectName, job.cls)
+          : students;
+        students.sort((a, b) => a.gender !== b.gender ? (a.gender === 'F' ? -1 : 1) : a.name.localeCompare(b.name));
+        const pages = buildMinistryLandscapePagesHtml({
+          db,
+          subject: job.subj,
+          subjectName: job.subjectName,
+          cls: job.cls,
+          term,
+          month,
+          students,
+          blank
+        });
+        if (pages) allHtml += pages;
+      }
+      if (!allHtml) {
+        alert('تعذّر بناء أي كشف من التوليفات المحددة.');
+        return;
+      }
+      printMinistryLandscapeHtml(allHtml);
+    }
+    window.printMinistryLandscapeBatch = printMinistryLandscapeBatch;
+
 
     async function printTermAverageSheet() {
       const db = loadDB();
