@@ -5502,6 +5502,8 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
       const root = getRootDB();
       if (profile.role === 'superadmin') {
         currentAccountType = 'superadmin'; currentRole = 'admin';
+        try{ if(typeof renderCalendar==='function') setTimeout(renderCalendar, 100); }catch(e){}
+
         currentTeacher = null; currentStageAdmin = null;
         currentStageId = (root.stages && root.stages[0]) ? root.stages[0].id : null;
         saveSession({ accountType: 'superadmin', stageId: currentStageId, cloudAuth: true, profileId: profile.id });
@@ -23573,28 +23575,75 @@ function roundToHalf(n){ if (!Number.isFinite(n)) return 0; return Math.round(n 
     saveDB(db);
     try{ const root=getRootDB(); (root.stages||[]).forEach(st=>{st.data=st.data||{};st.data.schoolInfo=st.data.schoolInfo||{};st.data.schoolInfo[CAL_KEY]=JSON.parse(JSON.stringify(db.schoolInfo[CAL_KEY]));st.data.schoolInfo.recordingPeriods=JSON.parse(JSON.stringify(db.schoolInfo.recordingPeriods));st.data.schoolInfo.week1Dates=JSON.parse(JSON.stringify(db.schoolInfo.week1Dates));st.data.schoolInfo.months=JSON.parse(JSON.stringify(db.schoolInfo.months));}); if(typeof persistRootDB==='function')persistRootDB(root); }catch(e){console.warn('calendar propagation',e);}
   }
+  function calEsc(v){
+    try { if (typeof escapeHtml === 'function') return escapeHtml(v); } catch(e) {}
+    return String(v ?? '').replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));
+  }
+  function calCanEdit(){
+    try {
+      if (typeof currentAccountType !== 'undefined' && currentAccountType === 'superadmin') return true;
+      if (typeof currentRole !== 'undefined' && currentRole === 'admin' && currentAccountType !== 'monitor' && currentAccountType !== 'teacher') return true;
+    } catch(e) {}
+    return false;
+  }
   function renderCalendar(){
-    const box=document.getElementById('termCalendarEditor'); if(!box)return; const term=document.getElementById('siCalendarTerm')?.value||'first'; const c=calLoad(term); window._termCalendarDraft=window._termCalendarDraft||{}; window._termCalendarDraft[term]=c;
-    const canEdit=currentAccountType==='superadmin'; const dis=canEdit?'':'disabled';
-    const weekOpts=Array.from({length:c.totalWeeks},(_,i)=>`<option value="${i+1}">الأسبوع ${AR_WEEKS[i]||i+1}</option>`).join('');
-    let rows=''; c.months.forEach((m,i)=>{const startOpts=weekOpts;const endOpts=weekOpts;
-      const examAfterOpts=Array.from({length:c.totalWeeks},(_,wi)=>`<option value="${wi+1}" ${(Number(m.examAfterWeek)||m.endWeek)===(wi+1)?'selected':''}>بعد الأسبوع ${AR_WEEKS[wi]||(wi+1)} (${wi+1})</option>`).join('');
-      rows+=`<div class="card" style="padding:12px;border:1px solid #dbe7df;background:#fbfefc"><div style="display:grid;grid-template-columns:1.4fr 1fr 1fr auto;gap:10px;align-items:end"><div class="form-group"><label>اسم الشهر / الفترة ${i+1}</label><input ${dis} value="${escapeHtml(m.name||'')}" onchange="termCalField(${i},'name',this.value)"></div><div class="form-group"><label>${i===0?'يبدأ من':'يبدأ بعد الأسبوع السابق'}</label><select ${dis} onchange="termCalField(${i},'startWeek',this.value)">${startOpts}</select></div><div class="form-group"><label>ينتهي عند</label><select ${dis} onchange="termCalField(${i},'endWeek',this.value)">${endOpts}</select></div><div>${canEdit&&c.months.length>2?`<button type="button" class="btn btn-outline btn-sm" onclick="termCalRemoveMonth(${i})">حذف</button>`:''}</div></div>
-      <div style="display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:center;margin-top:10px;padding:10px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px">
-        <label style="display:flex;align-items:center;gap:8px;font-weight:700;white-space:nowrap;cursor:pointer">
-          <input type="checkbox" ${dis} ${m.hasExam?'checked':''} onchange="termCalField(${i},'hasExam',this.checked)"> يوجد اختبار شهر
-        </label>
-        <div class="form-group" style="margin:0">
-          <label style="font-size:12px">موضع عمود الاختبار في كشف الرصد (يختاره رئيس الكنترول)</label>
-          <select ${dis} ${m.hasExam?'':'disabled'} onchange="termCalField(${i},'examAfterWeek',this.value)" style="width:100%">
-            <option value="0">— في نهاية أسابيع هذه الفترة —</option>
-            ${examAfterOpts}
-          </select>
+    const box=document.getElementById('termCalendarEditor'); if(!box)return;
+    const term=document.getElementById('siCalendarTerm')?.value||'first';
+    let c;
+    try { c=calLoad(term); } catch(err){ console.warn('calLoad',err); box.innerHTML='<div style="color:#b91c1c">تعذّر تحميل الروزنامة. حدّث الصفحة بعد تسجيل الدخول.</div>'; return; }
+    window._termCalendarDraft=window._termCalendarDraft||{};
+    window._termCalendarDraft[term]=c;
+    const canEdit=calCanEdit();
+    const dis=canEdit?'':'disabled';
+    const weekOpts=Array.from({length:Math.max(1,Number(c.totalWeeks)||16)},(_,i)=>`<option value="${i+1}">الأسبوع ${AR_WEEKS[i]||(i+1)}</option>`).join('');
+    let rows='';
+    (c.months||[]).forEach((m,i)=>{
+      const examAfterOpts=Array.from({length:Math.max(1,Number(c.totalWeeks)||16)},(_,wi)=>{
+        const sel=((Number(m.examAfterWeek)||m.endWeek)===(wi+1))?' selected':'';
+        return `<option value="${wi+1}"${sel}>بعد الأسبوع ${AR_WEEKS[wi]||(wi+1)} (${wi+1})</option>`;
+      }).join('');
+      const nameVal=calEsc(m.name||'');
+      rows+=`<div class="card" style="padding:12px;border:1px solid #dbe7df;background:#fbfefc;margin-bottom:10px" data-month-idx="${i}">
+        <div style="display:grid;grid-template-columns:1.4fr 1fr 1fr auto;gap:10px;align-items:end">
+          <div class="form-group"><label>اسم الشهر / الفترة ${i+1}</label>
+            <input ${dis} data-cal-field="name" data-cal-i="${i}" value="${nameVal}" onchange="termCalField(${i},'name',this.value)">
+          </div>
+          <div class="form-group"><label>${i===0?'يبدأ من':'يبدأ بعد الأسبوع السابق'}</label>
+            <select ${dis} data-cal-field="startWeek" data-cal-i="${i}" onchange="termCalField(${i},'startWeek',this.value)">${weekOpts}</select>
+          </div>
+          <div class="form-group"><label>ينتهي عند</label>
+            <select ${dis} data-cal-field="endWeek" data-cal-i="${i}" onchange="termCalField(${i},'endWeek',this.value)">${weekOpts}</select>
+          </div>
+          <div>${canEdit&&c.months.length>2?`<button type="button" class="btn btn-outline btn-sm" onclick="termCalRemoveMonth(${i})">حذف</button>`:''}</div>
         </div>
-      </div>
-      <div style="font-size:12px;color:#64748b;margin-top:7px">تاريخ بداية هذا الشهر: <strong>${calFmt(addDaysISO(c.startDate,(m.startWeek-1)*7))}</strong> · عدد أسابيعه: <strong>${Math.max(0,m.endWeek-m.startWeek+1)}</strong>${m.hasExam?` · <span style="color:#b45309;font-weight:700">عمود الاختبار بعد الأسبوع ${Number(m.examAfterWeek)||m.endWeek}</span>`:''}</div></div>`;});
-    box.innerHTML=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px"><div class="form-group"><label>📅 تاريخ بداية الأسبوع الأول</label><input ${dis} type="date" id="termCalStartDate" value="${c.startDate||''}" onchange="termCalBaseField('startDate',this.value)"></div><div class="form-group"><label>🔢 عدد أسابيع الفصل الدراسي بالكامل</label><input ${dis} type="number" min="1" max="40" id="termCalTotalWeeks" value="${c.totalWeeks}" onchange="termCalBaseField('totalWeeks',this.value)"></div></div><div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:10px 12px;margin-bottom:12px;line-height:1.8;font-size:13px"><strong>القاعدة:</strong> الأسبوع 1 يبدأ من التاريخ المحدد، وكل أسبوع يليه تلقائياً بفاصل 7 أيام. تحدد هنا بعد أي أسبوع يبدأ كل شهر؛ وستستخدم نفس الخريطة في الرصد والطباعة والغياب.</div>${rows}<div style="display:flex;gap:8px;margin-top:10px">${canEdit?'<button type="button" class="btn btn-outline btn-sm" onclick="termCalAddMonth()">➕ إضافة شهر/فترة</button><button type="button" class="btn btn-primary btn-sm" onclick="saveTermCalendar()">💾 حفظ الروزنامة</button>':''}</div><div id="termCalendarMsg" style="font-size:13px;margin-top:8px"></div>`;
-    c.months.forEach((m,i)=>{const s=box.querySelectorAll('select')[i*2],e=box.querySelectorAll('select')[i*2+1];if(s)s.value=String(m.startWeek);if(e)e.value=String(m.endWeek);});
+        <div style="display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:center;margin-top:10px;padding:10px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px">
+          <label style="display:flex;align-items:center;gap:8px;font-weight:700;white-space:nowrap;cursor:pointer">
+            <input type="checkbox" ${dis} data-cal-field="hasExam" data-cal-i="${i}" ${m.hasExam?'checked':''} onchange="termCalField(${i},'hasExam',this.checked)"> يوجد اختبار شهر
+          </label>
+          <div class="form-group" style="margin:0">
+            <label style="font-size:12px">موضع عمود الاختبار في كشف الرصد (يختاره رئيس الكنترول)</label>
+            <select ${dis} ${m.hasExam?'':'disabled'} data-cal-field="examAfterWeek" data-cal-i="${i}" onchange="termCalField(${i},'examAfterWeek',this.value)" style="width:100%">
+              <option value="0">— في نهاية أسابيع هذه الفترة —</option>
+              ${examAfterOpts}
+            </select>
+          </div>
+        </div>
+        <div style="font-size:12px;color:#64748b;margin-top:7px">تاريخ بداية هذا الشهر: <strong>${calFmt(addDaysISO(c.startDate,(m.startWeek-1)*7))}</strong> · عدد أسابيعه: <strong>${Math.max(0,(m.endWeek||0)-(m.startWeek||0)+1)}</strong>${m.hasExam?` · <span style="color:#b45309;font-weight:700">عمود الاختبار بعد الأسبوع ${Number(m.examAfterWeek)||m.endWeek}</span>`:''}</div>
+      </div>`;
+    });
+    const lockNote = canEdit ? '' : '<div style="background:#fff7ed;border:1px solid #fdba74;border-radius:8px;padding:8px 12px;margin-bottom:10px;font-size:13px;color:#9a3412">🔒 تعديل الروزنامة متاح لرئيس الكنترول فقط. سجّل الدخول ثم افتح تبويب بيانات المدرسة.</div>';
+    box.innerHTML=`${lockNote}<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px"><div class="form-group"><label>📅 تاريخ بداية الأسبوع الأول</label><input ${dis} type="date" id="termCalStartDate" value="${c.startDate||''}" onchange="termCalBaseField('startDate',this.value)"></div><div class="form-group"><label>🔢 عدد أسابيع الفصل الدراسي بالكامل</label><input ${dis} type="number" min="1" max="40" id="termCalTotalWeeks" value="${c.totalWeeks}" onchange="termCalBaseField('totalWeeks',this.value)"></div></div><div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:10px 12px;margin-bottom:12px;line-height:1.8;font-size:13px"><strong>القاعدة:</strong> الأسبوع 1 يبدأ من التاريخ المحدد، وكل أسبوع يليه تلقائياً بفاصل 7 أيام. تحدد هنا بعد أي أسبوع يبدأ كل شهر؛ وستستخدم نفس الخريطة في الرصد والطباعة والغياب.</div>${rows}<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">${canEdit?'<button type="button" class="btn btn-outline btn-sm" onclick="termCalAddMonth()">➕ إضافة شهر/فترة</button><button type="button" class="btn btn-primary btn-sm" onclick="saveTermCalendar()">💾 حفظ الروزنامة</button>':'<span style="color:#64748b;font-size:13px">لا يمكن الحفظ من هذا الحساب.</span>'}</div><div id="termCalendarMsg" style="font-size:13px;margin-top:8px"></div>`;
+    // ضبط قيم قوائم الأسابيع بعد الرسم
+    (c.months||[]).forEach((m,i)=>{
+      const root=box.querySelector('[data-month-idx="'+i+'"]');
+      if(!root) return;
+      const s=root.querySelector('select[data-cal-field="startWeek"]');
+      const e=root.querySelector('select[data-cal-field="endWeek"]');
+      const ea=root.querySelector('select[data-cal-field="examAfterWeek"]');
+      if(s) s.value=String(m.startWeek||1);
+      if(e) e.value=String(m.endWeek||1);
+      if(ea) ea.value=String(Number(m.examAfterWeek)||0 || m.endWeek||0);
+    });
   }
   window.termCalField=function(i,f,v){const term=document.getElementById('siCalendarTerm')?.value||'first';const c=window._termCalendarDraft?.[term]||calLoad(term);if(f==='name')c.months[i].name=v;else if(f==='hasExam'){c.months[i].hasExam=!!v;if(c.months[i].hasExam&&!Number(c.months[i].examAfterWeek))c.months[i].examAfterWeek=c.months[i].endWeek;}else if(f==='examAfterWeek'){const n=parseInt(v,10)||0;c.months[i].examAfterWeek=n>0?Math.max(1,Math.min(c.totalWeeks,n)):0;}else c.months[i][f]=Math.max(1,Math.min(c.totalWeeks,parseInt(v,10)||1)); if(f==='startWeek'&&c.months[i].endWeek<c.months[i].startWeek)c.months[i].endWeek=c.months[i].startWeek; if(f==='endWeek'&&c.months[i].endWeek<c.months[i].startWeek)c.months[i].startWeek=c.months[i].endWeek; if((f==='endWeek'||f==='startWeek')&&c.months[i].hasExam){const ea=Number(c.months[i].examAfterWeek)||0;if(ea&&(ea<c.months[i].startWeek||ea>c.months[i].endWeek))c.months[i].examAfterWeek=c.months[i].endWeek;} window._termCalendarDraft[term]=c;renderCalendar();};
   window.termCalBaseField=function(f,v){const term=document.getElementById('siCalendarTerm')?.value||'first';const c=window._termCalendarDraft?.[term]||calLoad(term);if(f==='startDate')c.startDate=v;else c.totalWeeks=Math.max(1,Math.min(40,parseInt(v,10)||1)); c.months.forEach(m=>{m.startWeek=Math.min(m.startWeek,c.totalWeeks);m.endWeek=Math.min(m.endWeek,c.totalWeeks);if(m.endWeek<m.startWeek)m.endWeek=m.startWeek;});window._termCalendarDraft[term]=c;renderCalendar();};
@@ -23602,6 +23651,8 @@ function roundToHalf(n){ if (!Number.isFinite(n)) return 0; return Math.round(n 
   window.termCalRemoveMonth=function(i){const term=document.getElementById('siCalendarTerm')?.value||'first';const c=window._termCalendarDraft?.[term]||calLoad(term);if(c.months.length<=2)return;c.months.splice(i,1);window._termCalendarDraft[term]=c;renderCalendar();};
   window.saveTermCalendar=function(){const term=document.getElementById('siCalendarTerm')?.value||'first';const c=window._termCalendarDraft?.[term]||calLoad(term);c.months.sort((a,b)=>a.startWeek-b.startWeek);for(let i=0;i<c.months.length;i++){if(i===0)c.months[i].startWeek=1;else c.months[i].startWeek=Math.max(c.months[i].startWeek,c.months[i-1].endWeek+1);c.months[i].endWeek=Math.max(c.months[i].startWeek,Math.min(c.totalWeeks,c.months[i].endWeek));}if(c.months.length)c.months[c.months.length-1].endWeek=c.totalWeeks;calSaveToDb(term,c);const msg=document.getElementById('termCalendarMsg');if(msg)msg.textContent='✅ تم حفظ الروزنامة المركزية، وتم تحديث تواريخ الشهور والأسابيع المستخدمة في الرصد والطباعة.';try{populateMonthSelects();}catch(e){}try{renderCalendar();}catch(e){}};
   window.loadTermCalendarUI=function(){try{renderCalendar();}catch(e){console.warn(e)}};
+  // إعادة رسم عند فتح تبويب بيانات المدرسة أو بعد الدخول
+
   // الخريطة المركزية: هذه الدوال تحل محل منطق «أربعة أسابيع ثابتة لكل شهر» في الطباعة والرصد.
   function getCentralCalendar(term){const db=calDb();const tc=db.schoolInfo?.[CAL_KEY]?.[term];if(tc&&tc.startDate&&Number(tc.totalWeeks)>0&&Array.isArray(tc.months))return tc;return calLoad(term);}
   function getWeek1DateISO(term,monthIndex0){const c=getCentralCalendar(term),m=c.months[monthIndex0];return m?addDaysISO(c.startDate,(m.startWeek-1)*7):'';}
@@ -23619,7 +23670,33 @@ function roundToHalf(n){ if (!Number.isFinite(n)) return 0; return Math.round(n 
   window.updateGradeCalendarSummary=function(){const box=document.getElementById('gradeCalendarSummary');if(!box)return;const term=document.getElementById('gradeTermSelect')?.value||'first';const m=(parseInt(document.getElementById('gradeMonthSelect')?.value||'1',10)-1);const c=getCentralCalendar(term),p=c.months[m];if(!p){box.textContent='لا توجد فترة محددة في الروزنامة لهذا الاختيار.';return;}const a=addDaysISO(c.startDate,(p.startWeek-1)*7),b=addDaysISO(c.startDate,(p.endWeek-1)*7);box.innerHTML='🗓️ <strong>'+escapeHtml(p.name||('الشهر '+(m+1)))+'</strong> · من <strong>الأسبوع '+(p.startWeek)+'</strong> إلى <strong>الأسبوع '+(p.endWeek)+'</strong> · بداية الأسبوع: <strong>'+calFmt(a)+'</strong> · بداية آخر أسبوع: <strong>'+calFmt(b)+'</strong>';};
   window.updateAttendanceCalendarSummary=function(){const box=document.getElementById('attendanceCalendarSummary');if(!box)return;const term=document.getElementById('attTermSelect')?.value||'first';const m=(parseInt(document.getElementById('attMonthSelect')?.value||'1',10)-1);const c=getCentralCalendar(term),p=c.months[m];if(!p){box.textContent='لا توجد فترة محددة في الروزنامة لهذا الاختيار.';return;}box.innerHTML='🗓️ <strong>'+escapeHtml(p.name||('الشهر '+(m+1)))+'</strong> · الأسابيع <strong>'+p.startWeek+'–'+p.endWeek+'</strong> · من <strong>'+calFmt(addDaysISO(c.startDate,(p.startWeek-1)*7))+'</strong> إلى بداية الأسبوع <strong>'+calFmt(addDaysISO(c.startDate,(p.endWeek-1)*7))+'</strong> · كل أسبوع مقسم إلى أيام وتواريخ فعلية.';};
   const _oldAttFilterCentral=window.onAttendanceFilterChange; window.onAttendanceFilterChange=function(){const r=typeof _oldAttFilterCentral==='function'?_oldAttFilterCentral.apply(this,arguments):undefined;setTimeout(function(){try{updateAttendanceCalendarSummary();}catch(e){}},0);return r;};
-  document.addEventListener('DOMContentLoaded',function(){setTimeout(function(){const card=document.getElementById('termCalendarCard');if(card){const t=document.getElementById('siCalendarTerm');if(t)t.addEventListener('change',renderCalendar);renderCalendar();}try{updateGradeCalendarSummary();}catch(e){}try{updateAttendanceCalendarSummary();}catch(e){}},100);});
+  document.addEventListener('DOMContentLoaded',function(){setTimeout(function(){const card=document.getElementById('termCalendarCard');if(card){const t=document.getElementById('siCalendarTerm');if(t&&!t.dataset.calHook){t.dataset.calHook='1';t.addEventListener('change',function(){try{renderCalendar();}catch(e){console.warn(e);}});}try{renderCalendar();}catch(e){console.warn(e);}}try{updateGradeCalendarSummary();}catch(e){}try{updateAttendanceCalendarSummary();}catch(e){}},100);});
+  // بعد تسجيل الدخول أو تبديل التبويب: أعد تفعيل الحقول
+  const _prevActivateForCal=window.activateTab;
+  if(typeof _prevActivateForCal==='function' && !window._calActivateHooked){
+    window._calActivateHooked=true;
+    window.activateTab=function(tabName){
+      const r=_prevActivateForCal.apply(this,arguments);
+      if(tabName==='schoolinfo'||tabName==='school'||tabName==='settings'||tabName==='schoolInfo'||tabName==='data'){
+        setTimeout(function(){try{renderCalendar();}catch(e){}},50);
+      }
+      return r;
+    };
+  }
+  // راقب ظهور لوحة التحكم بعد الدخول
+  try{
+    const dash=document.getElementById('dashboard');
+    if(dash && !dash.dataset.calObs){
+      dash.dataset.calObs='1';
+      const obs=new MutationObserver(function(){
+        if(dash.style.display!=='none' && document.getElementById('termCalendarEditor')){
+          try{renderCalendar();}catch(e){}
+        }
+      });
+      obs.observe(dash,{attributes:true,attributeFilter:['style','class']});
+    }
+  }catch(e){}
+
 })();
 </script>
 
