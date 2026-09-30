@@ -2392,7 +2392,16 @@ html[data-theme="dark"] .dash-more-menu button:hover{background:#1a2338}
     html[data-theme="dark"] .warning-box, html[data-theme="dark"] .error-box { background:#241a10; }
     html[data-theme="dark"] a { color:#7dd3fc; }
 
-  </style>
+  
+    .ml-absence-table td.att-mark-abs { color:#b91c1c; font-weight:800; background:#fef2f2 !important; }
+    .ml-absence-table td.att-mark-exc { color:#b45309; font-weight:700; background:#fffbeb !important; }
+    .ml-absence-table td.att-mark-pres { color:#047857; font-weight:700; }
+    .ml-absence-table th.att-sum-abs, .ml-absence-table td.att-sum-abs {
+      background:#fee2e2 !important; color:#991b1b; font-weight:800;
+    }
+    .ml-absence-table th.att-day-head { font-size:7.5px; }
+    .ml-absence-table th.att-date-head { font-size:6.5px; font-weight:600; }
+</style>
 
 <style id="v22-security-css">
 .v22-sec-card{background:var(--card,#fff);border:1px solid var(--border,#e5e7eb);border-radius:14px;padding:16px;margin:12px 0}
@@ -4256,6 +4265,8 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
           <button type="button" class="btn btn-primary" onclick="printBlankGradeSheetsBatch()">🖨️ طباعة كشوف الرصد المحددة (طولي)</button>
           <button type="button" class="btn btn-success" onclick="printMinistryLandscapeBatch({blank:true})" title="كشف وزارة عرضي فارغ — لكل توليفة فصل×مادة حسب النطاق المحدد أعلاه">🖨️ كشوف وزارة عرضي فارغة (دفعة)</button>
           <button type="button" class="btn btn-success" onclick="printMinistryLandscapeBatch({blank:false})" title="كشف وزارة عرضي بالدرجات المرصودة — لكل توليفة فصل×مادة حسب النطاق">🖨️ كشوف وزارة عرضي ببيانات (دفعة)</button>
+          <button type="button" class="btn btn-outline" onclick="printMinistryAbsenceBatch({blank:true})" title="كشف غياب عرضي فارغ — 4 أسابيع × أيام مع التواريخ — بدون غلاف">🖨️ كشوف غياب عرضي فارغة (دفعة)</button>
+          <button type="button" class="btn btn-outline" onclick="printMinistryAbsenceBatch({blank:false})" title="كشف غياب عرضي بالبيانات الفعلية من سجل المواظبة">🖨️ كشوف غياب عرضي ببيانات (دفعة)</button>
         </div>
         <p class="up-hint" style="margin-top:8px">دفعة الوزارة العرضية تستخدم نفس نطاق الفصول والمواد والشهر أعلاه، وتقسم كل فصل على ورقتين A4 أفقية مع تذييل التوقيعات الخمسة.</p>
       </div>
@@ -15678,6 +15689,283 @@ function renderMonthlyExportButtons() {
       printMinistryLandscapeHtml(allHtml);
     }
 
+
+
+    // ============================================================
+    //  كشف غياب عرضي — 4 أسابيع × أيام + تواريخ (بدون غلاف)
+    //  نفس أسلوب طباعة كشوف الوزارة العرضية للدرجات
+    // ============================================================
+
+    function buildMinistryAbsencePagesHtml(cfg) {
+      const { db, subjectName, cls, term, month, blank } = cfg;
+      let students = (cfg.students || []).slice();
+      const att = (typeof ensureAttendance === 'function') ? ensureAttendance(db) : (db.attendance || {});
+      const columns = (typeof getMonthCalendarDays === 'function') ? getMonthCalendarDays(term, month) : [];
+      const activeDays = (typeof getActiveDayIndices === 'function') ? getActiveDayIndices(att) : [0,1,2,3,4];
+      const daysPerWeek = activeDays.length || 5;
+      const scopeWeeks = (typeof getPeriodWeekCount === 'function') ? getPeriodWeekCount(term, month - 1) : 4;
+      const weekCount = Math.min(4, Math.max(scopeWeeks, 1));
+      let globalStart = 1;
+      try {
+        if (typeof getCentralCalendar === 'function') {
+          const cal = getCentralCalendar(term);
+          const mth = cal && cal.months && cal.months[month - 1];
+          if (mth) globalStart = mth.startWeek || 1;
+        }
+      } catch (e) {}
+
+      const dayLabels = (typeof DAY_LABELS !== 'undefined' && DAY_LABELS) ? DAY_LABELS : ['س','ح','ث','أ','خ','ج','س'];
+      // تجميع أعمدة كل أسبوع
+      const weeks = [];
+      for (let w = 0; w < weekCount; w++) {
+        const days = [];
+        for (let di = 0; di < daysPerWeek; di++) {
+          const col = columns[w * daysPerWeek + di] || null;
+          days.push(col);
+        }
+        weeks.push({ globalWeek: globalStart + w, days });
+      }
+
+      const totalDayCols = weekCount * daysPerWeek;
+      // صف 1: الأسابيع
+      let weekRow = `<th rowspan="3" class="serial-col">م</th><th rowspan="3">اسم الطالب</th>`;
+      weeks.forEach((wk, wi) => {
+        const out = wi >= scopeWeeks ? ' week-out-of-scope' : '';
+        const name = (typeof mlWeekArabicName === 'function') ? mlWeekArabicName(wk.globalWeek) : ('الأسبوع ' + wk.globalWeek);
+        const firstDate = (wk.days[0] && wk.days[0].dateLabel) ? wk.days[0].dateLabel : '';
+        weekRow += `<th colspan="${daysPerWeek}" class="ml-week-head att-week-${(wi%4)+1}${out}"><div class="w-name">${name}</div>${firstDate ? `<div class="w-date">${firstDate}</div>` : ''}</th>`;
+      });
+      weekRow += `<th rowspan="3" class="att-sum-abs">إجمالي<br>الغياب</th>`;
+
+      // صف 2: أسماء الأيام
+      let dayRow = '';
+      weeks.forEach((wk, wi) => {
+        const out = wi >= scopeWeeks ? ' week-out-of-scope' : '';
+        wk.days.forEach((col, di) => {
+          const lab = col ? (col.label || dayLabels[di] || '') : (dayLabels[di] || '—');
+          const sep = di === 0 ? ' week-sep-left' : '';
+          dayRow += `<th class="att-day-head${sep}${out}">${escapeHtml(lab)}</th>`;
+        });
+      });
+
+      // صف 3: التواريخ
+      let dateRow = '';
+      weeks.forEach((wk, wi) => {
+        const out = wi >= scopeWeeks ? ' week-out-of-scope' : '';
+        wk.days.forEach((col, di) => {
+          const dlab = col ? (col.dateLabel || '—') : '—';
+          const hol = col && col.isHoliday ? ' holiday-day' : '';
+          const sep = di === 0 ? ' week-sep-left' : '';
+          dateRow += `<th class="att-date-head${sep}${out}${hol}">${escapeHtml(dlab)}</th>`;
+        });
+      });
+
+      const theadHtml = `<tr class="week-row">${weekRow}</tr><tr class="comp-row">${dayRow}</tr><tr class="max-row">${dateRow}</tr>`;
+
+      function markCell(val, col) {
+        if (!col || col.outOfScope) return `<td class="week-out-of-scope blank-cell"></td>`;
+        if (col.isHoliday) return `<td class="holiday-day" title="إجازة">إج</td>`;
+        if (blank) return `<td class="blank-cell"></td>`;
+        if (val === 'غ') return `<td class="gs-score att-mark-abs">غ</td>`;
+        if (val === 'ع') return `<td class="gs-score att-mark-exc">ع</td>`;
+        if (val === '✓' || val === 'ح') return `<td class="gs-score att-mark-pres">✓</td>`;
+        return `<td class="blank-cell"></td>`; // فارغ = حضور افتراضي أو لم يُرصد
+      }
+
+      function buildBody(slice, startIdx) {
+        let html = '';
+        const list = slice.length ? slice : [{ id: '', name: '' }];
+        list.forEach((s, li) => {
+          const idx = startIdx + li;
+          let row = `<td class="serial-col">${toHindiDigits(idx + 1)}</td><td class="gs-name">${escapeHtml(s.name || '')}</td>`;
+          let totalAbs = 0;
+          weeks.forEach((wk, wi) => {
+            wk.days.forEach((col) => {
+              let val = '';
+              if (!blank && s.id && col && col.dateISO && typeof recordKey === 'function') {
+                const k = recordKey(s.id, subjectName, term, month, col.dateISO);
+                val = (att.records && att.records[k]) || '';
+              }
+              if (val === 'غ') totalAbs++;
+              row += markCell(val, col);
+            });
+          });
+          row += blank
+            ? `<td class="blank-cell att-sum-abs"></td>`
+            : `<td class="gs-score att-sum-abs">${totalAbs ? toHindiDigits(totalAbs) : ''}</td>`;
+          html += `<tr>${row}</tr>`;
+        });
+        return html;
+      }
+
+      if (blank && students.length === 0) {
+        students = Array.from({ length: 20 }, () => ({ id: '', name: '' }));
+      }
+
+      const { cls: clsPlain, section: clsSection } = (typeof splitClassSectionKey === 'function')
+        ? splitClassSectionKey(cls) : { cls: cls, section: '' };
+      const info = db.schoolInfo || {};
+      const monthLabels = (typeof getMonthLabels === 'function') ? getMonthLabels(term) : [];
+      const monthLabel = monthLabels[month - 1] || ('الشهر ' + month);
+      const termLabel = term === 'first' ? 'الفصل الدراسي الأول' : 'الفصل الدراسي الثاني';
+      const assignedTeachers = (db.teachers || []).filter(t =>
+        (t.assignments || []).some(a => a.subjectName === subjectName && (a.classes || []).includes(cls)));
+      const teacherName = assignedTeachers.length
+        ? assignedTeachers.map(t => escapeHtml(t.name)).join('، ') : '';
+      const printedBy = (typeof resolvePrintedByName === 'function') ? resolvePrintedByName() : '';
+      const printDate = new Date().toLocaleDateString('ar-EG');
+      const classGradeLabelForPrint = (db.classGrade && db.classGrade[cls]) || info.grade || '';
+      const classLabel = (typeof formatClassSectionForPrint === 'function')
+        ? formatClassSectionForPrint(classGradeLabelForPrint, clsSection, clsPlain)
+        : escapeHtml(cls);
+      const metaBarHtmlDet = [
+        `<span>${classLabel}</span>`,
+        `<span><strong>المادة:</strong> ${escapeHtml(subjectName)}${teacherName ? ' — <strong>المعلم:</strong> ' + teacherName : ''}</span>`,
+        `<span><strong>${escapeHtml(monthLabel)}</strong></span>`,
+        blank ? '<span style="color:#b45309;font-weight:700">نموذج للتعبئة اليدوية</span>' : ''
+      ].filter(Boolean).join('');
+
+      const footer = (typeof buildUnifiedFooter === 'function')
+        ? buildUnifiedFooter({
+            captions: ['معلم المادة', 'مشرف المادة', 'وكيل المرحلة', 'موجه المادة', 'مدير المدرسة']
+          })
+        : '';
+
+      const perPage = students.length <= 22 ? Math.max(students.length, 1) : Math.ceil(students.length / 2);
+      const chunks = [];
+      for (let i = 0; i < students.length; i += perPage) chunks.push(students.slice(i, i + perPage));
+      if (!chunks.length) chunks.push([]);
+
+      let pagesHtml = '';
+      chunks.forEach((chunk, pageIdx) => {
+        pagesHtml += `
+        <div class="ministry-landscape-page detailed-sheet-page ds-scope ml-absence-page">
+          <div class="ml-page-label">ورقة ${toHindiDigits(pageIdx + 1)} من ${toHindiDigits(chunks.length)} · كشف رصد غياب · ${escapeHtml(monthLabel)}</div>
+          ${typeof buildUnifiedLetterhead === 'function' ? buildUnifiedLetterhead({
+            title: (blank ? 'كشف رصد غياب (نموذج) — ' : 'كشف رصد غياب — ') + subjectName,
+            subtitleRight: monthLabel,
+            subtitleLeft: termLabel,
+            printedBy,
+            printDate,
+            governorate: info.governorate || '',
+            educationAdmin: info.educationAdmin || '',
+            schoolName: info.schoolName || '',
+            academicYear: info.academicYear || '',
+            metaBarHtml: metaBarHtmlDet
+          }) : ''}
+          <table class="detailed-weekly-table ml-week-first-table ml-absence-table">
+            <thead>${theadHtml}</thead>
+            <tbody>${buildBody(chunk, pageIdx * perPage)}</tbody>
+          </table>
+          <div style="text-align:center;font-size:9px;color:#64748b;margin-top:2mm">✓ حضور · غ غياب · ع عذر · إج إجازة — التواريخ من الروزنامة المركزية</div>
+          ${footer}
+        </div>`;
+      });
+      return pagesHtml;
+    }
+
+    async function printMinistryAbsenceLandscapeSheet(opts) {
+      opts = opts || {};
+      const blank = !!opts.blank;
+      const db = loadDB();
+      // فلاتر تبويب الغياب أولاً ثم الدرجات
+      let subjectName = opts.subjectName || '';
+      let cls = opts.cls || '';
+      let term = opts.term || 'first';
+      let month = opts.month != null ? parseInt(opts.month, 10) : 1;
+      try {
+        if (typeof getFilterState === 'function') {
+          const f = getFilterState();
+          if (f) {
+            if (!subjectName) subjectName = f.subjectName || '';
+            if (!cls) cls = f.classKey || '';
+            if (f.term) term = f.term;
+            if (f.month) month = f.month;
+          }
+        }
+      } catch (e) {}
+      if (!subjectName) subjectName = (document.getElementById('gradeSubjectSelect') || {}).value || '';
+      if (!cls) cls = (document.getElementById('gradeClassSelect') || {}).value || '';
+      if (!opts.term) term = (document.getElementById('gradeTermSelect') || {}).value || term;
+      if (opts.month == null) {
+        const gm = document.getElementById('gradeMonthSelect');
+        if (gm && gm.value) month = parseInt(gm.value, 10);
+      }
+
+      if (!subjectName || !cls) {
+        alert('يرجى اختيار المادة والفصل أولاً (من تبويب الغياب أو الدرجات).');
+        return;
+      }
+
+      let students = db.students.filter(s => classSectionKey(s.class, s.section) === cls);
+      if (typeof filterStudentsForTeacherLanguage === 'function') {
+        students = filterStudentsForTeacherLanguage(students, subjectName, cls);
+      }
+      if (students.length === 0 && !blank) { alert('لا يوجد طلاب في هذا الفصل.'); return; }
+      students.sort((a, b) => a.gender !== b.gender ? (a.gender === 'F' ? -1 : 1) : a.name.localeCompare(b.name));
+
+      const pages = buildMinistryAbsencePagesHtml({
+        db, subjectName, cls, term, month, students, blank
+      });
+      if (!pages) { alert('تعذّر بناء كشف الغياب.'); return; }
+      printMinistryLandscapeHtml(pages); // نفس محرك الطباعة العرضي (بدون غلاف هنا)
+    }
+    window.printMinistryAbsenceLandscapeSheet = printMinistryAbsenceLandscapeSheet;
+
+    async function printMinistryAbsenceBatch(opts) {
+      opts = opts || {};
+      const blank = !!opts.blank;
+      if (typeof canAccessPrintCenter === 'function' && !canAccessPrintCenter()) {
+        alert('مركز الطباعة متاح للإدارة ومدير المرحلة فقط.');
+        return;
+      }
+      if (typeof currentAccountType !== 'undefined' && currentAccountType === 'teacher') {
+        alert('دفعة مركز الطباعة متاحة للإدارة ومدير المرحلة.');
+        return;
+      }
+      const db = loadDB();
+      const classes = (typeof pcGetChecked === 'function') ? pcGetChecked('pcClassList', 'data-class') : [];
+      const subjectNames = (typeof pcGetChecked === 'function') ? pcGetChecked('pcSubjectList', 'data-subject') : [];
+      const term = (document.getElementById('pcBlankTerm') || {}).value || 'first';
+      const month = parseInt((document.getElementById('pcBlankMonth') || {}).value || '1', 10);
+      if (!classes.length || !subjectNames.length) {
+        alert('يرجى تحديد فصل واحد على الأقل ومادة واحدة على الأقل.');
+        return;
+      }
+      const printOrder = (document.getElementById('pcBlankPrintOrder') || {}).value || 'class-first';
+      const jobs = [];
+      function pushJob(cls, sn) {
+        const subj = (db.subjects || []).find(s => s.name === sn);
+        if (!subj) return;
+        if (typeof subjectAppliesToClass === 'function' && !subjectAppliesToClass(subj, cls, db)) return;
+        jobs.push({ cls, subjectName: sn });
+      }
+      if (printOrder === 'subject-first') {
+        subjectNames.forEach(sn => classes.forEach(cls => pushJob(cls, sn)));
+      } else {
+        classes.forEach(cls => subjectNames.forEach(sn => pushJob(cls, sn)));
+      }
+      if (!jobs.length) { alert('لا توجد توليفات صالحة.'); return; }
+      if (jobs.length > 1 && !confirm('طباعة ' + jobs.length + ' كشف غياب عرضي (' + (blank ? 'فارغ' : 'ببيانات') + ')؟')) return;
+
+      let allHtml = '';
+      for (const job of jobs) {
+        let students = db.students.filter(s => classSectionKey(s.class, s.section) === job.cls);
+        if (typeof filterStudentsForTeacherLanguage === 'function') {
+          students = filterStudentsForTeacherLanguage(students, job.subjectName, job.cls);
+        }
+        students.sort((a, b) => a.gender !== b.gender ? (a.gender === 'F' ? -1 : 1) : a.name.localeCompare(b.name));
+        const pages = buildMinistryAbsencePagesHtml({
+          db, subjectName: job.subjectName, cls: job.cls, term, month, students, blank
+        });
+        if (pages) allHtml += pages;
+      }
+      if (!allHtml) { alert('تعذّر بناء أي كشف غياب.'); return; }
+      printMinistryLandscapeHtml(allHtml);
+    }
+    window.printMinistryAbsenceBatch = printMinistryAbsenceBatch;
+
+
     window.printMinistryLandscapeBatch = printMinistryLandscapeBatch;
 
 
@@ -23570,7 +23858,7 @@ function roundToHalf(n){ if (!Number.isFinite(n)) return 0; return Math.round(n 
     const att=document.getElementById('tab-attendance');
     if(att && !document.getElementById('gspWeeklyAttendanceBox')){
       const box=document.createElement('div');box.id='gspWeeklyAttendanceBox';box.className='att-week-register-wrap';
-      box.innerHTML='<div class="att-week-register-title">📋 كشف المواظبة القائم على الأسابيع</div><p class="att-week-register-note">هذا هو الكشف الأسبوعي الذي يجمع الأسابيع الأربعة مع تواريخها الفعلية، ويقرأ الحضور والغياب من سجل المواظبة المحفوظ لكل يوم.</p><div style="display:flex;align-items:end;gap:10px;flex-wrap:wrap;margin-bottom:10px;padding:10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px"><div class="form-group" style="margin:0;min-width:210px"><label style="font-size:12px">📅 تاريخ بداية الأسبوع الأول للشهر المحدد</label><input type="date" id="gspWeek1Date" style="width:100%;box-sizing:border-box;padding:7px 9px;border:1px solid #cbd5e1;border-radius:8px" onchange="gspSaveWeek1Date(this.value)"></div><div style="font-size:11.5px;color:#64748b;max-width:500px;line-height:1.7">يحدد هذا التاريخ الأسبوع الأول، ثم يحسب النظام الأسبوع الثاني والثالث والرابع تلقائياً بفاصل 7 أيام. وهو نفس التاريخ المستخدم في الروزنامة وكشوف الأسابيع.</div><button type="button" class="btn btn-outline btn-sm" onclick="activateTab(\'schoolinfo\');setTimeout(()=>{document.getElementById(\'siPeriodsEditor\')?.scrollIntoView({behavior:\'smooth\',block:\'start\'});},100)">⚙️ إعدادات الفترات</button></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn btn-primary btn-sm" onclick="gspPrintWeeklyAttendance(false)">🖨️ طباعة كشف المواظبة بالبيانات الفعلية</button><button type="button" class="btn btn-outline btn-sm" onclick="gspPrintWeeklyAttendance(true)">🖨️ طباعة كشف مواظبة فارغ</button></div><div id="gspWeek1Msg" style="font-size:12px;margin-top:7px;color:#166534"></div>';
+      box.innerHTML='<div class="att-week-register-title">📋 كشف المواظبة القائم على الأسابيع</div><p class="att-week-register-note">هذا هو الكشف الأسبوعي الذي يجمع الأسابيع الأربعة مع تواريخها الفعلية، ويقرأ الحضور والغياب من سجل المواظبة المحفوظ لكل يوم.</p><div style="display:flex;align-items:end;gap:10px;flex-wrap:wrap;margin-bottom:10px;padding:10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px"><div class="form-group" style="margin:0;min-width:210px"><label style="font-size:12px">📅 تاريخ بداية الأسبوع الأول للشهر المحدد</label><input type="date" id="gspWeek1Date" style="width:100%;box-sizing:border-box;padding:7px 9px;border:1px solid #cbd5e1;border-radius:8px" onchange="gspSaveWeek1Date(this.value)"></div><div style="font-size:11.5px;color:#64748b;max-width:500px;line-height:1.7">يحدد هذا التاريخ الأسبوع الأول، ثم يحسب النظام الأسبوع الثاني والثالث والرابع تلقائياً بفاصل 7 أيام. وهو نفس التاريخ المستخدم في الروزنامة وكشوف الأسابيع.</div><button type="button" class="btn btn-outline btn-sm" onclick="activateTab(\'schoolinfo\');setTimeout(()=>{document.getElementById(\'siPeriodsEditor\')?.scrollIntoView({behavior:\'smooth\',block:\'start\'});},100)">⚙️ إعدادات الفترات</button></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn btn-primary btn-sm" onclick="gspPrintWeeklyAttendance(false)">🖨️ طباعة كشف المواظبة بالبيانات الفعلية</button><button type="button" class="btn btn-outline btn-sm" onclick="gspPrintWeeklyAttendance(true)">🖨️ طباعة كشف مواظبة فارغ</button><button type="button" class="btn btn-primary btn-sm" onclick="printMinistryAbsenceLandscapeSheet({blank:false})">🖨️ كشف غياب عرضي (ببيانات)</button><button type="button" class="btn btn-outline btn-sm" onclick="printMinistryAbsenceLandscapeSheet({blank:true})">🖨️ كشف غياب عرضي (فارغ)</button></div><div id="gspWeek1Msg" style="font-size:12px;margin-top:7px;color:#166534"></div>';
       const grid=document.getElementById('attGridWrap'); if(grid&&grid.parentNode)grid.parentNode.insertBefore(box,grid); else att.appendChild(box);
     }
     updatePrintSummary();
