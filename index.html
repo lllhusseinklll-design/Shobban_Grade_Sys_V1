@@ -3589,7 +3589,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
           </div>
           <div class="form-group">
             <label>📆 الشهر</label>
-            <select id="gradeMonthSelect" onchange="loadGradesUI()">
+            <select id="gradeMonthSelect" onchange="loadGradesUI(); updateGradeCalendarSummary()">
               <option value="1">الشهر الأول</option>
               <option value="2">الشهر الثاني</option>
             </select>
@@ -3602,6 +3602,8 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
             </div>
           </div>
         </div>
+
+        <div id="gradeCalendarSummary" style="margin:-6px 0 14px;padding:9px 12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;color:#166534;font-size:12.5px"></div>
 
         <div class="card" id="globalLockPanel" style="display:none; background:#fff7ed; border:1px solid #fdba74; margin-bottom:16px; padding:14px 18px;">
           <div class="flex justify-between items-center flex-wrap gap-12">
@@ -3938,6 +3940,8 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
             <select id="attClassSelect" onchange="onAttendanceFilterChange()"></select>
           </div>
         </div>
+
+        <div id="attendanceCalendarSummary" style="margin:-4px 0 14px;padding:9px 12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;color:#166534;font-size:12.5px"></div>
 
         <!-- ===== تكامل سلوكي: رصد مخالفة من المعلم أثناء الحصة ===== -->
         <div class="card" id="soloukiBehaviorCard" style="background:linear-gradient(180deg,#fdf4ff,#faf5ff);border:1px solid #e9d5ff;margin-bottom:14px;">
@@ -4383,6 +4387,13 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
               <option value="second">الفصل الدراسي الثاني</option>
             </select>
           </div>
+        </div>
+
+        <div class="card" id="termCalendarCard" style="margin-top:16px;border:2px solid #3f7a57;background:linear-gradient(180deg,#ffffff,#f6fbf7)">
+          <h2 style="margin-top:0;color:#285c42">🗓️ الروزنامة المركزية للأسابيع</h2>
+          <p style="color:#475569;line-height:1.8;margin-bottom:12px">حدد <strong>تاريخ بداية الأسبوع الأول</strong> وعدد أسابيع الفصل بالكامل، ثم حدد لكل شهر من أي أسبوع إلى أي أسبوع. بعد الحفظ تصبح هذه الروزنامة هي المرجع الموحد لكشوف رصد الدرجات وكشوف الغياب والمواظبة والطباعة.</p>
+          <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap"><strong>الفصل:</strong><select id="siCalendarTerm" style="min-width:190px"><option value="first">الفصل الدراسي الأول</option><option value="second">الفصل الدراسي الثاني</option></select></div>
+          <div id="termCalendarEditor"></div>
         </div>
 
         <h2 class="mt-16">📅 ضبط فترات الرصد</h2>
@@ -11876,7 +11887,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
       const weekDates = (typeof getFourWeekDates === 'function') ? getFourWeekDates(term, month - 1) : ['','','',''];
       const weekCount = 4;
       const scopeWeeks = (typeof getPeriodWeekCount === 'function') ? getPeriodWeekCount(term, month - 1) : 4;
-      const weekNames = ['الأسبوع 1', 'الأسبوع 2', 'الأسبوع 3', 'الأسبوع 4'];
+      const _calMonth = getCentralCalendar(term).months[month - 1] || {startWeek:1}; const weekNames = [0,1,2,3].map(i => 'الأسبوع ' + (Number(_calMonth.startWeek || 1) + i));
       const periodExam = (typeof periodHasMonthlyExam === 'function') ? periodHasMonthlyExam(term, month - 1) : true;
       const weekOutCls = (wi) => (typeof isWeekExcluded === 'function' ? isWeekExcluded(term, month - 1, wi) : (wi >= scopeWeeks)) ? ' week-out-of-scope' : '';
       const formatWeekDateAr = (typeof window.formatWeekDateAr === 'function') ? window.formatWeekDateAr
@@ -14391,7 +14402,7 @@ function renderMonthlyExportButtons() {
       const weekDates = getFourWeekDates(term, month - 1);
       const weekCount = 4;
       const scopeWeeks = (typeof getPeriodWeekCount === 'function') ? getPeriodWeekCount(term, month - 1) : 4;
-      const weekNames = ['الأسبوع 1', 'الأسبوع 2', 'الأسبوع 3', 'الأسبوع 4'];
+      const _calMonth = getCentralCalendar(term).months[month - 1] || {startWeek:1}; const weekNames = [0,1,2,3].map(i => 'الأسبوع ' + (Number(_calMonth.startWeek || 1) + i));
       const periodExam = (typeof periodHasMonthlyExam === 'function') ? periodHasMonthlyExam(term, month - 1) : true;
       const weekOutCls = (wi) => (typeof isWeekExcluded === 'function' ? isWeekExcluded(term, month - 1, wi) : (wi >= scopeWeeks)) ? ' week-out-of-scope' : '';
 
@@ -20277,17 +20288,17 @@ function roundToHalf(n){ if (!Number.isFinite(n)) return 0; return Math.round(n 
 
     return pages.map((pageStudents, pi) => {
       let thead = `<tr><th rowspan="3" class="att-fixed" style="width:7mm;">م</th><th rowspan="3" class="att-fixed" style="width:38mm;">اسم التلميذ</th>`;
-      for (let w=1;w<=4;w++) thead += `<th colspan="${daysPerWeek}" class="att-week-${w}${((typeof isWeekExcluded==='function'?isWeekExcluded(f.term,f.month-1,w-1):(w>scopeWeeksAtt)))?' week-out-of-scope':''}">الأسبوع ${['الأول','الثاني','الثالث','الرابع'][w-1]}${((typeof isWeekExcluded==='function'?isWeekExcluded(f.term,f.month-1,w-1):(w>scopeWeeksAtt)))?' (خارج الرصد)':''}</th>`;
+      for (let w=1;w<=scopeWeeksAtt;w++) thead += `<th colspan="${daysPerWeek}" class="att-week-${w}">الأسبوع ${toHindiDigits((getCentralCalendar(f.term).months[f.month-1]?.startWeek || 1)+w-1)}${((typeof isWeekExcluded==='function'?isWeekExcluded(f.term,f.month-1,w-1):false))?' (خارج الرصد)':''}</th>`;
       thead += `<th rowspan="3" class="att-sum-abs"><span class="att-v">عدد أيام الغياب</span></th>`;
       thead += `<th rowspan="3" class="att-sum-rate"><span class="att-v">نسبة الحضور %</span></th>`;
       thead += `<th rowspan="3" class="att-sum-score"><span class="att-v">درجة المواظبة</span></th></tr><tr>`;
-      for (let w=0;w<4;w++) for (let di=0;di<daysPerWeek;di++) {
+      for (let w=0;w<scopeWeeksAtt;w++) for (let di=0;di<daysPerWeek;di++) {
         const col = columns[w * daysPerWeek + di];
         const dn = col ? (col.label || '') : '';
         thead += `<th class="att-day-${w+1}"><span class="att-v">${escFn(dn)}</span></th>`;
       }
       thead += `</tr><tr>`;
-      for (let w=0;w<4;w++) for (let di=0;di<daysPerWeek;di++) {
+      for (let w=0;w<scopeWeeksAtt;w++) for (let di=0;di<daysPerWeek;di++) {
         const col = columns[w * daysPerWeek + di];
         const dd = col ? (col.dateLabel || (col.dateISO ? String(col.dateISO).slice(-2) : '—')) : '—';
         thead += `<th class="att-day-${w+1}"><span class="att-v">${escFn(dd)}</span></th>`;
@@ -23367,7 +23378,7 @@ function roundToHalf(n){ if (!Number.isFinite(n)) return 0; return Math.round(n 
     if(!f||!f.subjectName||!f.classKey){alert('اختر المادة والفصل أولاً من تبويب الغياب والمواظبة.');return;}
     const area=document.getElementById('printAttendanceArea');if(!area)return;
     if(typeof clearInactivePrintAreas==='function')clearInactivePrintAreas('printAttendanceArea');
-    const columns=getMonthCalendarDays(f.term,f.month);const daysPerWeek=getActiveDayIndices(att).length;const studyDays=getSubjectStudyDays(att,f.subjectName,f.classKey);const weekNames=['الأول','الثاني','الثالث','الرابع'];
+    const columns=getMonthCalendarDays(f.term,f.month);const daysPerWeek=getActiveDayIndices(att).length;const studyDays=getSubjectStudyDays(att,f.subjectName,f.classKey);const weekCount=getPeriodWeekCount(f.term,f.month-1);const monthCal=getCentralCalendar(f.term).months[f.month-1]||{startWeek:1};
     const students=(db.students||[]).filter(st=>{const k=typeof classSectionKey==='function'?classSectionKey(st.class,st.section):(st.class||'');return k===f.classKey&&(typeof canAccessStudentGrade!=='function'||canAccessStudentGrade(f.subjectName,st));});
     const info=db.schoolInfo||{};const labels=getMonthLabels(f.term)||[];const monthName=labels[f.month-1]||('الشهر '+f.month);const classLabel=typeof classSectionLabel==='function'?classSectionLabel(f.classKey):f.classKey;
     const teacher=(db.teachers||[]).find(t=>(t.assignments||[]).some(a=>a.subjectName===f.subjectName&&(a.classes||[]).includes(f.classKey)));
@@ -23376,13 +23387,13 @@ function roundToHalf(n){ if (!Number.isFinite(n)) return 0; return Math.round(n 
     const chunk=students.length?students:[{}];
     for(let start=0;start<chunk.length;start+=35){
       const rows=chunk.slice(start,start+35);let head='<tr><th rowspan="3">م</th><th rowspan="3">رقم الجلوس</th><th rowspan="3" class="gs-name">اسم الطالب</th>';
-      for(let w=0;w<4;w++){const out=typeof isWeekExcluded==='function'&&isWeekExcluded(f.term,f.month-1,w);head+=`<th colspan="${daysPerWeek}" class="${out?'week-out-of-scope':''}">الأسبوع ${weekNames[w]}${out?' — خارج الرصد':''}</th><th rowspan="3" class="gsp-week-total ${out?'week-out-of-scope':''}">غياب<br>الأسبوع</th>`;}
+      for(let w=0;w<weekCount;w++){head+=`<th colspan="${daysPerWeek}" class="att-week-${w+1}">الأسبوع ${monthCal.startWeek+w}</th><th rowspan="3" class="gsp-week-total">غياب<br>الأسبوع</th>`;}
       head+='<th rowspan="3">إجمالي<br>الغياب</th><th rowspan="3">نسبة<br>الحضور %</th></tr><tr>';
-      for(let w=0;w<4;w++)for(let di=0;di<daysPerWeek;di++){const c=columns[w*daysPerWeek+di];head+=`<th class="${c&&c.outOfScope?'week-out-of-scope':''}">${c?escFn(c.label):'—'}</th>`;}head+='</tr><tr>';
-      for(let w=0;w<4;w++)for(let di=0;di<daysPerWeek;di++){const c=columns[w*daysPerWeek+di];head+=`<th class="${c&&c.outOfScope?'week-out-of-scope':''}">${c?escFn(c.dateLabel||'—'):'—'}</th>`;}head+='</tr>';
-      let body='';rows.forEach((st,ri)=>{const serial=start+ri+1;if(!st.id){body+=`<tr><td>${serial}</td><td></td><td class="gs-name"></td>${columns.map(c=>`<td class="${c&&c.outOfScope?'week-out-of-scope':''}"></td>`).join('')}${[1,2,3,4].map(()=>'<td></td>').join('')}<td></td><td></td></tr>`;return;}
+      for(let w=0;w<weekCount;w++)for(let di=0;di<daysPerWeek;di++){const c=columns[w*daysPerWeek+di];head+=`<th class="${c&&c.outOfScope?'week-out-of-scope':''}">${c?escFn(c.label):'—'}</th>`;}head+='</tr><tr>';
+      for(let w=0;w<weekCount;w++)for(let di=0;di<daysPerWeek;di++){const c=columns[w*daysPerWeek+di];head+=`<th class="${c&&c.outOfScope?'week-out-of-scope':''}">${c?escFn(c.dateLabel||'—'):'—'}</th>`;}head+='</tr>';
+      let body='';rows.forEach((st,ri)=>{const serial=start+ri+1;if(!st.id){body+=`<tr><td>${serial}</td><td></td><td class="gs-name"></td>${columns.map(c=>`<td class="${c&&c.outOfScope?'week-out-of-scope':''}"></td>`).join('')}${Array.from({length:weekCount},()=>'<td></td>').join('')}<td></td><td></td></tr>`;return;}
         let total=0,expected=0;let row=`<tr><td>${serial}</td><td>${escFn(st.seat||'')}</td><td class="gs-name">${escFn(st.name||'')}</td>`;
-        for(let w=1;w<=4;w++){let wa=0,we=0;for(let di=0;di<daysPerWeek;di++){const c=columns[(w-1)*daysPerWeek+di];let cell='';if(!c||!isColumnStudyDay(c,studyDays))cell='';else if(c.isHoliday)cell='إج';else if(c.outOfScope)cell='';else{we++;if(!blank){const v=att.records[recordKey(st.id,f.subjectName,f.term,f.month,c.dateISO)]||'';cell=v==='غ'?'غ':(v==='ع'?'ع':'✓');if(v==='غ')wa++;}else cell='';}row+=`<td class="${c&&c.outOfScope?'week-out-of-scope':''}">${cell}</td>`;}if(!blank){total+=wa;expected+=we;}row+=`<td class="gsp-week-total ${typeof isWeekExcluded==='function'&&isWeekExcluded(f.term,f.month-1,w-1)?'week-out-of-scope':''}">${blank?'':wa}</td>`;}const rate=(!blank&&expected>0)?Math.round(((expected-total)/expected)*1000)/10:'';row+=`<td>${blank?'':total}</td><td>${rate===''?'':rate}</td></tr>`;body+=row;});
+        for(let w=1;w<=weekCount;w++){let wa=0,we=0;for(let di=0;di<daysPerWeek;di++){const c=columns[(w-1)*daysPerWeek+di];let cell='';if(!c||!isColumnStudyDay(c,studyDays))cell='';else if(c.isHoliday)cell='إج';else if(c.outOfScope)cell='';else{we++;if(!blank){const v=att.records[recordKey(st.id,f.subjectName,f.term,f.month,c.dateISO)]||'';cell=v==='غ'?'غ':(v==='ع'?'ع':'✓');if(v==='غ')wa++;}else cell='';}row+=`<td class="${c&&c.outOfScope?'week-out-of-scope':''}">${cell}</td>`;}if(!blank){total+=wa;expected+=we;}row+=`<td class="gsp-week-total ${typeof isWeekExcluded==='function'&&isWeekExcluded(f.term,f.month-1,w-1)?'week-out-of-scope':''}">${blank?'':wa}</td>`;}const rate=(!blank&&expected>0)?Math.round(((expected-total)/expected)*1000)/10:'';row+=`<td>${blank?'':total}</td><td>${rate===''?'':rate}</td></tr>`;body+=row;});
       const letter=(typeof buildUnifiedLetterhead==='function')?buildUnifiedLetterhead({title:'سجل الغياب الأسبوعي',subtitleRight:monthName,subtitleLeft:f.term==='first'?'الفصل الدراسي الأول':'الفصل الدراسي الثاني',printedBy:typeof resolvePrintedByName==='function'?resolvePrintedByName():'المستخدم',printDate:new Date().toLocaleDateString('ar-EG'),governorate:info.governorate||'',educationAdmin:info.educationAdmin||'',schoolName:info.schoolName||'',academicYear:info.academicYear||'',metaBarHtml:`<span><strong>الفصل:</strong> ${escFn(classLabel)}</span><span><strong>المادة:</strong> ${escFn(f.subjectName)}${teacherName?' — <strong>المعلم:</strong> '+escFn(teacherName):''}</span>`}):'';
       pages+=`<div class="att-print-page detailed-sheet-page gsp-weekly-att-page">${letter}<table class="att-print-table gsp-weekly-att-table"><thead>${head}</thead><tbody>${body}</tbody></table><div style="text-align:center;font-size:9px;color:#64748b;margin-top:3mm">✓ حضور · غ غياب · ع عذر · إج إجازة. التاريخ مأخوذ من روزنامة النظام، والبيانات من سجل الغياب المحفوظ.</div></div>`;
     }
@@ -23408,6 +23419,71 @@ function roundToHalf(n){ if (!Number.isFinite(n)) return 0; return Math.round(n 
 })();
 </script>
 </script>
+
+<!-- ==================== التقويم الدراسي المركزي للأسابيع ==================== -->
+<script>
+(function(){
+  const CAL_KEY='termCalendar';
+  const AR_WEEKS=['الأول','الثاني','الثالث','الرابع','الخامس','السادس','السابع','الثامن','التاسع','العاشر','الحادي عشر','الثاني عشر','الثالث عشر','الرابع عشر','الخامس عشر','السادس عشر','السابع عشر','الثامن عشر','التاسع عشر','العشرون','الحادي والعشرون','الثاني والعشرون','الثالث والعشرون','الرابع والعشرون','الخامس والعشرون','السادس والعشرون','السابع والعشرون','الثامن والعشرون','التاسع والعشرون','الثلاثون'];
+  const CAL_MONTH_DEFAULTS={first:['سبتمبر','أكتوبر','نوفمبر','ديسمبر'],second:['فبراير','مارس','أبريل','مايو']};
+  const FALLBACK_START={first:'2026-09-13',second:''};
+  function calDb(){ return typeof loadDB==='function'?loadDB():{}; }
+  function addDaysISO(iso,n){ if(!iso)return ''; const d=new Date(iso+'T00:00:00'); if(isNaN(d.getTime()))return ''; d.setDate(d.getDate()+Number(n||0)); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+  function calFmt(iso){ if(!iso)return '—'; const d=new Date(iso+'T00:00:00'); if(isNaN(d.getTime()))return iso; return toHindiDigits(`${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`); }
+  function calLoad(term){
+    const db=calDb(), info=db.schoolInfo||{}; const tc=info[CAL_KEY]||{}; let c=tc[term];
+    if(c && c.startDate && Number(c.totalWeeks)>0 && Array.isArray(c.months) && c.months.length) return JSON.parse(JSON.stringify(c));
+    const periods=(typeof migrateMonthsToPeriods==='function')?migrateMonthsToPeriods(info)[term]||[]:[];
+    const start=(periods[0]&&periods[0].week1)||((info.week1Dates||{})[term]||[])[0]||FALLBACK_START[term]||'';
+    let cursor=1; const months=(periods.length?periods:CAL_MONTH_DEFAULTS[term].map((name,i)=>({name,weeks:i<2?4:0}))).map((p,i)=>{const w=Math.max(1,Number(p.weeks)||4);const out={name:p.name||('الشهر '+(i+1)),startWeek:cursor,endWeek:cursor+w-1};cursor=out.endWeek+1;return out;}).filter(m=>m.startWeek<=Math.max(cursor-1,1));
+    const total=Math.max(1,Math.max(cursor-1,16));
+    return {startDate:start,totalWeeks:total,months:months.length?months:[{name:'الشهر الأول',startWeek:1,endWeek:Math.min(8,total)},{name:'الشهر الثاني',startWeek:Math.min(9,total),endWeek:total}]};
+  }
+  function calSaveToDb(term,c){
+    const db=calDb(); db.schoolInfo=db.schoolInfo||{}; db.schoolInfo[CAL_KEY]=db.schoolInfo[CAL_KEY]||{}; db.schoolInfo[CAL_KEY][term]=c;
+    // مزامنة البنية القديمة حتى تبقى كل الوظائف الحالية متوافقة.
+    db.schoolInfo.recordingPeriods=db.schoolInfo.recordingPeriods||{first:[],second:[]}; db.schoolInfo.week1Dates=db.schoolInfo.week1Dates||{first:[],second:[]}; db.schoolInfo.months=db.schoolInfo.months||{first:[],second:[]};
+    db.schoolInfo.recordingPeriods[term]=c.months.map((m,i)=>({id:term[0]+(i+1),name:m.name||('الشهر '+(i+1)),weeks:Math.max(0,m.endWeek-m.startWeek+1),excludedWeeks:[],week1:addDaysISO(c.startDate,(m.startWeek-1)*7),hasExam:(db.schoolInfo.recordingPeriods[term]||[])[i]?.hasExam||false,holidays:(db.schoolInfo.recordingPeriods[term]||[])[i]?.holidays||'',enabled:true}));
+    db.schoolInfo.week1Dates[term]=c.months.map(m=>addDaysISO(c.startDate,(m.startWeek-1)*7));
+    db.schoolInfo.months[term]=c.months.map(m=>m.name||'فترة');
+    saveDB(db);
+    try{ const root=getRootDB(); (root.stages||[]).forEach(st=>{st.data=st.data||{};st.data.schoolInfo=st.data.schoolInfo||{};st.data.schoolInfo[CAL_KEY]=JSON.parse(JSON.stringify(db.schoolInfo[CAL_KEY]));st.data.schoolInfo.recordingPeriods=JSON.parse(JSON.stringify(db.schoolInfo.recordingPeriods));st.data.schoolInfo.week1Dates=JSON.parse(JSON.stringify(db.schoolInfo.week1Dates));st.data.schoolInfo.months=JSON.parse(JSON.stringify(db.schoolInfo.months));}); if(typeof persistRootDB==='function')persistRootDB(root); }catch(e){console.warn('calendar propagation',e);}
+  }
+  function renderCalendar(){
+    const box=document.getElementById('termCalendarEditor'); if(!box)return; const term=document.getElementById('siCalendarTerm')?.value||'first'; const c=calLoad(term); window._termCalendarDraft=window._termCalendarDraft||{}; window._termCalendarDraft[term]=c;
+    const canEdit=currentAccountType==='superadmin'; const dis=canEdit?'':'disabled';
+    const weekOpts=Array.from({length:c.totalWeeks},(_,i)=>`<option value="${i+1}">الأسبوع ${AR_WEEKS[i]||i+1}</option>`).join('');
+    let rows=''; c.months.forEach((m,i)=>{const startOpts=weekOpts;const endOpts=weekOpts;rows+=`<div class="card" style="padding:12px;border:1px solid #dbe7df;background:#fbfefc"><div style="display:grid;grid-template-columns:1.4fr 1fr 1fr auto;gap:10px;align-items:end"><div class="form-group"><label>اسم الشهر / الفترة ${i+1}</label><input ${dis} value="${escapeHtml(m.name||'')}" onchange="termCalField(${i},'name',this.value)"></div><div class="form-group"><label>${i===0?'يبدأ من':'يبدأ بعد الأسبوع السابق'}</label><select ${dis} onchange="termCalField(${i},'startWeek',this.value)">${startOpts}</select></div><div class="form-group"><label>ينتهي عند</label><select ${dis} onchange="termCalField(${i},'endWeek',this.value)">${endOpts}</select></div><div>${canEdit&&c.months.length>2?`<button type="button" class="btn btn-outline btn-sm" onclick="termCalRemoveMonth(${i})">حذف</button>`:''}</div></div><div style="font-size:12px;color:#64748b;margin-top:7px">تاريخ بداية هذا الشهر: <strong>${calFmt(addDaysISO(c.startDate,(m.startWeek-1)*7))}</strong> · عدد أسابيعه: <strong>${Math.max(0,m.endWeek-m.startWeek+1)}</strong></div></div>`;});
+    box.innerHTML=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px"><div class="form-group"><label>📅 تاريخ بداية الأسبوع الأول</label><input ${dis} type="date" id="termCalStartDate" value="${c.startDate||''}" onchange="termCalBaseField('startDate',this.value)"></div><div class="form-group"><label>🔢 عدد أسابيع الفصل الدراسي بالكامل</label><input ${dis} type="number" min="1" max="40" id="termCalTotalWeeks" value="${c.totalWeeks}" onchange="termCalBaseField('totalWeeks',this.value)"></div></div><div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:10px 12px;margin-bottom:12px;line-height:1.8;font-size:13px"><strong>القاعدة:</strong> الأسبوع 1 يبدأ من التاريخ المحدد، وكل أسبوع يليه تلقائياً بفاصل 7 أيام. تحدد هنا بعد أي أسبوع يبدأ كل شهر؛ وستستخدم نفس الخريطة في الرصد والطباعة والغياب.</div>${rows}<div style="display:flex;gap:8px;margin-top:10px">${canEdit?'<button type="button" class="btn btn-outline btn-sm" onclick="termCalAddMonth()">➕ إضافة شهر/فترة</button><button type="button" class="btn btn-primary btn-sm" onclick="saveTermCalendar()">💾 حفظ الروزنامة</button>':''}</div><div id="termCalendarMsg" style="font-size:13px;margin-top:8px"></div>`;
+    c.months.forEach((m,i)=>{const s=box.querySelectorAll('select')[i*2],e=box.querySelectorAll('select')[i*2+1];if(s)s.value=String(m.startWeek);if(e)e.value=String(m.endWeek);});
+  }
+  window.termCalField=function(i,f,v){const term=document.getElementById('siCalendarTerm')?.value||'first';const c=window._termCalendarDraft?.[term]||calLoad(term);if(f==='name')c.months[i].name=v;else c.months[i][f]=Math.max(1,Math.min(c.totalWeeks,parseInt(v,10)||1)); if(f==='startWeek'&&c.months[i].endWeek<c.months[i].startWeek)c.months[i].endWeek=c.months[i].startWeek; if(f==='endWeek'&&c.months[i].endWeek<c.months[i].startWeek)c.months[i].startWeek=c.months[i].endWeek; window._termCalendarDraft[term]=c;renderCalendar();};
+  window.termCalBaseField=function(f,v){const term=document.getElementById('siCalendarTerm')?.value||'first';const c=window._termCalendarDraft?.[term]||calLoad(term);if(f==='startDate')c.startDate=v;else c.totalWeeks=Math.max(1,Math.min(40,parseInt(v,10)||1)); c.months.forEach(m=>{m.startWeek=Math.min(m.startWeek,c.totalWeeks);m.endWeek=Math.min(m.endWeek,c.totalWeeks);if(m.endWeek<m.startWeek)m.endWeek=m.startWeek;});window._termCalendarDraft[term]=c;renderCalendar();};
+  window.termCalAddMonth=function(){const term=document.getElementById('siCalendarTerm')?.value||'first';const c=window._termCalendarDraft?.[term]||calLoad(term);const last=c.months[c.months.length-1];const sw=Math.min(c.totalWeeks,(last?last.endWeek+1:1));c.months.push({name:'الشهر '+(c.months.length+1),startWeek:sw,endWeek:c.totalWeeks});window._termCalendarDraft[term]=c;renderCalendar();};
+  window.termCalRemoveMonth=function(i){const term=document.getElementById('siCalendarTerm')?.value||'first';const c=window._termCalendarDraft?.[term]||calLoad(term);if(c.months.length<=2)return;c.months.splice(i,1);window._termCalendarDraft[term]=c;renderCalendar();};
+  window.saveTermCalendar=function(){const term=document.getElementById('siCalendarTerm')?.value||'first';const c=window._termCalendarDraft?.[term]||calLoad(term);c.months.sort((a,b)=>a.startWeek-b.startWeek);for(let i=0;i<c.months.length;i++){if(i===0)c.months[i].startWeek=1;else c.months[i].startWeek=Math.max(c.months[i].startWeek,c.months[i-1].endWeek+1);c.months[i].endWeek=Math.max(c.months[i].startWeek,Math.min(c.totalWeeks,c.months[i].endWeek));}if(c.months.length)c.months[c.months.length-1].endWeek=c.totalWeeks;calSaveToDb(term,c);const msg=document.getElementById('termCalendarMsg');if(msg)msg.textContent='✅ تم حفظ الروزنامة المركزية، وتم تحديث تواريخ الشهور والأسابيع المستخدمة في الرصد والطباعة.';try{populateMonthSelects();}catch(e){}try{renderCalendar();}catch(e){}};
+  window.loadTermCalendarUI=function(){try{renderCalendar();}catch(e){console.warn(e)}};
+  // الخريطة المركزية: هذه الدوال تحل محل منطق «أربعة أسابيع ثابتة لكل شهر» في الطباعة والرصد.
+  function getCentralCalendar(term){const db=calDb();const tc=db.schoolInfo?.[CAL_KEY]?.[term];if(tc&&tc.startDate&&Number(tc.totalWeeks)>0&&Array.isArray(tc.months))return tc;return calLoad(term);}
+  function getWeek1DateISO(term,monthIndex0){const c=getCentralCalendar(term),m=c.months[monthIndex0];return m?addDaysISO(c.startDate,(m.startWeek-1)*7):'';}
+  function getFourWeekDates(term,monthIndex0){const c=getCentralCalendar(term),m=c.months[monthIndex0];if(!m)return ['', '', '', ''];const out=[];for(let w=m.startWeek;w<=Math.min(c.totalWeeks,m.endWeek);w++)out.push(addDaysISO(c.startDate,(w-1)*7));while(out.length<4)out.push('');return out.slice(0,4);}
+  function getPeriodWeekCount(term,monthIndex0){const c=getCentralCalendar(term),m=c.months[monthIndex0];return m?Math.max(0,m.endWeek-m.startWeek+1):0;}
+  function isWeekExcluded(term,monthIndex0,weekIndex0){const c=getCentralCalendar(term),m=c.months[monthIndex0];return !m || (m.startWeek+weekIndex0)>m.endWeek || (m.startWeek+weekIndex0)>c.totalWeeks;}
+  function getRecordingPeriods(term){const c=getCentralCalendar(term);return c.months.map((m,i)=>({id:term[0]+(i+1),name:m.name||('الشهر '+(i+1)),weeks:m.endWeek-m.startWeek+1,excludedWeeks:[],week1:addDaysISO(c.startDate,(m.startWeek-1)*7),hasExam:false,holidays:'',enabled:true}));}
+  function getRecordingPeriod(term,monthIndex0){return getRecordingPeriods(term)[monthIndex0]||null;}
+  function getMonthLabels(term){return getRecordingPeriods(term).map(p=>p.name||'فترة');}
+  // استبدال getMonthCalendarDays بحيث تبني الأيام من الروزنامة المركزية.
+  function getMonthCalendarDays(term,month){const db=calDb(),att=ensureAttendance(db),c=getCentralCalendar(term),m=c.months[month-1];const active=getActiveDayIndices(att),holidays=collectSchoolHolidaySet(),cols=[];if(!m)return cols;for(let w=m.startWeek;w<=m.endWeek;w++){const base=parseISO(addDaysISO(c.startDate,(w-1)*7));if(!base)continue;const startJs=base.getDay();active.forEach((jsDay,di)=>{let delta=jsDay-startJs;if(delta<0)delta+=7;const d=new Date(base);d.setDate(d.getDate()+delta);const iso=toISO(d);cols.push({week:w-m.startWeek+1,globalWeek:w,dayIdx:di,jsDay,dateISO:iso,label:DAY_LABELS[di]||'',dateLabel:calFmt(iso),isHoliday:holidays.has(iso),hasDate:true,outOfScope:false});});}return cols;}
+  // حفظ تقويم الروزنامة قبل حفظ بيانات المدرسة حتى لا تمسحه saveSchoolInfo القديمة.
+  const oldSaveSchoolInfo=window.saveSchoolInfo;
+  window.saveSchoolInfo=function(){try{['first','second'].forEach(term=>{const c=window._termCalendarDraft?.[term];if(c)calSaveToDb(term,c);});}catch(e){console.warn('calendar pre-save',e)} const r=typeof oldSaveSchoolInfo==='function'?oldSaveSchoolInfo.apply(this,arguments):undefined;try{['first','second'].forEach(term=>{const c=window._termCalendarDraft?.[term]||calLoad(term);calSaveToDb(term,c);});}catch(e){console.warn('calendar post-save',e)}return r;};
+  window.updateGradeCalendarSummary=function(){const box=document.getElementById('gradeCalendarSummary');if(!box)return;const term=document.getElementById('gradeTermSelect')?.value||'first';const m=(parseInt(document.getElementById('gradeMonthSelect')?.value||'1',10)-1);const c=getCentralCalendar(term),p=c.months[m];if(!p){box.textContent='لا توجد فترة محددة في الروزنامة لهذا الاختيار.';return;}const a=addDaysISO(c.startDate,(p.startWeek-1)*7),b=addDaysISO(c.startDate,(p.endWeek-1)*7);box.innerHTML='🗓️ <strong>'+escapeHtml(p.name||('الشهر '+(m+1)))+'</strong> · من <strong>الأسبوع '+(p.startWeek)+'</strong> إلى <strong>الأسبوع '+(p.endWeek)+'</strong> · بداية الأسبوع: <strong>'+calFmt(a)+'</strong> · بداية آخر أسبوع: <strong>'+calFmt(b)+'</strong>';};
+  window.updateAttendanceCalendarSummary=function(){const box=document.getElementById('attendanceCalendarSummary');if(!box)return;const term=document.getElementById('attTermSelect')?.value||'first';const m=(parseInt(document.getElementById('attMonthSelect')?.value||'1',10)-1);const c=getCentralCalendar(term),p=c.months[m];if(!p){box.textContent='لا توجد فترة محددة في الروزنامة لهذا الاختيار.';return;}box.innerHTML='🗓️ <strong>'+escapeHtml(p.name||('الشهر '+(m+1)))+'</strong> · الأسابيع <strong>'+p.startWeek+'–'+p.endWeek+'</strong> · من <strong>'+calFmt(addDaysISO(c.startDate,(p.startWeek-1)*7))+'</strong> إلى بداية الأسبوع <strong>'+calFmt(addDaysISO(c.startDate,(p.endWeek-1)*7))+'</strong> · كل أسبوع مقسم إلى أيام وتواريخ فعلية.';};
+  const _oldAttFilterCentral=window.onAttendanceFilterChange; window.onAttendanceFilterChange=function(){const r=typeof _oldAttFilterCentral==='function'?_oldAttFilterCentral.apply(this,arguments):undefined;setTimeout(function(){try{updateAttendanceCalendarSummary();}catch(e){}},0);return r;};
+  document.addEventListener('DOMContentLoaded',function(){setTimeout(function(){const card=document.getElementById('termCalendarCard');if(card){const t=document.getElementById('siCalendarTerm');if(t)t.addEventListener('change',renderCalendar);renderCalendar();}try{updateGradeCalendarSummary();}catch(e){}try{updateAttendanceCalendarSummary();}catch(e){}},100);});
+})();
+</script>
+
   <!-- PWA: تسجيل Service Worker وزر التثبيت -->
   <script src="pwa-register.js"></script>
 </body>
