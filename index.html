@@ -1999,8 +1999,12 @@
     }
     .ministry-landscape-page .detailed-weekly-table td.serial-col,
     .ministry-landscape-page .detailed-weekly-table th.serial-col {
-      width: 6mm;
-      font-size: 8px;
+      width: 9mm !important;
+      min-width: 9mm !important;
+      max-width: 11mm !important;
+      font-size: 9px !important;
+      font-weight: 800;
+      text-align: center !important;
     }
     .ministry-landscape-page .detailed-sheet-footer {
       display: flex;
@@ -2082,6 +2086,22 @@
       color: #ffffff !important;
     }
     
+          .ml-absence-table th.serial-col,
+          .ml-absence-table td.serial-col {
+            width: 10mm !important;
+            min-width: 10mm !important;
+            font-size: 9.5px !important;
+            font-weight: 800 !important;
+            text-align: center !important;
+          }
+          .ministry-landscape-page .detailed-weekly-table td.serial-col,
+          .ministry-landscape-page .detailed-weekly-table th.serial-col {
+            width: 9mm !important;
+            min-width: 9mm !important;
+            font-size: 9px !important;
+            font-weight: 800 !important;
+            text-align: center !important;
+          }
           .ml-absence-table td.gs-name {
             min-width: 42mm !important;
             width: 42mm !important;
@@ -2417,6 +2437,16 @@ html[data-theme="dark"] .dash-more-menu button:hover{background:#1a2338}
     html[data-theme="dark"] a { color:#7dd3fc; }
 
   
+    .ml-absence-table th.serial-col,
+    .ml-absence-table td.serial-col {
+      width: 10mm !important;
+      min-width: 10mm !important;
+      max-width: 12mm !important;
+      font-size: 9.5px !important;
+      font-weight: 800 !important;
+      text-align: center !important;
+      padding: 0.5mm 0.8mm !important;
+    }
     .ml-absence-table td.att-mark-abs { color:#b91c1c; font-weight:800; background:#fef2f2 !important; }
     .ml-absence-table td.att-mark-exc { color:#b45309; font-weight:700; background:#fffbeb !important; }
     .ml-absence-table td.att-mark-pres { color:#047857; font-weight:700; }
