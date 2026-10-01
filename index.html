@@ -875,6 +875,78 @@
         flex: 1 1 auto;
         justify-content: center;
       }
+
+      /* قائمة الطلاب على الموبايل: كل طالب ككرت مستقل مثل كروت رصد الدرجات */
+      .students-table-wrap {
+        max-height: none;
+        overflow-x: visible;
+        border: none;
+      }
+      .students-table {
+        min-width: 0;
+      }
+      .students-table thead {
+        display: none;
+      }
+      .students-table,
+      .students-table tbody,
+      .students-table tr,
+      .students-table td {
+        display: block;
+        width: 100%;
+      }
+      .students-table tr {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 12px 14px;
+        margin-bottom: 14px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, .06);
+      }
+      .students-table td {
+        border-bottom: none;
+        padding: 7px 0;
+      }
+      .students-table td.col-index {
+        display: none;
+      }
+      .students-table td.col-name {
+        font-size: 16px;
+        font-weight: 700;
+        color: #0f172a;
+        padding-bottom: 10px;
+        margin-bottom: 6px;
+        border-bottom: 2px solid #e2e8f0;
+      }
+      .students-table td.col-id,
+      .students-table td.col-gender,
+      .students-table td.col-class,
+      .students-table td.col-path,
+      .students-table td.col-spec,
+      .students-table td.col-lang {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        border-top: 1px dashed #f1f5f9;
+      }
+      .students-table td.col-id::before,
+      .students-table td.col-gender::before,
+      .students-table td.col-class::before,
+      .students-table td.col-path::before,
+      .students-table td.col-spec::before,
+      .students-table td.col-lang::before {
+        content: attr(data-label);
+        font-weight: 600;
+        color: #64748b;
+        font-size: 13px;
+        flex-shrink: 0;
+      }
+      .students-table td select,
+      .students-table td input {
+        max-width: 58%;
+        min-width: 120px;
+      }
     }
     .auth-overlay {
       position: fixed;
@@ -3708,9 +3780,9 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
           </select>
           <input type="text" id="studentSearch" placeholder="🔍 بحث بالاسم أو رقم الجلوس أو الرقم القومي..." oninput="filterStudents()" style="flex:1; min-width:200px;" />
         </div>
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>#</th><th>الرقم القومي</th><th>رقم الجلوس</th><th>اسم الطالب</th><th>النوع</th><th>الفصل</th><th>اللغة الثانية</th></tr></thead>
+        <div class="table-wrap students-table-wrap">
+          <table class="students-table">
+            <thead><tr><th>#</th><th>الرقم القومي</th><th>رقم الجلوس</th><th>اسم الطالب</th><th>النوع</th><th>الفصل</th><th>المسار</th><th>مادة التخصص</th><th>اللغة الثانية</th></tr></thead>
             <tbody id="studentsTableBody"></tbody>
           </table>
         </div>
@@ -3992,7 +4064,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
             </select>
           </div>
         </div>
-        <p style="color:#64748b; margin-bottom:12px;">أضف كل معلم مع تخصيصه، ورقم سري خاص به. يمكن لنفس المعلم أن يُسنَد له أكثر من مادة، وأن تختلف الفصول من مادة لأخرى (مثال: يدرّس مادة واحدة لفصل، ومادتين لفصل آخر): اختر المادة والفصول ثم اضغط "➕ إضافة هذا التخصيص" وكرر ذلك لكل مادة قبل حفظ المعلم. المعلم بعد الدخول لن يرى أو يعدّل إلا المواد والفصول المُسنَدة له فعلياً. لمادة "اللغة الثانية" تحديداً: حدد أيضاً نوع اللغة الأجنبية (فرنسي/الماني...) لكل تخصيص، فلن يستطيع رصد أو تعديل درجات هذه المادة إلا لطلابه الذين تطابق لغتهم الثانية المسجَّلة نوعَ لغته بالضبط داخل فصوله. يمكنك لاحقاً تعديل بيانات أي معلم (الاسم أو أي من تخصيصاته) بالضغط على "✏️ تعديل" في الجدول أدناه.</p>
+        <p style="color:#64748b; margin-bottom:12px;">أضف كل معلم مع تخصيصه، ورقم سري خاص به. يمكن لنفس المعلم أن يُسنَد له أكثر من مادة، وأن تختلف الفصول من مادة لأخرى (مثال: يدرّس مادة واحدة لفصل، ومادتين لفصل آخر): اختر المادة والفصول ثم اضغط "➕ إضافة هذا التخصيص" وكرر ذلك لكل مادة قبل حفظ المعلم. المعلم بعد الدخول لن يرى أو يعدّل إلا المواد والفصول المُسنَدة له فعلياً. لمادة "اللغة الثانية" تحديداً: حدد أيضاً نوع اللغة الأجنبية (فرنسي/الماني...) لكل تخصيص. لمادة "مادة التخصص" (الصف الثاني بكالوريا): حدد نوع التخصص (رياضيات/فيزياء/كيمياء...). في الحالتين لن يستطيع المعلم رصد أو تعديل درجات هذه المادة إلا لطلابه الذين تطابق قيمتهم المسجَّلة نوعَ تخصيصه. يمكنك لاحقاً تعديل بيانات أي معلم (الاسم أو أي من تخصيصاته) بالضغط على "✏️ تعديل" في الجدول أدناه.</p>
         <div class="warning-box">⚠️ ملاحظة أمان: هذا تحكم عملي يمنع الاطلاع العرضي على بيانات المواد/الفصول الأخرى داخل الاستخدام العادي للبرنامج. لأن البرنامج يعمل بالكامل داخل المتصفح بدون خادم، فإن أي شخص لديه خبرة تقنية بأدوات المطوّر (Developer Tools) يستطيع نظرياً تجاوز هذا الحماية أو الوصول للبيانات المخزّنة على نفس الجهاز. لا تعتمد عليه لبيانات شديدة الحساسية.</div>
 
         <div class="grid-2">
@@ -4015,6 +4087,12 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
           <select id="newTeacherLangType" onchange="handleLangTypeSelectChange(); updateTeacherMatchPreview();"><option value="">-- اختر اللغة --</option></select>
           <input type="text" id="newTeacherLangTypeCustom" placeholder="اكتب اسم اللغة كما هو مسجَّل بالضبط في بيانات الطلاب" style="display:none; margin-top:8px;" oninput="updateTeacherMatchPreview()">
           <p style="color:#64748b; font-size:12px; margin-top:6px;">يظهر هذا الحقل فقط عند اختيار مادة لغة ثانية. اختر اللغة من القائمة (مستخرجة تلقائياً من بيانات الطلاب المسجَّلة)، أو اختر "إدخال يدوي" إذا لم تكن اللغة مدرجة بعد. لن يستطيع هذا المعلم رصد أو تعديل درجات هذه المادة إلا لطلاب فصوله الذين تطابق لغتهم الثانية المسجَّلة هذه القيمة (مطابقة متسامحة مع فروق المسافات/الهمزات).</p>
+        </div>
+        <div class="form-group mt-16" id="newTeacherSpecTypeWrap" style="display:none;">
+          <label>نوع التخصص الذي يدرّسه (مادة التخصص)</label>
+          <select id="newTeacherSpecType" onchange="handleSpecTypeSelectChange(); updateTeacherMatchPreview();"><option value="">-- اختر التخصص --</option></select>
+          <input type="text" id="newTeacherSpecTypeCustom" placeholder="اكتب اسم التخصص كما هو مسجَّل بالضبط في بيانات الطلاب" style="display:none; margin-top:8px;" oninput="updateTeacherMatchPreview()">
+          <p style="color:#64748b; font-size:12px; margin-top:6px;">يظهر هذا الحقل فقط عند اختيار مادة «مادة التخصص» (الصف الثاني بكالوريا). اختر التخصص من القائمة، أو أدخل يدوياً. لن يرى هذا المعلم إلا الطلاب الذين تطابق مادة تخصصهم المسجَّلة هذه القيمة.</p>
         </div>
         <div class="form-group mt-16">
           <label>الفصول التي يُدرّسها بهذه المادة تحديداً</label>
@@ -6437,6 +6515,13 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
       return match ? match.languageType : '';
     }
 
+    // يرجع نوع التخصص المسجَّل لهذا المعلم لهذه المادة (مادة التخصص) تحديداً.
+    function teacherSpecializationTypeForSubject(t, subjectName, cls) {
+      const match = (t.assignments || []).find(a => a.subjectName === subjectName && a.specializationType &&
+        (!cls || (a.classes || []).includes(cls)));
+      return match ? match.specializationType : '';
+    }
+
     async function sha256Hex(str) {
       const enc = new TextEncoder().encode(str);
       const buf = await crypto.subtle.digest('SHA-256', enc);
@@ -6549,6 +6634,13 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
       return /لغه(\s+(ال)?اجنبيه)?\s+(ال)?ثاني/.test(n);
     }
 
+    // مادة "مادة التخصص" في الصف الثاني بكالوريا: يُقيَّد المعلم بنوع التخصص الذي يدرّسه
+    // (رياضيات/فيزياء/كيمياء...) بنفس أسلوب تقييد معلم اللغة الثانية.
+    function subjectIsSpecialization(subjectName) {
+      const n = normalizeArabicText(subjectName);
+      return /ماده\s*(ال)?تخصص/.test(n);
+    }
+
     // لوحة ألوان ثابتة لتمييز كل لغة أجنبية بلون شارة مختلف وواضح في كل أنحاء البرنامج
     // (جدول الدرجات، جدول الطلاب، جدول المعلمين، بطاقات الدخول). نفس اللغة = نفس اللون دائماً.
     const LANG_COLOR_PALETTE = [
@@ -6574,22 +6666,34 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
     // الذين تطابق لغتهم الثانية المسجَّلة نوع اللغة المخصص له. لا يؤثر هذا على مدير النظام
     // ولا على أي مادة أخرى غير اللغة الثانية.
     function filterStudentsForTeacherLanguage(students, subjectName, cls) {
-      if (currentRole === 'teacher' && currentTeacher && subjectIsSecondLang(subjectName)) {
-        const languageType = teacherLanguageTypeForSubject(currentTeacher, subjectName, cls);
-        if (languageType) return students.filter(s => langValuesMatch(s.secondLanguage, languageType));
+      if (currentRole === 'teacher' && currentTeacher) {
+        if (subjectIsSecondLang(subjectName)) {
+          const languageType = teacherLanguageTypeForSubject(currentTeacher, subjectName, cls);
+          if (languageType) return students.filter(s => langValuesMatch(s.secondLanguage, languageType));
+        }
+        if (subjectIsSpecialization(subjectName)) {
+          const specType = teacherSpecializationTypeForSubject(currentTeacher, subjectName, cls);
+          if (specType) return students.filter(s => langValuesMatch(s.specialization, specType));
+        }
       }
       return students;
     }
 
     // فحص صلاحية الوصول لدرجة طالب بعينه: يضيف فوق فحص المادة/الفصل المعتاد فحص تطابق نوع اللغة
-    // الثانية للمعلم المسجَّل دخوله مع اللغة الثانية المسجَّلة لهذا الطالب تحديداً.
+    // الثانية أو نوع التخصص للمعلم المسجَّل دخوله مع القيمة المسجَّلة لهذا الطالب.
     function canAccessStudentGrade(subjectName, student) {
       if (!student) return false;
       const key = classSectionKey(student.class, student.section);
       if (!canAccessGrade(subjectName, key)) return false;
-      if (currentRole === 'teacher' && currentTeacher && subjectIsSecondLang(subjectName)) {
-        const languageType = teacherLanguageTypeForSubject(currentTeacher, subjectName, key);
-        if (languageType) return langValuesMatch(student.secondLanguage, languageType);
+      if (currentRole === 'teacher' && currentTeacher) {
+        if (subjectIsSecondLang(subjectName)) {
+          const languageType = teacherLanguageTypeForSubject(currentTeacher, subjectName, key);
+          if (languageType) return langValuesMatch(student.secondLanguage, languageType);
+        }
+        if (subjectIsSpecialization(subjectName)) {
+          const specType = teacherSpecializationTypeForSubject(currentTeacher, subjectName, key);
+          if (specType) return langValuesMatch(student.specialization, specType);
+        }
       }
       return true;
     }
@@ -6604,16 +6708,31 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
 
     function toggleTeacherLangTypeField() {
       const subjectName = document.getElementById('newTeacherSubject').value;
-      const wrap = document.getElementById('newTeacherLangTypeWrap');
-      if (!wrap) return;
-      if (subjectIsSecondLang(subjectName)) {
-        wrap.style.display = 'block';
-        populateLangTypeOptions();
-      } else {
-        wrap.style.display = 'none';
-        document.getElementById('newTeacherLangType').value = '';
-        document.getElementById('newTeacherLangTypeCustom').value = '';
-        document.getElementById('newTeacherLangTypeCustom').style.display = 'none';
+      const langWrap = document.getElementById('newTeacherLangTypeWrap');
+      const specWrap = document.getElementById('newTeacherSpecTypeWrap');
+      if (langWrap) {
+        if (subjectIsSecondLang(subjectName)) {
+          langWrap.style.display = 'block';
+          populateLangTypeOptions();
+        } else {
+          langWrap.style.display = 'none';
+          const lt = document.getElementById('newTeacherLangType');
+          const ltc = document.getElementById('newTeacherLangTypeCustom');
+          if (lt) lt.value = '';
+          if (ltc) { ltc.value = ''; ltc.style.display = 'none'; }
+        }
+      }
+      if (specWrap) {
+        if (subjectIsSpecialization(subjectName)) {
+          specWrap.style.display = 'block';
+          populateSpecTypeOptions();
+        } else {
+          specWrap.style.display = 'none';
+          const st = document.getElementById('newTeacherSpecType');
+          const stc = document.getElementById('newTeacherSpecTypeCustom');
+          if (st) st.value = '';
+          if (stc) { stc.value = ''; stc.style.display = 'none'; }
+        }
       }
     }
 
@@ -6664,6 +6783,76 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
       return sel.value;
     }
 
+    // قائمة التخصصات المعروفة للصف الثاني بكالوريا (تُدمج مع القيم المسجَّلة فعلياً لدى الطلاب).
+    const KNOWN_SPECIALIZATIONS = [
+      'الرياضيات', 'الفيزياء', 'الكيمياء', 'البرمجة',
+      'المحاسبة', 'إدارة الأعمال', 'علم النفس', 'اللغة الفرنسية', 'اللغة الألمانية'
+    ];
+    const KNOWN_PATHS = [
+      'الطب وعلوم الحياة', 'الهندسة وعلوم الحاسب', 'الأعمال', 'الآداب والفنون'
+    ];
+    const PATH_SPECIALIZATIONS = {
+      'الطب وعلوم الحياة': ['الرياضيات', 'الفيزياء'],
+      'الهندسة وعلوم الحاسب': ['الكيمياء', 'البرمجة'],
+      'الأعمال': ['المحاسبة', 'إدارة الأعمال'],
+      'الآداب والفنون': ['علم النفس', 'اللغة الفرنسية', 'اللغة الألمانية']
+    };
+    function specializationsForPath(path) {
+      const key = Object.keys(PATH_SPECIALIZATIONS).find(k => normalizeArabicText(k) === normalizeArabicText(path || ''));
+      return key ? PATH_SPECIALIZATIONS[key] : KNOWN_SPECIALIZATIONS.slice();
+    }
+
+    function populateSpecTypeOptions(selectedValue) {
+      const db = loadDB();
+      const seen = new Map();
+      KNOWN_SPECIALIZATIONS.forEach(v => {
+        const key = normalizeArabicText(v);
+        if (!seen.has(key)) seen.set(key, v);
+      });
+      (db.students || []).forEach(s => {
+        const v = (s.specialization || '').trim();
+        if (!v) return;
+        const key = normalizeArabicText(v);
+        if (!seen.has(key)) seen.set(key, v);
+      });
+      const sorted = Array.from(seen.values()).sort();
+      const sel = document.getElementById('newTeacherSpecType');
+      const custom = document.getElementById('newTeacherSpecTypeCustom');
+      if (!sel) return;
+      sel.innerHTML = '<option value="">-- اختر التخصص --</option>' +
+        sorted.map(v => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('') +
+        '<option value="__custom__">✏️ إدخال يدوي (تخصص غير مدرج)</option>';
+      if (selectedValue && sorted.some(v => normalizeArabicText(v) === normalizeArabicText(selectedValue))) {
+        const match = sorted.find(v => normalizeArabicText(v) === normalizeArabicText(selectedValue));
+        sel.value = match;
+        if (custom) { custom.style.display = 'none'; custom.value = ''; }
+      } else if (selectedValue) {
+        sel.value = '__custom__';
+        if (custom) { custom.style.display = 'block'; custom.value = selectedValue; }
+      } else {
+        sel.value = '';
+        if (custom) { custom.style.display = 'none'; custom.value = ''; }
+      }
+    }
+
+    function handleSpecTypeSelectChange() {
+      const sel = document.getElementById('newTeacherSpecType');
+      const custom = document.getElementById('newTeacherSpecTypeCustom');
+      if (!sel || !custom) return;
+      if (sel.value === '__custom__') { custom.style.display = 'block'; custom.focus(); }
+      else { custom.style.display = 'none'; custom.value = ''; }
+    }
+
+    function getSelectedSpecializationType() {
+      const sel = document.getElementById('newTeacherSpecType');
+      if (!sel) return '';
+      if (sel.value === '__custom__') {
+        const custom = document.getElementById('newTeacherSpecTypeCustom');
+        return custom ? custom.value.trim() : '';
+      }
+      return sel.value;
+    }
+
     // معاينة حيّة أثناء إضافة/تعديل معلم: توضح لمدير النظام فوراً (قبل الحفظ) كم عدد الطلاب الذين
     // سيراهم هذا المعلم فعلياً بناءً على الفصول ونوع اللغة المختارَين، لضمان أن الفلترة صحيحة قبل
     // اعتماد بيانات المعلم. هذا يمنع اكتشاف خطأ في تحديد اللغة بعد فوات الأوان.
@@ -6678,26 +6867,45 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
 
       const db = loadDB();
       const isSecondLang = subjectIsSecondLang(subjectName);
+      const isSpec = subjectIsSpecialization(subjectName);
       const classStudents = (db.students || []).filter(s => classes.includes(classSectionKey(s.class, s.section)));
 
-      if (!isSecondLang) {
+      if (!isSecondLang && !isSpec) {
         box.style.display = 'block';
-        box.innerHTML = `<div class="success-box">👁️ سيرى هذا المعلم <strong>${classStudents.length}</strong> طالب في الفصول المختارة (لا يوجد قيد لغة على هذه المادة).</div>`;
+        box.innerHTML = `<div class="success-box">👁️ سيرى هذا المعلم <strong>${classStudents.length}</strong> طالب في الفصول المختارة (لا يوجد قيد لغة/تخصص على هذه المادة).</div>`;
         return;
       }
 
-      const languageType = getSelectedLanguageType();
-      if (!languageType) {
+      if (isSecondLang) {
+        const languageType = getSelectedLanguageType();
+        if (!languageType) {
+          box.style.display = 'block';
+          box.innerHTML = `<div class="warning-box">⚠️ حدد نوع اللغة أولاً لمعرفة عدد الطلاب المطابقين. إجمالي طلاب الفصول المختارة: ${classStudents.length}.</div>`;
+          return;
+        }
+        const matched = classStudents.filter(s => langValuesMatch(s.secondLanguage, languageType));
         box.style.display = 'block';
-        box.innerHTML = `<div class="warning-box">⚠️ حدد نوع اللغة أولاً لمعرفة عدد الطلاب المطابقين. إجمالي طلاب الفصول المختارة: ${classStudents.length}.</div>`;
+        if (matched.length === 0) {
+          box.innerHTML = `<div class="warning-box">🚫 لا يوجد أي طالب في الفصول المختارة تطابق لغته الثانية القيمة "${escapeHtml(languageType)}" (من إجمالي ${classStudents.length} طالب). تأكد أن هذه القيمة مطابقة لما هو مسجَّل في بيانات الطلاب.</div>`;
+        } else {
+          box.innerHTML = `<div class="success-box">👁️ سيرى هذا المعلم ${langBadgeHtml(languageType)} <strong>${matched.length}</strong> طالب من إجمالي ${classStudents.length} في الفصول المختارة.</div>`;
+        }
         return;
       }
-      const matched = classStudents.filter(s => langValuesMatch(s.secondLanguage, languageType));
+
+      // isSpec
+      const specType = getSelectedSpecializationType();
+      if (!specType) {
+        box.style.display = 'block';
+        box.innerHTML = `<div class="warning-box">⚠️ حدد نوع التخصص أولاً لمعرفة عدد الطلاب المطابقين. إجمالي طلاب الفصول المختارة: ${classStudents.length}.</div>`;
+        return;
+      }
+      const matched = classStudents.filter(s => langValuesMatch(s.specialization, specType));
       box.style.display = 'block';
       if (matched.length === 0) {
-        box.innerHTML = `<div class="warning-box">🚫 لا يوجد أي طالب في الفصول المختارة تطابق لغته الثانية القيمة "${languageType}" (من إجمالي ${classStudents.length} طالب). تأكد أن هذه القيمة مطابقة تماماً لما هو مسجَّل في بيانات الطلاب (تبويب "الطلاب")، وإلا فلن يرى هذا المعلم أي طالب عند رصد الدرجات.</div>`;
+        box.innerHTML = `<div class="warning-box">🚫 لا يوجد أي طالب في الفصول المختارة تطابق مادة تخصصه القيمة "${escapeHtml(specType)}" (من إجمالي ${classStudents.length} طالب). تأكد أن هذه القيمة مطابقة لما هو مسجَّل في عمود «مادة التخصص» بملف الطلاب.</div>`;
       } else {
-        box.innerHTML = `<div class="success-box">👁️ سيرى هذا المعلم ${langBadgeHtml(languageType)} <strong>${matched.length}</strong> طالب من إجمالي ${classStudents.length} في الفصول المختارة.</div>`;
+        box.innerHTML = `<div class="success-box">👁️ سيرى هذا المعلم ${langBadgeHtml(specType)} <strong>${matched.length}</strong> طالب من إجمالي ${classStudents.length} في الفصول المختارة.</div>`;
       }
     }
 
@@ -6708,8 +6916,10 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
       const classChecks = document.querySelectorAll('#newTeacherClasses input[type=checkbox]:checked');
       const classes = Array.from(classChecks).map(c => c.value);
       const isSecondLang = subjectIsSecondLang(subjectName);
+      const isSpecialization = subjectIsSpecialization(subjectName);
       const languageType = isSecondLang ? getSelectedLanguageType() : '';
-      return { subjectName, classes, isSecondLang, languageType };
+      const specializationType = isSpecialization ? getSelectedSpecializationType() : '';
+      return { subjectName, classes, isSecondLang, isSpecialization, languageType, specializationType };
     }
 
     function clearCurrentAssignmentFields() {
@@ -6763,7 +6973,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
     // (مثال: يدرّس مادة واحدة لفصل، ومادتين لفصل آخر).
     function addAssignmentToDraft() {
       const msg = document.getElementById('teacherFormMsg');
-      const { subjectName, classes, isSecondLang, languageType } = getCurrentAssignmentFields();
+      const { subjectName, classes, isSecondLang, isSpecialization, languageType, specializationType } = getCurrentAssignmentFields();
       if (!subjectName) { msg.textContent = '⚠️ يرجى اختيار المادة أولاً';
         msg.style.color = '#b91c1c'; return; }
       if (classes.length === 0) { msg.textContent = '⚠️ يرجى اختيار فصل واحد على الأقل';
@@ -6772,13 +6982,19 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
         msg.textContent = '⚠️ يرجى تحديد نوع اللغة الأجنبية لهذا التخصيص';
         msg.style.color = '#b91c1c'; return;
       }
-      // إن وُجد تخصيص سابق بنفس المادة ونفس نوع اللغة، يتم دمج الفصول الجديدة معه بدل تكراره
-      const existing = teacherAssignmentsDraft.find(a => a.subjectName === subjectName && (a.languageType || '') === (
-        languageType || ''));
+      if (isSpecialization && !specializationType) {
+        msg.textContent = '⚠️ يرجى تحديد نوع التخصص (رياضيات / فيزياء / ...) لهذا التخصيص';
+        msg.style.color = '#b91c1c'; return;
+      }
+      // إن وُجد تخصيص سابق بنفس المادة ونفس نوع اللغة/التخصص، يتم دمج الفصول الجديدة معه بدل تكراره
+      const existing = teacherAssignmentsDraft.find(a =>
+        a.subjectName === subjectName &&
+        (a.languageType || '') === (languageType || '') &&
+        (a.specializationType || '') === (specializationType || ''));
       if (existing) {
         classes.forEach(c => { if (!existing.classes.includes(c)) existing.classes.push(c); });
       } else {
-        teacherAssignmentsDraft.push({ subjectName, classes, languageType });
+        teacherAssignmentsDraft.push({ subjectName, classes, languageType, specializationType });
       }
       clearCurrentAssignmentFields();
       renderTeacherAssignmentsDraft();
@@ -6804,6 +7020,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
           <div>
             <span class="badge badge-subject">${escapeHtml(a.subjectName)}</span>
             ${a.languageType ? ' ' + langBadgeHtml(a.languageType) : ''}
+            ${a.specializationType ? ' ' + langBadgeHtml(a.specializationType) : ''}
             <span style="margin-right:8px; color:#334155; font-size:13px;">🏫 ${(a.classes || []).map(c => escapeHtml(typeof classSectionLabel === 'function' ? classSectionLabel(c) : c)).join('، ')}</span>
           </div>
           <button type="button" class="btn btn-danger btn-sm" onclick="removeAssignmentFromDraft(${idx})">🗑️ حذف</button>
@@ -9840,6 +10057,8 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
       class: ['الفصل', 'فصل', 'الصف'],
       gender: ['النوع', 'الجنس', 'نوع الطالب', 'نوع'],
       secondLang: ['اللغة الثانية', 'لغة ثانية', 'لغة ثانيه', 'تحديد لغة ثانية'],
+      path: ['المسار', 'مسار'],
+      specialization: ['مادة التخصص', 'التخصص', 'مادة تخصص', 'اختيار التخصص'],
       resultStatus: ['حالة النتيجة'],
       examPeriod: ['نتيجة']
     };
@@ -10534,6 +10753,8 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
 
         const cls = colMap.class !== undefined ? (String(row[colMap.class] || '').trim() || 'عام') : 'عام';
         const secondLang = colMap.secondLang !== undefined ? String(row[colMap.secondLang] || '').trim() : '';
+        const path = colMap.path !== undefined ? String(row[colMap.path] || '').trim() : '';
+        const specialization = colMap.specialization !== undefined ? String(row[colMap.specialization] || '').trim() : '';
 
         // تنبيه تكرار رقم الجلوس يقتصر الآن على التكرار داخل نفس الفصل فقط، ولا يُعتبر خطأ حقيقياً
         // إذا كان لدى الطالب رقم قومي (لأن الرقم القومي هو المعرّف الفعلي المعتمد داخل قاعدة البيانات).
@@ -10558,7 +10779,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
         // تماماً في هذه الحالة لأن الرقم القومي هو الفيصل. فقط إذا غاب الرقم القومي يُستخدم الفصل
         // + رقم الجلوس معاً كبديل احتياطي (بدلاً من رقم الجلوس وحده) لتقليل احتمال التعارض.
         const studentId = (section || '') + '::' + (grade || '') + '::' + (nationalId || (cls + '::' + seat));
-        students.push({ id: studentId, nationalId, seat, name, gender, class: cls, grade: grade || '', section: section || '', secondLanguage: secondLang, rowIndex: r });
+        students.push({ id: studentId, nationalId, seat, name, gender, class: cls, grade: grade || '', section: section || '', secondLanguage: secondLang, path, specialization, rowIndex: r });
 
         reconciledSubjects.forEach(subj => {
           subj.components.forEach((comp, ci) => {
@@ -10696,7 +10917,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
     // ============================================================
     const STUDENT_FIELD_LABELS = {
       nationalId: 'الرقم القومي', name: 'الاسم', class: 'الفصل', seat: 'رقم الجلوس',
-      secondLang: 'اللغة الثانية', gender: 'النوع'
+      secondLang: 'اللغة الثانية', gender: 'النوع', path: 'المسار', specialization: 'مادة التخصص'
     };
 
     function diffStudentFields(os, ns) {
@@ -10707,6 +10928,8 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
       if ((os.seat || '') !== (ns.seat || '')) changed.push('seat');
       if ((os.secondLanguage || '') !== (ns.secondLanguage || '')) changed.push('secondLang');
       if ((os.gender || '') !== (ns.gender || '')) changed.push('gender');
+      if ((os.path || '') !== (ns.path || '')) changed.push('path');
+      if ((os.specialization || '') !== (ns.specialization || '')) changed.push('specialization');
       return changed;
     }
 
@@ -11366,7 +11589,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
         return sectionShort ? `${gradeLabel} (${sectionShort})` : gradeLabel;
       }
 
-      const header = ['الرقم القومي', 'نتيجة', 'الصف', 'اسم الطالب', 'رقم الجلوس', 'حالة النتيجة'];
+      const header = ['الرقم القومي', 'نتيجة', 'الصف', 'اسم الطالب', 'رقم الجلوس', 'حالة النتيجة', 'المسار', 'مادة التخصص'];
       let secondLangMarkerAdded = false;
       const subjectCols = []; // { type: 'secondLangText' } أو { type: 'subject', subject, comps }
       (db.subjects || []).forEach(subj => {
@@ -11407,7 +11630,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
       });
       const aoa = [header];
       students.forEach(s => {
-        const row = [s.nationalId || '', examPeriodText, classTextForStudent(s), s.name, s.seat, 'متاح'];
+        const row = [s.nationalId || '', examPeriodText, classTextForStudent(s), s.name, s.seat, 'متاح', s.path || '', s.specialization || ''];
         subjectCols.forEach(col => {
           if (col.type === 'secondLangText') { row.push(s.secondLanguage || ''); return; }
           let sum = 0, hasAny = false, hasNumeric = false;
@@ -11509,7 +11732,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
       const grade = meta.grade || gradeKey || '';
       const section = meta.section || '';
 
-      const header = ['رقم الجلوس', 'اسم الطالب'];
+      const header = ['رقم الجلوس', 'اسم الطالب', 'المسار', 'مادة التخصص'];
       let secondLangMarkerAdded = false;
       const subjectCols = []; // { type: 'secondLangText' } أو { type: 'subject', subject }
       // مواد هذا الصف/القسم فقط (حسب appliesTo المسجّل عند رفع الملف الأصلي) حتى لا تظهر مواد صفوف أخرى
@@ -11531,7 +11754,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
 
       const aoa = [header];
       students.forEach(s => {
-        const row = [s.seat || '', s.name];
+        const row = [s.seat || '', s.name, s.path || '', s.specialization || ''];
         subjectCols.forEach(col => {
           if (col.type === 'secondLangText') { row.push(s.secondLanguage || ''); return; }
           const total = subjectTermTotal(db, s.id, col.subject.name, term, col.subject);
@@ -12934,6 +13157,7 @@ function renderMonthlyExportButtons() {
     function loadStudentsUI() {
       const db = loadDB();
       const tbody = document.getElementById('studentsTableBody');
+      if (!tbody) return;
       const datalist = document.getElementById('secondLangDatalist');
       if (datalist) {
         const seen = new Map();
@@ -12947,7 +13171,7 @@ function renderMonthlyExportButtons() {
       const filterGender = document.getElementById('studentGenderFilter').value;
       const search = document.getElementById('studentSearch').value.trim().toLowerCase();
 
-      let filtered = db.students;
+      let filtered = db.students || [];
       if (currentRole === 'teacher' && currentTeacher) { const tClasses = teacherAllClasses(currentTeacher);
         filtered = filtered.filter(s => tClasses.includes(classSectionKey(s.class, s.section))); }
       if (filterClass) filtered = filtered.filter(s => classSectionKey(s.class, s.section) === filterClass);
@@ -12955,25 +13179,26 @@ function renderMonthlyExportButtons() {
       if (search) filtered = filtered.filter(s =>
         s.name.toLowerCase().includes(search) ||
         (s.seat || '').includes(search) ||
-        (canViewNationalId() && (s.nationalId || '').includes(search))
+        (canViewNationalId() && (s.nationalId || '').includes(search)) ||
+        (s.path || '').toLowerCase().includes(search) ||
+        (s.specialization || '').toLowerCase().includes(search)
       );
 
       const canEdit = currentRole === 'admin';
       const canOpenCard = (currentRole === 'admin' || currentRole === 'viewer' || currentRole === 'teacher') && typeof v20OpenStudent === 'function';
       const showNid = canViewNationalId();
-      // تحديث رأس الجدول حسب صلاحية الرقم القومي
       try {
         const theadRow = document.querySelector('#tab-students thead tr');
         if (theadRow) {
           theadRow.innerHTML = showNid
-            ? '<th>#</th><th>الرقم القومي</th><th>رقم الجلوس</th><th>اسم الطالب</th><th>النوع</th><th>الفصل</th><th>اللغة الثانية</th>'
-            : '<th>#</th><th>رقم الجلوس</th><th>اسم الطالب</th><th>النوع</th><th>الفصل</th><th>اللغة الثانية</th>';
+            ? '<th>#</th><th>الرقم القومي</th><th>رقم الجلوس</th><th>اسم الطالب</th><th>النوع</th><th>الفصل</th><th>المسار</th><th>مادة التخصص</th><th>اللغة الثانية</th>'
+            : '<th>#</th><th>رقم الجلوس</th><th>اسم الطالب</th><th>النوع</th><th>الفصل</th><th>المسار</th><th>مادة التخصص</th><th>اللغة الثانية</th>';
         }
         const searchInp = document.getElementById('studentSearch');
         if (searchInp) {
           searchInp.placeholder = showNid
-            ? '🔍 بحث بالاسم أو رقم الجلوس أو الرقم القومي...'
-            : '🔍 بحث بالاسم أو رقم الجلوس...';
+            ? '🔍 بحث بالاسم أو رقم الجلوس أو الرقم القومي أو المسار...'
+            : '🔍 بحث بالاسم أو رقم الجلوس أو المسار...';
         }
       } catch (e) {}
       tbody.innerHTML = '';
@@ -12981,15 +13206,39 @@ function renderMonthlyExportButtons() {
         const row = document.createElement('tr');
         const genderLabel = s.gender === 'F' ? 'أنثى' : 'ذكر';
         const badgeClass = s.gender === 'F' ? 'badge-f' : 'badge-m';
-        const classOptionsForStudent = db.classes
+        const classOptionsForStudent = (db.classes || [])
           .filter(c => splitClassSectionKey(c).section === s.section)
           .map(c => splitClassSectionKey(c).cls);
         if (!classOptionsForStudent.includes(s.class)) classOptionsForStudent.push(s.class);
+
         const classCell = canEdit
           ? `<select onchange="updateStudentField('${s.id}','class',this.value)" style="padding:3px 5px; border:1px solid #cbd5e1; border-radius:4px;">
               ${classOptionsForStudent.map(c => `<option value="${escapeHtml(c)}" ${c === s.class ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('')}
              </select>`
-          : `${escapeHtml(s.class)}`;
+          : escapeHtml(s.class || '-');
+
+        // مسار — قائمة منسدلة ثابتة + أي قيمة موجودة غير مدرجة
+        const pathOpts = KNOWN_PATHS.slice();
+        if (s.path && !pathOpts.some(p => normalizeArabicText(p) === normalizeArabicText(s.path))) pathOpts.push(s.path);
+        const pathCell = canEdit
+          ? `<select onchange="updateStudentPathAndSpec('${s.id}', this.value)" style="padding:3px 5px; border:1px solid #cbd5e1; border-radius:4px; max-width:180px;">
+              <option value="">-- اختر المسار --</option>
+              ${pathOpts.map(p => `<option value="${escapeHtml(p)}" ${normalizeArabicText(p) === normalizeArabicText(s.path || '') ? 'selected' : ''}>${escapeHtml(p)}</option>`).join('')}
+             </select>`
+          : (s.path ? langBadgeHtml(s.path) : '-');
+
+        // مادة التخصص — حسب المسار المختار
+        const specOpts = specializationsForPath(s.path);
+        if (s.specialization && !specOpts.some(sp => normalizeArabicText(sp) === normalizeArabicText(s.specialization))) {
+          specOpts.push(s.specialization);
+        }
+        const specCell = canEdit
+          ? `<select onchange="updateStudentField('${s.id}','specialization',this.value)" style="padding:3px 5px; border:1px solid #cbd5e1; border-radius:4px; max-width:160px;">
+              <option value="">-- اختر التخصص --</option>
+              ${specOpts.map(sp => `<option value="${escapeHtml(sp)}" ${normalizeArabicText(sp) === normalizeArabicText(s.specialization || '') ? 'selected' : ''}>${escapeHtml(sp)}</option>`).join('')}
+             </select>`
+          : (s.specialization ? langBadgeHtml(s.specialization) : '-');
+
         const langDotColor = getLangColor(s.secondLanguage).bg;
         const secondLangCell = canEdit
           ? `<div class="flex items-center gap-12" style="gap:6px;">
@@ -13002,21 +13251,42 @@ function renderMonthlyExportButtons() {
         const nameCell = canOpenCard
           ? `<a href="javascript:void(0)" onclick="v20OpenStudent(${escapeHtml(JSON.stringify(s.id))})" title="عرض بطاقة الطالب: الدرجات ونسبة الحضور" style="color:#1e3a5f; font-weight:700; text-decoration:underline; cursor:pointer;">${escapeHtml(s.name)}</a>`
           : escapeHtml(s.name);
-        const nidCell = showNid ? `<td>${escapeHtml(s.nationalId || '-')}</td>` : '';
+        const nidCell = showNid
+          ? `<td class="col-id" data-label="الرقم القومي">${escapeHtml(s.nationalId || '-')}</td>`
+          : '';
         row.innerHTML = `
-          <td>${idx + 1}</td>
+          <td class="col-index">${idx + 1}</td>
           ${nidCell}
-          <td><strong>${escapeHtml(s.seat)}</strong></td>
-          <td>${nameCell}</td>
-          <td><span class="badge ${badgeClass}">${genderLabel}</span></td>
-          <td>${classCell}</td>
-          <td>${secondLangCell}</td>
+          <td class="col-id" data-label="رقم الجلوس"><strong>${escapeHtml(s.seat || '-')}</strong></td>
+          <td class="col-name">${nameCell}</td>
+          <td class="col-gender" data-label="النوع"><span class="badge ${badgeClass}">${genderLabel}</span></td>
+          <td class="col-class" data-label="الفصل">${classCell}</td>
+          <td class="col-path" data-label="المسار">${pathCell}</td>
+          <td class="col-spec" data-label="مادة التخصص">${specCell}</td>
+          <td class="col-lang" data-label="اللغة الثانية">${secondLangCell}</td>
         `;
         tbody.appendChild(row);
       });
       document.getElementById('studentsCount').textContent = `إجمالي: ${filtered.length} طالب` +
-        (canEdit ? ' - يمكنك تعديل الفصل واللغة الثانية مباشرة من الجدول' : '') +
+        (canEdit ? ' - يمكنك تعديل الفصل والمسار ومادة التخصص واللغة الثانية مباشرة' : '') +
         (canOpenCard ? ' - اضغط على اسم الطالب لعرض بطاقته' : '');
+    }
+
+    // عند تغيير المسار: تحديث القيمة وإعادة بناء قائمة التخصص (وتصفية التخصص إن لم يعد صالحاً)
+    function updateStudentPathAndSpec(id, newPath) {
+      if (currentRole !== 'admin') return;
+      const db = loadDB();
+      const student = (db.students || []).find(s => s.id === id);
+      if (!student) return;
+      student.path = newPath || '';
+      const allowed = specializationsForPath(newPath);
+      if (student.specialization && !allowed.some(sp => normalizeArabicText(sp) === normalizeArabicText(student.specialization))) {
+        student.specialization = '';
+      }
+      saveDB(db);
+      loadStudentsUI();
+      updateFilters();
+      if (typeof loadStatsUI === 'function') loadStatsUI();
     }
 
     function updateStudentField(id, field, value) {
@@ -17602,13 +17872,23 @@ function renderMonthlyExportButtons() {
           msg.textContent = '⚠️ يرجى تحديد نوع اللغة الأجنبية التي يدرّسها هذا المعلم (فرنسي/الماني...)';
           msg.style.color = '#b91c1c'; return;
         }
-        const existing = teacherAssignmentsDraft.find(a => a.subjectName === pending.subjectName && (a.languageType ||
-            '') === (pending.languageType || ''));
+        if (pending.isSpecialization && !pending.specializationType) {
+          msg.textContent = '⚠️ يرجى تحديد نوع التخصص الذي يدرّسه هذا المعلم (رياضيات / فيزياء / ...)';
+          msg.style.color = '#b91c1c'; return;
+        }
+        const existing = teacherAssignmentsDraft.find(a =>
+          a.subjectName === pending.subjectName &&
+          (a.languageType || '') === (pending.languageType || '') &&
+          (a.specializationType || '') === (pending.specializationType || ''));
         if (existing) {
           pending.classes.forEach(c => { if (!existing.classes.includes(c)) existing.classes.push(c); });
         } else {
-          teacherAssignmentsDraft.push({ subjectName: pending.subjectName, classes: pending.classes, languageType: pending
-              .languageType });
+          teacherAssignmentsDraft.push({
+            subjectName: pending.subjectName,
+            classes: pending.classes,
+            languageType: pending.languageType,
+            specializationType: pending.specializationType
+          });
         }
       }
 
@@ -17617,8 +17897,12 @@ function renderMonthlyExportButtons() {
         msg.style.color = '#b91c1c'; return;
       }
 
-      const assignments = teacherAssignmentsDraft.map(a => ({ subjectName: a.subjectName, classes: [...a.classes],
-        languageType: a.languageType || '' }));
+      const assignments = teacherAssignmentsDraft.map(a => ({
+        subjectName: a.subjectName,
+        classes: [...a.classes],
+        languageType: a.languageType || '',
+        specializationType: a.specializationType || ''
+      }));
 
       db.teachers = db.teachers || [];
 
@@ -17705,8 +17989,12 @@ function renderMonthlyExportButtons() {
       document.getElementById('newTeacherName').value = t.name;
       const perEl = document.getElementById('newTeacherPeriods');
       if (perEl) perEl.value = (t.assignedPeriods != null ? t.assignedPeriods : '');
-      teacherAssignmentsDraft = (t.assignments || []).map(a => ({ subjectName: a.subjectName, classes: [...(a.classes ||
-          [])], languageType: a.languageType || '' }));
+      teacherAssignmentsDraft = (t.assignments || []).map(a => ({
+        subjectName: a.subjectName,
+        classes: [...(a.classes || [])],
+        languageType: a.languageType || '',
+        specializationType: a.specializationType || ''
+      }));
       clearCurrentAssignmentFields();
       renderTeacherAssignmentsDraft();
       document.getElementById('teacherSubmitBtn').textContent = '💾 حفظ التعديل';
@@ -17798,20 +18086,20 @@ function renderMonthlyExportButtons() {
       if (!teachers.length) { alert('لا يوجد معلمون لتصديرهم.');
         return; }
       const classList = db.classes || [];
-      const header = ['المعرف', 'الاسم', 'المادة', 'نوع اللغة', ...classList.map(c => classSectionLabel(c)), 'الرقم السري'];
+      const header = ['المعرف', 'الاسم', 'المادة', 'نوع اللغة', 'نوع التخصص', ...classList.map(c => classSectionLabel(c)), 'الرقم السري'];
       const aoa = [header];
       teachers.forEach(t => {
         const assignments = (t.assignments && t.assignments.length) ? t.assignments : [{ subjectName: '', classes: [],
-          languageType: '' }];
+          languageType: '', specializationType: '' }];
         assignments.forEach(a => {
-          const row = [t.id, t.name, a.subjectName, a.languageType || ''];
+          const row = [t.id, t.name, a.subjectName, a.languageType || '', a.specializationType || ''];
           classList.forEach(c => row.push((a.classes || []).includes(c) ? '✔' : ''));
           row.push(t.pin || '');
           aoa.push(row);
         });
       });
       const ws = XLSX.utils.aoa_to_sheet(aoa);
-      ws['!cols'] = [{ wch: 14 }, { wch: 25 }, { wch: 20 }, { wch: 14 }, ...classList.map(() => ({ wch: 10 })), { wch: 15 }];
+      ws['!cols'] = [{ wch: 14 }, { wch: 25 }, { wch: 20 }, { wch: 14 }, { wch: 14 }, ...classList.map(() => ({ wch: 10 })), { wch: 15 }];
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, 'المعلمون');
       const stageRec = (typeof getStageRecord === 'function') ? getStageRecord(currentStageId) : null;
@@ -17839,6 +18127,7 @@ function renderMonthlyExportButtons() {
       const nameIdx = header.indexOf('الاسم');
       const subjectIdx = header.indexOf('المادة');
       const langTypeIdx = header.indexOf('نوع اللغة');
+      const specTypeIdx = header.indexOf('نوع التخصص');
       const pinIdx = header.indexOf('الرقم السري');
       if (nameIdx === -1 || subjectIdx === -1) {
         throw new Error('الملف لا يحتوي على عمودي "الاسم" و "المادة" المطلوبين. تأكد من استخدام نفس تنسيق ملف التصدير.');
@@ -17854,6 +18143,7 @@ function renderMonthlyExportButtons() {
           name: String(r[nameIdx] || '').trim(),
           subjectName: String(r[subjectIdx] || '').trim(),
           languageType: langTypeIdx !== -1 ? String(r[langTypeIdx] || '').trim() : '',
+          specializationType: specTypeIdx !== -1 ? String(r[specTypeIdx] || '').trim() : '',
           pin: pinIdx !== -1 ? String(r[pinIdx] || '').trim() : '',
           classes: Object.keys(classColIdx).filter(c => String(r[classColIdx[c]] || '').trim() !== ''),
         }));
@@ -17980,7 +18270,13 @@ function renderMonthlyExportButtons() {
             skipped++;
             continue;
           }
+          if (subjectIsSpecialization(r.subjectName) && !r.specializationType) {
+            errors.push(`الصف ${rowNum} (${escapeHtml(r.name)}): مادة التخصص تتطلب تحديد "نوع التخصص" (رياضيات/فيزياء/...)`);
+            skipped++;
+            continue;
+          }
           const languageType = subjectIsSecondLang(r.subjectName) ? r.languageType : '';
+          const specializationType = subjectIsSpecialization(r.subjectName) ? r.specializationType : '';
 
           const key = r.id ? ('id:' + r.id) : ('name:' + r.name);
           let gi = groupIndexByKey.get(key);
@@ -17991,12 +18287,14 @@ function renderMonthlyExportButtons() {
           }
           const group = groups[gi];
           if (r.pin) group.pin = r.pin;
-          const existingAssignment = group.assignments.find(a => a.subjectName === r.subjectName && (a.languageType ||
-              '') === (languageType || ''));
+          const existingAssignment = group.assignments.find(a =>
+            a.subjectName === r.subjectName &&
+            (a.languageType || '') === (languageType || '') &&
+            (a.specializationType || '') === (specializationType || ''));
           if (existingAssignment) {
             classes.forEach(c => { if (!existingAssignment.classes.includes(c)) existingAssignment.classes.push(c); });
           } else {
-            group.assignments.push({ subjectName: r.subjectName, classes, languageType });
+            group.assignments.push({ subjectName: r.subjectName, classes, languageType, specializationType });
           }
         }
 
