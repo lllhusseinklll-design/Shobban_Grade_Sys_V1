@@ -19699,6 +19699,7 @@ html[data-theme="dark"] .v21-pill.active{background:#1e3a5f;color:#fff;border-co
 (function(){
   'use strict';
   const DAY_LABELS = ['الأحد','الإثنين','الثلاثاء','الأربعاء','الخميس','السبت'];
+  window.DAY_LABELS = DAY_LABELS;
   const esc = escapeHtml; // مصدر واحد لمنطق الهروب من HTML (راجع تعريف escapeHtml الرئيسي)
   function canManageAttReports(){
     return currentAccountType === 'superadmin' || currentAccountType === 'stageadmin' || currentAccountType === 'monitor';
@@ -19842,10 +19843,14 @@ html[data-theme="dark"] .v21-pill.active{background:#1e3a5f;color:#fff;border-co
   };
 function roundToHalf(n){ if (!Number.isFinite(n)) return 0; return Math.round(n * 2) / 2; }
   function parseISO(iso){ if (!iso) return null; const d = new Date(iso + 'T00:00:00'); return isNaN(d.getTime()) ? null : d; }
+  window.parseISO = parseISO;
   function toISO(d){
     const y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,'0'), day = String(d.getDate()).padStart(2,'0');
     return y + '-' + m + '-' + day;
   }
+  window.toISO = toISO;
+  window.addDaysISO = typeof addDaysISO!=='undefined'?addDaysISO:window.addDaysISO;
+
   function getActiveDayIndices(att){ const days = [0,1,2,3,4]; if (att.saturdayEnabled) days.push(6); return days; }
   function collectSchoolHolidaySet(){
     // إجازات المدرسة: اتحاد إجازات كل المراحل (للتوافق مع نسخ قديمة حُفظت في مرحلة واحدة فقط)
@@ -23980,18 +23985,20 @@ function roundToHalf(n){ if (!Number.isFinite(n)) return 0; return Math.round(n 
   });
 })();
 </script>
-</script>
 
 <!-- ==================== التقويم الدراسي المركزي للأسابيع ==================== -->
 <script>
 (function(){
   const CAL_KEY='termCalendar';
+  const DAY_LABELS=['الأحد','الإثنين','الثلاثاء','الأربعاء','الخميس','السبت'];
   const AR_WEEKS=['الأول','الثاني','الثالث','الرابع','الخامس','السادس','السابع','الثامن','التاسع','العاشر','الحادي عشر','الثاني عشر','الثالث عشر','الرابع عشر','الخامس عشر','السادس عشر','السابع عشر','الثامن عشر','التاسع عشر','العشرون','الحادي والعشرون','الثاني والعشرون','الثالث والعشرون','الرابع والعشرون','الخامس والعشرون','السادس والعشرون','السابع والعشرون','الثامن والعشرون','التاسع والعشرون','الثلاثون'];
   const CAL_MONTH_DEFAULTS={first:['سبتمبر','أكتوبر','نوفمبر','ديسمبر'],second:['فبراير','مارس','أبريل','مايو']};
   const FALLBACK_START={first:'2026-09-13',second:''};
   function calDb(){ return typeof loadDB==='function'?loadDB():{}; }
   function addDaysISO(iso,n){ if(!iso)return ''; const d=new Date(iso+'T00:00:00'); if(isNaN(d.getTime()))return ''; d.setDate(d.getDate()+Number(n||0)); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
-  function calFmt(iso){ if(!iso)return '—'; const d=new Date(iso+'T00:00:00'); if(isNaN(d.getTime()))return iso; return toHindiDigits(`${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`); }
+  function parseISO(iso){ if(!iso) return null; const d=new Date(String(iso)+'T00:00:00'); return isNaN(d.getTime())?null:d; }
+  function toISO(d){ if(!d||!(d instanceof Date)||isNaN(d.getTime())) return ''; return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+  function calFmt(iso){ if(!iso)return '—'; const d=new Date(iso+'T00:00:00'); if(isNaN(d.getTime()))return iso; const _s=`${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`; return (typeof toHindiDigits==='function')?toHindiDigits(_s):_s; }
   function calLoad(term){
     const db=calDb(), info=db.schoolInfo||{}; const tc=info[CAL_KEY]||{}; let c=tc[term];
     if(c && c.startDate && Number(c.totalWeeks)>0 && Array.isArray(c.months) && c.months.length){const copy=JSON.parse(JSON.stringify(c));copy.months.forEach(m=>{if(m.hasExam==null)m.hasExam=false;if(!Number(m.examAfterWeek))m.examAfterWeek=m.endWeek||1;});return copy;}
