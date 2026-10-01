@@ -1962,7 +1962,7 @@
     }
     .ministry-landscape-page:last-child {
       page-break-after: auto !important;
-      break-after: avoid-page !important;
+      break-after: auto !important;
     }
     .ministry-landscape-page .ml-page-label {
       text-align: left;
@@ -15240,7 +15240,7 @@ function renderMonthlyExportButtons() {
         students = Array.from({ length: 20 }, () => ({ id: '', name: '' }));
       }
 
-      const perPage = students.length <= 22 ? Math.max(students.length, 1) : Math.ceil(students.length / 2);
+      const perPage = students.length <= 16 ? Math.max(students.length, 1) : Math.ceil(students.length / Math.ceil(students.length / 16));
       const chunks = [];
       for (let i = 0; i < students.length; i += perPage) chunks.push(students.slice(i, i + perPage));
       if (!chunks.length) chunks.push([]);
@@ -15478,12 +15478,35 @@ function renderMonthlyExportButtons() {
           #printGradeSheetArea { display: block !important; width: 100% !important; margin: 0 !important; padding: 0 !important; }
           .ministry-landscape-page {
             page-break-after: always !important;
-            page-break-inside: avoid !important;
-            break-inside: avoid !important;
+            break-after: page !important;
+            page-break-inside: auto !important;
+            break-inside: auto !important;
             width: 100% !important;
-            overflow: hidden !important;
+            max-height: none !important;
+            min-height: 0 !important;
+            overflow: visible !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            box-sizing: border-box !important;
           }
-          .ministry-landscape-page:last-child { page-break-after: auto !important; }
+          .ministry-landscape-page:last-child {
+            page-break-after: auto !important;
+            break-after: auto !important;
+          }
+          .ministry-landscape-page table { page-break-inside: auto !important; }
+          .ministry-landscape-page tr { page-break-inside: avoid !important; break-inside: avoid !important; }
+          .ministry-landscape-page .detailed-sheet-footer {
+            margin-top: 2mm !important;
+            page-break-inside: avoid !important;
+          }
+          .ministry-landscape-page .detailed-sheet-footer .gs-line { margin-top: 5mm !important; }
+          /* منع صفحة فارغة بعد الغلاف/المحضر */
+          .ml-cover-page, .ml-protocol-page {
+            page-break-after: always !important;
+            break-after: page !important;
+            min-height: 0 !important;
+            height: auto !important;
+          }
           .ministry-landscape-page .blank-cell { min-height: 4.2mm; }
           .ministry-landscape-page .ml-week-head { background: #3f7a57 !important; color: #fff !important; }
           .ministry-landscape-page .detailed-weekly-table th,
@@ -15508,10 +15531,10 @@ function renderMonthlyExportButtons() {
             position: relative;
             border: 3px solid #14532d;
             outline: 1px solid #86efac;
-            outline-offset: 2.5mm;
+            outline-offset: 1.5mm;
             border-radius: 4px;
-            padding: 7mm 12mm 8mm;
-            width: 92%; max-width: 270mm;
+            padding: 5mm 10mm 6mm;
+            width: 90%; max-width: 260mm;
             text-align: center;
             background: #fff;
           }
@@ -15549,7 +15572,7 @@ function renderMonthlyExportButtons() {
             margin: 2mm auto 4mm;
           }
           .ml-cover-headline {
-            font-size: 36px; font-weight: 900; color: #0a1f14;
+            font-size: 32px; font-weight: 900; color: #0a1f14;
             letter-spacing: 1.2px; line-height: 1.15;
             margin: 2mm 0 1.5mm;
             text-shadow: 0 0.3mm 0 rgba(20,83,45,0.12);
@@ -15594,7 +15617,21 @@ function renderMonthlyExportButtons() {
         }
       `;
       if (!forceStyle.parentNode) document.head.appendChild(forceStyle);
-      area.innerHTML = pagesHtml;
+      // تنظيف صفحات فارغة قبل الطباعة
+      const wrap = document.createElement('div');
+      wrap.innerHTML = pagesHtml;
+      const pages = Array.from(wrap.querySelectorAll('.ministry-landscape-page'));
+      pages.forEach(p => {
+        const text = (p.textContent || '').replace(/\s+/g, ' ').trim();
+        const hasTable = !!p.querySelector('table');
+        const hasCover = p.classList.contains('ml-cover-page') || p.classList.contains('ml-protocol-page');
+        if (!hasTable && !hasCover && text.length < 8) p.remove();
+      });
+      // إزالة أي عناصر فارغة متبقية
+      Array.from(wrap.childNodes).forEach(n => {
+        if (n.nodeType === 3 && !(n.textContent || '').trim()) n.remove();
+      });
+      area.innerHTML = wrap.innerHTML;
       area.style.display = 'block';
       setTimeout(() => {
         window.print();
@@ -15831,7 +15868,7 @@ function renderMonthlyExportButtons() {
           })
         : '';
 
-      const perPage = students.length <= 22 ? Math.max(students.length, 1) : Math.ceil(students.length / 2);
+      const perPage = students.length <= 16 ? Math.max(students.length, 1) : Math.ceil(students.length / Math.ceil(students.length / 16));
       const chunks = [];
       for (let i = 0; i < students.length; i += perPage) chunks.push(students.slice(i, i + perPage));
       if (!chunks.length) chunks.push([]);
