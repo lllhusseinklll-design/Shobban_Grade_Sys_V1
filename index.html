@@ -13203,8 +13203,9 @@ function renderMonthlyExportButtons() {
       const canEdit = currentRole === 'admin';
       const canOpenCard = (currentRole === 'admin' || currentRole === 'viewer' || currentRole === 'teacher') && typeof v20OpenStudent === 'function';
       const showNid = canViewNationalId();
-      // أعمدة المسار/التخصص تظهر فقط إن وُجد طلاب صف ثانٍ ثانوي ضمن القائمة المعروضة
+      // المسار/التخصص: صف ثانٍ ثانوي فقط. اللغة الثانية: لغير الثاني (لأنها في الثاني اختيار ضمن مسار الآداب فقط)
       const showPathSpec = filtered.some(s => studentHasPathSpecScope(s));
+      const showSecondLang = filtered.some(s => !studentHasPathSpecScope(s));
       try {
         const theadRow = document.querySelector('#tab-students thead tr');
         if (theadRow) {
@@ -13212,14 +13213,20 @@ function renderMonthlyExportButtons() {
           if (showNid) cols += '<th>الرقم القومي</th>';
           cols += '<th>رقم الجلوس</th><th>اسم الطالب</th><th>النوع</th><th>الفصل</th>';
           if (showPathSpec) cols += '<th>المسار</th><th>مادة التخصص</th>';
-          cols += '<th>اللغة الثانية</th>';
+          if (showSecondLang) cols += '<th>اللغة الثانية</th>';
           theadRow.innerHTML = cols;
         }
         const searchInp = document.getElementById('studentSearch');
         if (searchInp) {
-          searchInp.placeholder = showNid
-            ? (showPathSpec ? '🔍 بحث بالاسم أو رقم الجلوس أو الرقم القومي أو المسار...' : '🔍 بحث بالاسم أو رقم الجلوس أو الرقم القومي...')
-            : (showPathSpec ? '🔍 بحث بالاسم أو رقم الجلوس أو المسار...' : '🔍 بحث بالاسم أو رقم الجلوس...');
+          if (showPathSpec && !showSecondLang) {
+            searchInp.placeholder = showNid
+              ? '🔍 بحث بالاسم أو رقم الجلوس أو الرقم القومي أو المسار...'
+              : '🔍 بحث بالاسم أو رقم الجلوس أو المسار...';
+          } else {
+            searchInp.placeholder = showNid
+              ? '🔍 بحث بالاسم أو رقم الجلوس أو الرقم القومي...'
+              : '🔍 بحث بالاسم أو رقم الجلوس...';
+          }
         }
       } catch (e) {}
       tbody.innerHTML = '';
@@ -13266,15 +13273,23 @@ function renderMonthlyExportButtons() {
           }
         }
 
-        const langDotColor = getLangColor(s.secondLanguage).bg;
-        const secondLangCell = canEdit
-          ? `<div class="flex items-center gap-12" style="gap:6px;">
-              <span style="width:10px; height:10px; border-radius:50%; flex-shrink:0; background:${langDotColor}; border:1px solid #94a3b8;"></span>
-              <input type="text" list="secondLangDatalist" value="${escapeHtml(s.secondLanguage || '')}"
-                onchange="updateStudentField('${s.id}','secondLanguage',this.value)"
-                placeholder="-" style="width:120px; padding:3px 5px; border:1px solid #cbd5e1; border-radius:4px;" />
-             </div>`
-          : (s.secondLanguage ? langBadgeHtml(s.secondLanguage) : '-');
+        let secondLangTd = '';
+        if (showSecondLang) {
+          if (studentHasPathSpecScope(s)) {
+            secondLangTd = `<td class="col-lang" data-label="اللغة الثانية">—</td>`;
+          } else {
+            const langDotColor = getLangColor(s.secondLanguage).bg;
+            const secondLangCell = canEdit
+              ? `<div class="flex items-center gap-12" style="gap:6px;">
+                  <span style="width:10px; height:10px; border-radius:50%; flex-shrink:0; background:${langDotColor}; border:1px solid #94a3b8;"></span>
+                  <input type="text" list="secondLangDatalist" value="${escapeHtml(s.secondLanguage || '')}"
+                    onchange="updateStudentField('${s.id}','secondLanguage',this.value)"
+                    placeholder="-" style="width:120px; padding:3px 5px; border:1px solid #cbd5e1; border-radius:4px;" />
+                 </div>`
+              : (s.secondLanguage ? langBadgeHtml(s.secondLanguage) : '-');
+            secondLangTd = `<td class="col-lang" data-label="اللغة الثانية">${secondLangCell}</td>`;
+          }
+        }
         const nameCell = canOpenCard
           ? `<a href="javascript:void(0)" onclick="v20OpenStudent(${escapeHtml(JSON.stringify(s.id))})" title="عرض بطاقة الطالب: الدرجات ونسبة الحضور" style="color:#1e3a5f; font-weight:700; text-decoration:underline; cursor:pointer;">${escapeHtml(s.name)}</a>`
           : escapeHtml(s.name);
@@ -13289,12 +13304,17 @@ function renderMonthlyExportButtons() {
           <td class="col-gender" data-label="النوع"><span class="badge ${badgeClass}">${genderLabel}</span></td>
           <td class="col-class" data-label="الفصل">${classCell}</td>
           ${pathSpecCells}
-          <td class="col-lang" data-label="اللغة الثانية">${secondLangCell}</td>
+          ${secondLangTd}
         `;
         tbody.appendChild(row);
       });
-      document.getElementById('studentsCount').textContent = `إجمالي: ${filtered.length} طالب` +
-        (canEdit ? (showPathSpec ? ' - يمكنك تعديل الفصل والمسار ومادة التخصص واللغة الثانية مباشرة' : ' - يمكنك تعديل الفصل واللغة الثانية مباشرة') : '') +
+      let editHint = '';
+      if (canEdit) {
+        if (showPathSpec && !showSecondLang) editHint = ' - يمكنك تعديل الفصل والمسار ومادة التخصص مباشرة';
+        else if (showPathSpec && showSecondLang) editHint = ' - يمكنك تعديل الفصل والمسار/التخصص (للثاني) واللغة الثانية (لغيره) مباشرة';
+        else editHint = ' - يمكنك تعديل الفصل واللغة الثانية مباشرة';
+      }
+      document.getElementById('studentsCount').textContent = `إجمالي: ${filtered.length} طالب` + editHint +
         (canOpenCard ? ' - اضغط على اسم الطالب لعرض بطاقته' : '');
     }
 
