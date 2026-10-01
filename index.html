@@ -12169,7 +12169,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
     // تظليل أيام خارج التدريس إن ضبط المعلم أيام الدراسة للمادة/الفصل؛ وإلا بدون تظليل إضافي
     function printAttendanceSheetBatchInternal(jobs, term, month, blank) {
       const db = loadDB();
-      const att = (typeof ensureAttendance === 'function') ? ensureAttendance(db) : (db.attendance || {});
+      const att = (typeof ensureAttendance === 'function') ? ensureAttendance(db) : ((typeof window.ensureAttendance === 'function') ? window.ensureAttendance(db) : (db.attendance || { records: {} }));
       const area = document.getElementById('printAttendanceArea');
       if (!area) { alert('تعذر العثور على منطقة الطباعة.'); return; }
       if (typeof clearInactivePrintAreas === 'function') clearInactivePrintAreas('printAttendanceArea');
@@ -19714,6 +19714,8 @@ html[data-theme="dark"] .v21-pill.active{background:#1e3a5f;color:#fff;border-co
     if (typeof db.attendance.syncToGrades !== 'boolean') db.attendance.syncToGrades = false;
     return db.attendance;
   }
+  window.ensureAttendance = ensureAttendance;
+
   function subjectDaysKey(subjectName, classKey){ return String(subjectName||'') + '||' + String(classKey||''); }
   function recordKey(studentId, subjectName, term, month, dateISO){ return [studentId, subjectName, term, month, dateISO].join('|'); }
   
@@ -19897,6 +19899,11 @@ function roundToHalf(n){ if (!Number.isFinite(n)) return 0; return Math.round(n 
     if (!Array.isArray(days) || !days.length) days = [0,1,2,3,4];
     return days.map(Number).filter(n => n >= 0 && n <= 5);
   }
+  window.getActiveDayIndices = getActiveDayIndices;
+  window.collectSchoolHolidaySet = collectSchoolHolidaySet;
+  window.getSubjectStudyDays = getSubjectStudyDays;
+  window.recordKey = recordKey;
+
   function isColumnStudyDay(col, studyDayIdxList){ return studyDayIdxList.indexOf(col.dayIdx) >= 0; }
   function findAttendanceComponent(subject){
     if (!subject || !Array.isArray(subject.components)) return null;
@@ -24097,7 +24104,7 @@ function roundToHalf(n){ if (!Number.isFinite(n)) return 0; return Math.round(n 
   function getRecordingPeriod(term,monthIndex0){return getRecordingPeriods(term)[monthIndex0]||null;}
   function getMonthLabels(term){return getRecordingPeriods(term).map(p=>p.name||'فترة');}
   // استبدال getMonthCalendarDays بحيث تبني الأيام من الروزنامة المركزية.
-  function getMonthCalendarDays(term,month){const db=calDb(),att=ensureAttendance(db),c=getCentralCalendar(term),m=c.months[month-1];const active=getActiveDayIndices(att),holidays=collectSchoolHolidaySet(),cols=[];if(!m)return cols;for(let w=m.startWeek;w<=m.endWeek;w++){const base=parseISO(addDaysISO(c.startDate,(w-1)*7));if(!base)continue;const startJs=base.getDay();active.forEach((jsDay,di)=>{let delta=jsDay-startJs;if(delta<0)delta+=7;const d=new Date(base);d.setDate(d.getDate()+delta);const iso=toISO(d);cols.push({week:w-m.startWeek+1,globalWeek:w,dayIdx:di,jsDay,dateISO:iso,label:DAY_LABELS[di]||'',dateLabel:calFmt(iso),isHoliday:holidays.has(iso),hasDate:true,outOfScope:false});});}return cols;}
+  function getMonthCalendarDays(term,month){const db=calDb();const _ens=(typeof ensureAttendance==='function'?ensureAttendance:(typeof window.ensureAttendance==='function'?window.ensureAttendance:null));const att=_ens?_ens(db):(db.attendance||{records:{},saturdayEnabled:false,holidays:[]});const c=getCentralCalendar(term),m=c.months[month-1];const _gai=(typeof getActiveDayIndices==='function'?getActiveDayIndices:window.getActiveDayIndices);const active=(_gai?_gai(att):[0,1,2,3,4]);const _hol=(typeof collectSchoolHolidaySet==='function'?collectSchoolHolidaySet:window.collectSchoolHolidaySet);const holidays=_hol?_hol():new Set();const cols=[];if(!m)return cols;for(let w=m.startWeek;w<=m.endWeek;w++){const base=parseISO(addDaysISO(c.startDate,(w-1)*7));if(!base)continue;const startJs=base.getDay();active.forEach((jsDay,di)=>{let delta=jsDay-startJs;if(delta<0)delta+=7;const d=new Date(base);d.setDate(d.getDate()+delta);const iso=toISO(d);cols.push({week:w-m.startWeek+1,globalWeek:w,dayIdx:di,jsDay,dateISO:iso,label:DAY_LABELS[di]||'',dateLabel:calFmt(iso),isHoliday:holidays.has(iso),hasDate:true,outOfScope:false});});}return cols;}
   window.getCentralCalendar = getCentralCalendar;
   window.getWeek1DateISO = getWeek1DateISO;
   window.getFourWeekDates = getFourWeekDates;
