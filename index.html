@@ -4088,11 +4088,11 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
           <input type="text" id="newTeacherLangTypeCustom" placeholder="اكتب اسم اللغة كما هو مسجَّل بالضبط في بيانات الطلاب" style="display:none; margin-top:8px;" oninput="updateTeacherMatchPreview()">
           <p style="color:#64748b; font-size:12px; margin-top:6px;">يظهر هذا الحقل فقط عند اختيار مادة لغة ثانية. اختر اللغة من القائمة (مستخرجة تلقائياً من بيانات الطلاب المسجَّلة)، أو اختر "إدخال يدوي" إذا لم تكن اللغة مدرجة بعد. لن يستطيع هذا المعلم رصد أو تعديل درجات هذه المادة إلا لطلاب فصوله الذين تطابق لغتهم الثانية المسجَّلة هذه القيمة (مطابقة متسامحة مع فروق المسافات/الهمزات).</p>
         </div>
-        <div class="form-group mt-16" id="newTeacherSpecTypeWrap" style="display:none;">
-          <label>نوع التخصص الذي يدرّسه (مادة التخصص)</label>
-          <select id="newTeacherSpecType" onchange="handleSpecTypeSelectChange(); updateTeacherMatchPreview();"><option value="">-- اختر التخصص --</option></select>
+        <div class="form-group mt-16" id="newTeacherSpecTypeWrap" style="display:none; background:#f0fdf4; border:1px solid #86efac; border-radius:10px; padding:12px 14px;">
+          <label style="font-weight:700; color:#166534;">⭐ نوع التخصص الذي يدرّسه (مطلوب لمادة التخصص)</label>
+          <select id="newTeacherSpecType" onchange="handleSpecTypeSelectChange(); updateTeacherMatchPreview();" style="margin-top:6px;"><option value="">-- اختر: رياضيات / فيزياء / كيمياء / ... --</option></select>
           <input type="text" id="newTeacherSpecTypeCustom" placeholder="اكتب اسم التخصص كما هو مسجَّل بالضبط في بيانات الطلاب" style="display:none; margin-top:8px;" oninput="updateTeacherMatchPreview()">
-          <p style="color:#64748b; font-size:12px; margin-top:6px;">يظهر هذا الحقل فقط عند اختيار مادة «مادة التخصص» (الصف الثاني بكالوريا). اختر التخصص من القائمة، أو أدخل يدوياً. لن يرى هذا المعلم إلا الطلاب الذين تطابق مادة تخصصهم المسجَّلة هذه القيمة.</p>
+          <p style="color:#166534; font-size:12px; margin-top:8px; margin-bottom:0;">بعد اختيار المادة «مادة التخصص» من القائمة أعلاه، حدّد هنا النوع (رياضيات، فيزياء، كيمياء، برمجة، محاسبة...). لن يرى المعلم إلا طلاب هذا التخصص فقط. لا تختر «المسار» — فهو ليس مادة.</p>
         </div>
         <div class="form-group mt-16">
           <label>الفصول التي يُدرّسها بهذه المادة تحديداً</label>
@@ -6639,6 +6639,22 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
     function subjectIsSpecialization(subjectName) {
       const n = normalizeArabicText(subjectName);
       return /ماده\s*(ال)?تخصص/.test(n);
+    }
+
+    // أعمدة بيانات طالب دخلت خطأً كـ«مواد» من ملف الإكسيل (مثل عمود المسار) — تُستبعد من القوائم والرصد
+    function isNonGradeSubjectName(subjectName) {
+      const n = normalizeArabicText(subjectName || '');
+      if (!n) return true;
+      // عمود المسار فقط (ليس مادة دراسية)
+      if (n === 'المسار' || n === 'مسار') return true;
+      if (/^المسار$/.test(n) || /^مسار$/.test(n)) return true;
+      // أسماء شائعة لأعمدة هوية وليست مواد
+      if (n === 'النوع' || n === 'الفصل' || n === 'فصل') return true;
+      if (n === 'رقم الجلوس' || n === 'اسم الطالب' || n === 'الرقم القومي') return true;
+      return false;
+    }
+    function gradeSubjectsOnly(subjects) {
+      return (subjects || []).filter(s => s && s.name && !isNonGradeSubjectName(s.name));
     }
 
     // لوحة ألوان ثابتة لتمييز كل لغة أجنبية بلون شارة مختلف وواضح في كل أنحاء البرنامج
@@ -10219,7 +10235,10 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
         }
       });
 
-      return subjects.filter(s => s.components.some(c => c.colIndex !== undefined && c.colIndex >= 0));
+      return subjects.filter(s =>
+        s.components.some(c => c.colIndex !== undefined && c.colIndex >= 0) &&
+        !isNonGradeSubjectName(s.name)
+      );
     }
 
     // يطابق مادة مستوردة حديثاً مع تعريفها الرسمي المحفوظ مسبقاً (الكتالوج) بالاسم، بدلاً من استبدال
@@ -11161,6 +11180,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
         const subjectsByName = new Map(db.subjects.map(s => [s.name, s]));
         const scopeKey = importGrade + '|' + importSection;
         result.subjects.forEach(s => {
+          if (isNonGradeSubjectName(s.name)) return; // لا تستورد عمود المسار وغيره كمواد
           const existing = subjectsByName.get(s.name);
           if (!existing) {
             if (!s.appliesTo) s.appliesTo = [];
@@ -11176,6 +11196,8 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
             const { isNewComponent, ...compToSave } = c;
             existing.components.push(compToSave); } });
         });
+        // تنظيف أي مواد زائفة سبق حفظها (مثل «المسار»)
+        db.subjects = gradeSubjectsOnly(db.subjects);
 
         // تحديث خريطة (فصل ← صف)، بمفتاح مركّب من اسم الفصل + القسم، لفصول هذا الصف ولهذا القسم فقط،
         // مع الإبقاء التام على فصول الصفوف والقسم الآخر كما هي (حتى لو تشابهت أسماء الفصول بينهما).
@@ -13357,7 +13379,7 @@ function renderMonthlyExportButtons() {
       const db = loadDB();
       const container = document.getElementById('subjectsContainer');
       container.innerHTML = '';
-      let subjects = db.subjects || [];
+      let subjects = gradeSubjectsOnly(db.subjects || []);
       if (currentRole === 'teacher' && currentTeacher) { const tSubjects = teacherSubjectNames(currentTeacher);
         subjects = subjects.filter(s => tSubjects.includes(s.name)); }
       if (subjects.length === 0) {
@@ -13650,11 +13672,12 @@ function renderMonthlyExportButtons() {
       const gsVal = gradeSubj.value;
       const gradeClassEl = document.getElementById('gradeClassSelect');
       const currentClassVal = gradeClassEl ? gradeClassEl.value : '';
+      const allGradeSubjects = gradeSubjectsOnly(db.subjects || []);
       const scopeFilter = s => !currentClassVal || subjectAppliesToClass(s, currentClassVal, db);
       gradeSubj.innerHTML = '<option value="">-- اختر مادة --</option>';
       if (currentRole === 'teacher' && currentTeacher) {
         const subjNames = teacherSubjectNames(currentTeacher);
-        const filtered = db.subjects.filter(su => subjNames.includes(su.name) && scopeFilter(su));
+        const filtered = allGradeSubjects.filter(su => subjNames.includes(su.name) && scopeFilter(su));
         filtered.forEach(s => { const o = document.createElement('option');
           o.value = s.name;
           o.textContent = s.name;
@@ -13666,7 +13689,7 @@ function renderMonthlyExportButtons() {
         else if (filtered.length) gradeSubj.value = filtered[0].name;
       } else {
         gradeSubj.disabled = false;
-        db.subjects.filter(scopeFilter).forEach(s => { const o = document.createElement('option');
+        allGradeSubjects.filter(scopeFilter).forEach(s => { const o = document.createElement('option');
           o.value = s.name;
           o.textContent = s.name;
           gradeSubj.appendChild(o); });
@@ -18473,15 +18496,27 @@ function renderMonthlyExportButtons() {
      try {
       const db = loadDB();
       db.subjects = db.subjects || []; db.classes = db.classes || []; db.teachers = db.teachers || [];
+      // إزالة مواد زائفة محفوظة سابقاً (مثل عمود «المسار») مرة واحدة بهدوء
+      const cleaned = gradeSubjectsOnly(db.subjects);
+      if (cleaned.length !== db.subjects.length) {
+        db.subjects = cleaned;
+        try { saveDB(db); } catch (e) {}
+      }
 
       const subjSel = document.getElementById('newTeacherSubject');
       const curVal = subjSel.value;
       subjSel.innerHTML = '<option value="">-- اختر مادة --</option>';
-      db.subjects.forEach(s => { const o = document.createElement('option');
+      // استبعاد أعمدة الهوية التي دُرِجت خطأ كمواد (مثل «المسار»)
+      gradeSubjectsOnly(db.subjects).forEach(s => {
+        const o = document.createElement('option');
         o.value = s.name;
-        o.textContent = s.name;
-        subjSel.appendChild(o); });
-      if (curVal) subjSel.value = curVal;
+        // توضيح لمادة التخصص أن الخطوة التالية اختيار النوع
+        o.textContent = subjectIsSpecialization(s.name)
+          ? (s.name + '  ← اختر نوع التخصص بعد الاختيار')
+          : s.name;
+        subjSel.appendChild(o);
+      });
+      if (curVal && !isNonGradeSubjectName(curVal)) subjSel.value = curVal;
       toggleTeacherLangTypeField();
 
       const classBox = document.getElementById('newTeacherClasses');
