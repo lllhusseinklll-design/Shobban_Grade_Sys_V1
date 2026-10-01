@@ -2070,16 +2070,36 @@
       display: inline-block; max-height: 22mm;
     }
     .ministry-landscape-page th.avg-col {
-      background: #e0f2fe !important;
-      color: #0c4a6e !important;
+      background: #3f7a57 !important;
+      color: #ffffff !important;
       font-size: 7.5px !important;
     }
     .ministry-landscape-page th.ml-week-sum-head {
       vertical-align: middle !important;
       padding: 0.3mm 0.2mm !important;
       line-height: 1.15 !important;
+      background: #3f7a57 !important;
+      color: #ffffff !important;
     }
-    .ministry-landscape-page th.ml-week-sum-head .week-sum-label {
+    
+          .ml-absence-table td.gs-name {
+            min-width: 42mm !important;
+            width: 42mm !important;
+            font-size: 8.5px !important;
+            white-space: nowrap !important;
+            text-align: right !important;
+          }
+          .ml-absence-table th.att-day-head,
+          .ml-absence-table th.att-date-head,
+          .ml-absence-table .ml-week-head {
+            color: #fff !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          .ml-absence-table th.att-day-head { background: #3f7a57 !important; }
+          .ml-absence-table th.att-date-head { background: #2f5f43 !important; font-size: 6px !important; }
+          .ml-absence-table .ml-week-head { background: #3f7a57 !important; }
+.ministry-landscape-page th.ml-week-sum-head .week-sum-label {
       display: block;
       writing-mode: horizontal-tb !important;
       transform: none !important;
@@ -2090,7 +2110,11 @@
       word-break: keep-all;
       max-width: 100%;
       text-align: center;
-      color: #0c4a6e;
+      color: #ffffff !important;
+    }
+    .ministry-landscape-page td.avg-col {
+      background: #e8f5e9 !important;
+      font-weight: 700;
     }
 
 
@@ -2399,8 +2423,46 @@ html[data-theme="dark"] .dash-more-menu button:hover{background:#1a2338}
     .ml-absence-table th.att-sum-abs, .ml-absence-table td.att-sum-abs {
       background:#fee2e2 !important; color:#991b1b; font-weight:800;
     }
-    .ml-absence-table th.att-day-head { font-size:7.5px; }
-    .ml-absence-table th.att-date-head { font-size:6.5px; font-weight:600; }
+    .ml-absence-table th.att-day-head {
+      font-size: 7.5px !important;
+      color: #fff !important;
+      background: #3f7a57 !important;
+      font-weight: 800;
+    }
+    .ml-absence-table th.att-date-head {
+      font-size: 6px !important;
+      font-weight: 700 !important;
+      color: #fff !important;
+      background: #2f5f43 !important;
+      line-height: 1.15 !important;
+      white-space: normal !important;
+      padding: 0.35mm 0.15mm !important;
+      vertical-align: middle !important;
+    }
+    .ml-absence-table th.att-date-head.holiday-day {
+      background: #92400e !important;
+      color: #fff !important;
+    }
+    .ml-absence-table .ml-week-head {
+      color: #fff !important;
+      background: #3f7a57 !important;
+    }
+    .ml-absence-table .ml-week-head .w-name { color: #fff !important; }
+    .ml-absence-table .ml-week-head .w-date { color: #e2e8f0 !important; font-size: 6.5px !important; }
+    /* عمود الاسم عريض لاستيعاب الاسم كاملاً */
+    .ml-absence-table td.gs-name,
+    .ml-absence-table th.gs-name-head {
+      min-width: 42mm !important;
+      width: 42mm !important;
+      max-width: 48mm !important;
+      font-size: 8.5px !important;
+      text-align: right !important;
+      padding-right: 1.2mm !important;
+      white-space: nowrap !important;
+      overflow: visible !important;
+    }
+    .ml-absence-table col.col-name { width: 42mm; }
+
 </style>
 
 <style id="v22-security-css">
@@ -15491,6 +15553,13 @@ function renderMonthlyExportButtons() {
           .ministry-landscape-page .detailed-sheet-footer { margin-top: 3mm; }
           .ministry-landscape-page .detailed-sheet-footer .gs-line { margin-top: 7mm; }
           .ministry-landscape-page .detailed-sheet-footer .gs-sign-caption { font-size: 8px; }
+          .ministry-landscape-page th.ml-week-sum-head,
+          .ministry-landscape-page th.avg-col {
+            background: #3f7a57 !important;
+            color: #ffffff !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
           .ministry-landscape-page th.ml-week-sum-head .week-sum-label {
             display: block !important;
             writing-mode: horizontal-tb !important;
@@ -15500,6 +15569,12 @@ function renderMonthlyExportButtons() {
             line-height: 1.12 !important;
             white-space: normal !important;
             text-align: center !important;
+            color: #ffffff !important;
+          }
+          .ministry-landscape-page td.avg-col {
+            background: #e8f5e9 !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
           }
 
           .ml-cover-page, .ml-protocol-page { display:flex; align-items:center; justify-content:center; }
@@ -15709,6 +15784,31 @@ function renderMonthlyExportButtons() {
     //  نفس أسلوب طباعة كشوف الوزارة العرضية للدرجات
     // ============================================================
 
+    function mlShortDayDate(isoOrLabel) {
+      // مثال: 2026-10-19 → «19 أكتوبر»
+      const monthsAr = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+      let iso = String(isoOrLabel || '').trim();
+      if (!iso || iso === '—') return '—';
+      // إن كان ISO
+      let m = iso.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+      if (!m) {
+        // أشكال مثل 2026/10/19 أو 19/10/2026
+        m = iso.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+        if (!m) {
+          m = iso.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+          if (m) {
+            const d = parseInt(m[1],10), mo = parseInt(m[2],10);
+            const dayStr = (typeof toHindiDigits === 'function') ? toHindiDigits(String(d)) : String(d);
+            return dayStr + ' ' + (monthsAr[mo-1] || '');
+          }
+          return iso;
+        }
+      }
+      const year = m[1], mo = parseInt(m[2],10), d = parseInt(m[3],10);
+      const dayStr = (typeof toHindiDigits === 'function') ? toHindiDigits(String(d)) : String(d);
+      return dayStr + ' ' + (monthsAr[mo-1] || '');
+    }
+
     function buildMinistryAbsencePagesHtml(cfg) {
       const { db, subjectName, cls, term, month, blank } = cfg;
       let students = (cfg.students || []).slice();
@@ -15741,11 +15841,11 @@ function renderMonthlyExportButtons() {
 
       const totalDayCols = weekCount * daysPerWeek;
       // صف 1: الأسابيع
-      let weekRow = `<th rowspan="3" class="serial-col">م</th><th rowspan="3">اسم الطالب</th>`;
+      let weekRow = `<th rowspan="3" class="serial-col">م</th><th rowspan="3" class="gs-name-head">اسم الطالب</th>`;
       weeks.forEach((wk, wi) => {
         const out = wi >= scopeWeeks ? ' week-out-of-scope' : '';
         const name = (typeof mlWeekArabicName === 'function') ? mlWeekArabicName(wk.globalWeek) : ('الأسبوع ' + wk.globalWeek);
-        const firstDate = (wk.days[0] && wk.days[0].dateLabel) ? wk.days[0].dateLabel : '';
+        const firstDate = (wk.days[0] && (wk.days[0].dateISO || wk.days[0].dateLabel)) ? mlShortDayDate(wk.days[0].dateISO || wk.days[0].dateLabel) : '';
         weekRow += `<th colspan="${daysPerWeek}" class="ml-week-head att-week-${(wi%4)+1}${out}"><div class="w-name">${name}</div>${firstDate ? `<div class="w-date">${firstDate}</div>` : ''}</th>`;
       });
       weekRow += `<th rowspan="3" class="att-sum-abs">إجمالي<br>الغياب</th>`;
@@ -15766,10 +15866,10 @@ function renderMonthlyExportButtons() {
       weeks.forEach((wk, wi) => {
         const out = wi >= scopeWeeks ? ' week-out-of-scope' : '';
         wk.days.forEach((col, di) => {
-          const dlab = col ? (col.dateLabel || '—') : '—';
+          const dlab = col ? mlShortDayDate(col.dateISO || col.dateLabel || '—') : '—';
           const hol = col && col.isHoliday ? ' holiday-day' : '';
           const sep = di === 0 ? ' week-sep-left' : '';
-          dateRow += `<th class="att-date-head${sep}${out}${hol}">${escapeHtml(dlab)}</th>`;
+          dateRow += `<th class="att-date-head${sep}${out}${hol}" title="${escapeHtml(col && col.dateLabel ? col.dateLabel : dlab)}">${escapeHtml(dlab)}</th>`;
         });
       });
 
