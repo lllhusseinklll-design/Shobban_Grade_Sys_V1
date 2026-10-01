@@ -3782,7 +3782,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
         </div>
         <div class="table-wrap students-table-wrap">
           <table class="students-table">
-            <thead><tr><th>#</th><th>الرقم القومي</th><th>رقم الجلوس</th><th>اسم الطالب</th><th>النوع</th><th>الفصل</th><th>المسار</th><th>مادة التخصص</th><th>اللغة الثانية</th></tr></thead>
+            <thead><tr><th>#</th><th>الرقم القومي</th><th>رقم الجلوس</th><th>اسم الطالب</th><th>النوع</th><th>الفصل</th><th>اللغة الثانية</th></tr></thead>
             <tbody id="studentsTableBody"></tbody>
           </table>
         </div>
@@ -6800,6 +6800,22 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
     function specializationsForPath(path) {
       const key = Object.keys(PATH_SPECIALIZATIONS).find(k => normalizeArabicText(k) === normalizeArabicText(path || ''));
       return key ? PATH_SPECIALIZATIONS[key] : KNOWN_SPECIALIZATIONS.slice();
+    }
+
+    // المسار ومادة التخصص خاصان بالصف الثاني الثانوي (بكالوريا) فقط — لا يُعرضان للأول أو الثالث.
+    function isSecondYearSecondaryGrade(gradeName) {
+      const n = normalizeArabicText(gradeName || '');
+      if (!n) return false;
+      // استبعاد صريح للصف الأول والثالث الثانوي
+      if (/ثانوي/.test(n) && /اول/.test(n)) return false;
+      if (/ثانوي/.test(n) && /ثالث/.test(n)) return false;
+      // قبول: ثاني ثانوي / الثاني الثانوي / بكالوريا (عند الإشارة للثاني)
+      if (/ثانوي/.test(n) && /ثاني/.test(n)) return true;
+      if (/بكالوريا/.test(n) && !/ثالث/.test(n) && !/اول/.test(n)) return true;
+      return false;
+    }
+    function studentHasPathSpecScope(s) {
+      return isSecondYearSecondaryGrade(s && s.grade);
     }
 
     function populateSpecTypeOptions(selectedValue) {
@@ -13187,18 +13203,23 @@ function renderMonthlyExportButtons() {
       const canEdit = currentRole === 'admin';
       const canOpenCard = (currentRole === 'admin' || currentRole === 'viewer' || currentRole === 'teacher') && typeof v20OpenStudent === 'function';
       const showNid = canViewNationalId();
+      // أعمدة المسار/التخصص تظهر فقط إن وُجد طلاب صف ثانٍ ثانوي ضمن القائمة المعروضة
+      const showPathSpec = filtered.some(s => studentHasPathSpecScope(s));
       try {
         const theadRow = document.querySelector('#tab-students thead tr');
         if (theadRow) {
-          theadRow.innerHTML = showNid
-            ? '<th>#</th><th>الرقم القومي</th><th>رقم الجلوس</th><th>اسم الطالب</th><th>النوع</th><th>الفصل</th><th>المسار</th><th>مادة التخصص</th><th>اللغة الثانية</th>'
-            : '<th>#</th><th>رقم الجلوس</th><th>اسم الطالب</th><th>النوع</th><th>الفصل</th><th>المسار</th><th>مادة التخصص</th><th>اللغة الثانية</th>';
+          let cols = '<th>#</th>';
+          if (showNid) cols += '<th>الرقم القومي</th>';
+          cols += '<th>رقم الجلوس</th><th>اسم الطالب</th><th>النوع</th><th>الفصل</th>';
+          if (showPathSpec) cols += '<th>المسار</th><th>مادة التخصص</th>';
+          cols += '<th>اللغة الثانية</th>';
+          theadRow.innerHTML = cols;
         }
         const searchInp = document.getElementById('studentSearch');
         if (searchInp) {
           searchInp.placeholder = showNid
-            ? '🔍 بحث بالاسم أو رقم الجلوس أو الرقم القومي أو المسار...'
-            : '🔍 بحث بالاسم أو رقم الجلوس أو المسار...';
+            ? (showPathSpec ? '🔍 بحث بالاسم أو رقم الجلوس أو الرقم القومي أو المسار...' : '🔍 بحث بالاسم أو رقم الجلوس أو الرقم القومي...')
+            : (showPathSpec ? '🔍 بحث بالاسم أو رقم الجلوس أو المسار...' : '🔍 بحث بالاسم أو رقم الجلوس...');
         }
       } catch (e) {}
       tbody.innerHTML = '';
@@ -13217,27 +13238,33 @@ function renderMonthlyExportButtons() {
              </select>`
           : escapeHtml(s.class || '-');
 
-        // مسار — قائمة منسدلة ثابتة + أي قيمة موجودة غير مدرجة
-        const pathOpts = KNOWN_PATHS.slice();
-        if (s.path && !pathOpts.some(p => normalizeArabicText(p) === normalizeArabicText(s.path))) pathOpts.push(s.path);
-        const pathCell = canEdit
-          ? `<select onchange="updateStudentPathAndSpec('${s.id}', this.value)" style="padding:3px 5px; border:1px solid #cbd5e1; border-radius:4px; max-width:180px;">
-              <option value="">-- اختر المسار --</option>
-              ${pathOpts.map(p => `<option value="${escapeHtml(p)}" ${normalizeArabicText(p) === normalizeArabicText(s.path || '') ? 'selected' : ''}>${escapeHtml(p)}</option>`).join('')}
-             </select>`
-          : (s.path ? langBadgeHtml(s.path) : '-');
-
-        // مادة التخصص — حسب المسار المختار
-        const specOpts = specializationsForPath(s.path);
-        if (s.specialization && !specOpts.some(sp => normalizeArabicText(sp) === normalizeArabicText(s.specialization))) {
-          specOpts.push(s.specialization);
+        let pathSpecCells = '';
+        if (showPathSpec) {
+          if (studentHasPathSpecScope(s)) {
+            const pathOpts = KNOWN_PATHS.slice();
+            if (s.path && !pathOpts.some(p => normalizeArabicText(p) === normalizeArabicText(s.path))) pathOpts.push(s.path);
+            const pathCell = canEdit
+              ? `<select onchange="updateStudentPathAndSpec('${s.id}', this.value)" style="padding:3px 5px; border:1px solid #cbd5e1; border-radius:4px; max-width:180px;">
+                  <option value="">-- اختر المسار --</option>
+                  ${pathOpts.map(p => `<option value="${escapeHtml(p)}" ${normalizeArabicText(p) === normalizeArabicText(s.path || '') ? 'selected' : ''}>${escapeHtml(p)}</option>`).join('')}
+                 </select>`
+              : (s.path ? langBadgeHtml(s.path) : '-');
+            const specOpts = specializationsForPath(s.path);
+            if (s.specialization && !specOpts.some(sp => normalizeArabicText(sp) === normalizeArabicText(s.specialization))) {
+              specOpts.push(s.specialization);
+            }
+            const specCell = canEdit
+              ? `<select onchange="updateStudentField('${s.id}','specialization',this.value)" style="padding:3px 5px; border:1px solid #cbd5e1; border-radius:4px; max-width:160px;">
+                  <option value="">-- اختر التخصص --</option>
+                  ${specOpts.map(sp => `<option value="${escapeHtml(sp)}" ${normalizeArabicText(sp) === normalizeArabicText(s.specialization || '') ? 'selected' : ''}>${escapeHtml(sp)}</option>`).join('')}
+                 </select>`
+              : (s.specialization ? langBadgeHtml(s.specialization) : '-');
+            pathSpecCells = `<td class="col-path" data-label="المسار">${pathCell}</td><td class="col-spec" data-label="مادة التخصص">${specCell}</td>`;
+          } else {
+            // طالب من صف آخر ضمن قائمة مختلطة: لا قوائم منسدلة
+            pathSpecCells = `<td class="col-path" data-label="المسار">—</td><td class="col-spec" data-label="مادة التخصص">—</td>`;
+          }
         }
-        const specCell = canEdit
-          ? `<select onchange="updateStudentField('${s.id}','specialization',this.value)" style="padding:3px 5px; border:1px solid #cbd5e1; border-radius:4px; max-width:160px;">
-              <option value="">-- اختر التخصص --</option>
-              ${specOpts.map(sp => `<option value="${escapeHtml(sp)}" ${normalizeArabicText(sp) === normalizeArabicText(s.specialization || '') ? 'selected' : ''}>${escapeHtml(sp)}</option>`).join('')}
-             </select>`
-          : (s.specialization ? langBadgeHtml(s.specialization) : '-');
 
         const langDotColor = getLangColor(s.secondLanguage).bg;
         const secondLangCell = canEdit
@@ -13261,14 +13288,13 @@ function renderMonthlyExportButtons() {
           <td class="col-name">${nameCell}</td>
           <td class="col-gender" data-label="النوع"><span class="badge ${badgeClass}">${genderLabel}</span></td>
           <td class="col-class" data-label="الفصل">${classCell}</td>
-          <td class="col-path" data-label="المسار">${pathCell}</td>
-          <td class="col-spec" data-label="مادة التخصص">${specCell}</td>
+          ${pathSpecCells}
           <td class="col-lang" data-label="اللغة الثانية">${secondLangCell}</td>
         `;
         tbody.appendChild(row);
       });
       document.getElementById('studentsCount').textContent = `إجمالي: ${filtered.length} طالب` +
-        (canEdit ? ' - يمكنك تعديل الفصل والمسار ومادة التخصص واللغة الثانية مباشرة' : '') +
+        (canEdit ? (showPathSpec ? ' - يمكنك تعديل الفصل والمسار ومادة التخصص واللغة الثانية مباشرة' : ' - يمكنك تعديل الفصل واللغة الثانية مباشرة') : '') +
         (canOpenCard ? ' - اضغط على اسم الطالب لعرض بطاقته' : '');
     }
 
@@ -13278,6 +13304,7 @@ function renderMonthlyExportButtons() {
       const db = loadDB();
       const student = (db.students || []).find(s => s.id === id);
       if (!student) return;
+      if (!studentHasPathSpecScope(student)) return; // الصف الأول/الثالث: لا مسار ولا تخصص
       student.path = newPath || '';
       const allowed = specializationsForPath(newPath);
       if (student.specialization && !allowed.some(sp => normalizeArabicText(sp) === normalizeArabicText(student.specialization))) {
