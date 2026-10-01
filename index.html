@@ -4195,20 +4195,6 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
         <p style="margin:0;color:#64748b;font-size:13.5px;line-height:1.7">جميع أزرار الطباعة في مكان واحد حسب صلاحية حسابك. الأزرار ما زالت متاحة أيضاً في أماكنها الأصلية (الدرجات، المواظبة، التقارير…).</p>
       </div>
 
-      <!-- ===== رصد الدرجات ===== -->
-      <div class="card pc-sec" data-pc-roles="superadmin,stageadmin,teacher">
-        <h2>📝 كشوف رصد الدرجات</h2>
-        <p style="color:#64748b;font-size:13px;margin-bottom:12px;line-height:1.7">تطبع حسب المادة والفصل المختارين في تبويب <strong>إدخال الدرجات</strong>.</p>
-        <div class="flex flex-wrap gap-12">
-          <button type="button" class="btn btn-primary" onclick="printGradeSheet()">🖨️ كشف الرصد (مختصر)</button>
-          <button type="button" class="btn btn-primary" onclick="printDetailedGradeSheet()">🖨️ كشف الرصد التفصيلي (4 أسابيع + امتحان)</button>
-          <button type="button" class="btn btn-primary" onclick="printMinistryLandscapeSheet({blank:false})">🖨️ كشف وزارة عرضي (ببيانات)</button>
-          <button type="button" class="btn btn-outline" onclick="printMinistryLandscapeSheet({blank:true})">🖨️ كشف وزارة عرضي (فارغ)</button>
-          <button type="button" class="btn btn-outline" onclick="printTermAverageSheet()">🖨️ متوسط الفصل الدراسي</button>
-        </div>
-        <p class="up-hint" style="margin-top:10px">اختر المادة والفصل من تبويب الدرجات، وحدّد نطاق الأسابيع وعمود الامتحان من خيارات كشف الوزارة هناك. الفصل كاملاً = كتل 4 أسابيع متتالية + ورقة ملخص (امتحانان + مجموع).</p>
-      </div>
-
       <!-- ===== كشوف فارغة للرصد ===== -->
       <div class="card pc-sec" data-pc-roles="superadmin,stageadmin,monitor">
         <h2>📝 كشوف رصد (نموذج للتعبئة اليدوية)</h2>
@@ -4282,16 +4268,6 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
         <div class="flex flex-wrap gap-12 mt-16">
           <button type="button" class="btn btn-success" onclick="printTermTotalsSheet('first')">🖨️ طباعة الفصل الأول</button>
           <button type="button" class="btn btn-success" onclick="printTermTotalsSheet('second')">🖨️ طباعة الفصل الثاني</button>
-        </div>
-      </div>
-
-      <!-- ===== مواظبة ===== -->
-      <div class="card pc-sec" data-pc-roles="superadmin,stageadmin,teacher">
-        <h2>📅 المواظبة (من فلاتر تبويب الحضور)</h2>
-        <p style="color:#64748b;font-size:13px;margin-bottom:12px;line-height:1.7">تطبع حسب المادة والفصل والشهر المختارين في تبويب <strong>الغياب والمواظبة</strong>.</p>
-        <div class="flex flex-wrap gap-12">
-          <button type="button" class="btn btn-primary" onclick="printAttendanceSheet(false)">🖨️ بيان المواظبة (ببيانات)</button>
-          <button type="button" class="btn btn-outline" onclick="printAttendanceSheet(true)">🖨️ بيان المواظبة (نموذج للتعبئة)</button>
         </div>
       </div>
 
@@ -24122,6 +24098,16 @@ function roundToHalf(n){ if (!Number.isFinite(n)) return 0; return Math.round(n 
   function getMonthLabels(term){return getRecordingPeriods(term).map(p=>p.name||'فترة');}
   // استبدال getMonthCalendarDays بحيث تبني الأيام من الروزنامة المركزية.
   function getMonthCalendarDays(term,month){const db=calDb(),att=ensureAttendance(db),c=getCentralCalendar(term),m=c.months[month-1];const active=getActiveDayIndices(att),holidays=collectSchoolHolidaySet(),cols=[];if(!m)return cols;for(let w=m.startWeek;w<=m.endWeek;w++){const base=parseISO(addDaysISO(c.startDate,(w-1)*7));if(!base)continue;const startJs=base.getDay();active.forEach((jsDay,di)=>{let delta=jsDay-startJs;if(delta<0)delta+=7;const d=new Date(base);d.setDate(d.getDate()+delta);const iso=toISO(d);cols.push({week:w-m.startWeek+1,globalWeek:w,dayIdx:di,jsDay,dateISO:iso,label:DAY_LABELS[di]||'',dateLabel:calFmt(iso),isHoliday:holidays.has(iso),hasDate:true,outOfScope:false});});}return cols;}
+  window.getCentralCalendar = getCentralCalendar;
+  window.getWeek1DateISO = getWeek1DateISO;
+  window.getFourWeekDates = getFourWeekDates;
+  window.getPeriodWeekCount = getPeriodWeekCount;
+  window.isWeekExcluded = isWeekExcluded;
+  window.getRecordingPeriods = getRecordingPeriods;
+  window.getRecordingPeriod = getRecordingPeriod;
+  window.getMonthLabels = getMonthLabels;
+  window.getMonthCalendarDays = getMonthCalendarDays;
+
   // حفظ تقويم الروزنامة قبل حفظ بيانات المدرسة حتى لا تمسحه saveSchoolInfo القديمة.
   const oldSaveSchoolInfo=window.saveSchoolInfo;
   window.saveSchoolInfo=function(){try{['first','second'].forEach(term=>{const c=window._termCalendarDraft?.[term];if(c)calSaveToDb(term,c);});}catch(e){console.warn('calendar pre-save',e)} const r=typeof oldSaveSchoolInfo==='function'?oldSaveSchoolInfo.apply(this,arguments):undefined;try{['first','second'].forEach(term=>{const c=window._termCalendarDraft?.[term]||calLoad(term);calSaveToDb(term,c);});}catch(e){console.warn('calendar post-save',e)}return r;};
