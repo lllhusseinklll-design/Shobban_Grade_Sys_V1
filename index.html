@@ -2318,6 +2318,45 @@
       .ministry-portrait-page th.ml-grand-slot .grand-title { font-size: 7px; }
       .ministry-portrait-page th.ml-exam-slot .exam-max,
       .ministry-portrait-page th.ml-grand-slot .exam-max { font-size: 6.5px; }
+
+      /* غلاف ومحضر طولي: يملآن الصفحة ويتوسّطان عمودياً */
+      .ministry-portrait-page.ml-cover-page,
+      .ministry-portrait-page.ml-protocol-page {
+        display: flex !important;
+        flex-direction: column;
+        justify-content: center;
+        align-items: stretch;
+        min-height: 277mm;
+        height: 277mm;
+        box-sizing: border-box;
+        padding: 8mm 10mm !important;
+      }
+      .ministry-portrait-page .ml-cover-sheet {
+        flex: 1 1 auto;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        min-height: 100%;
+        padding: 12mm 10mm;
+        border-width: 3px;
+      }
+      .ministry-portrait-page .ml-cover-headline {
+        font-size: 36px !important;
+        margin: 14px 0 !important;
+      }
+      .ministry-portrait-page .ml-cover-subhead {
+        font-size: 18px !important;
+      }
+      .ministry-portrait-page .ml-cover-line-school {
+        font-size: 18px !important;
+      }
+      .ministry-portrait-page .ml-protocol-box {
+        flex: 1 1 auto;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        min-height: 100%;
+      }
     }
 
 
@@ -4508,6 +4547,8 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
           <button type="button" class="btn btn-success" onclick="printMinistryPortraitBatch({blank:false})" title="كشف وزارة طولي ببيانات — فصل كامل في كل ورقة A4 طولية">🖨️ كشوف وزارة طولي ببيانات (دفعة)</button>
           <button type="button" class="btn btn-outline" onclick="printMinistryAbsenceBatch({blank:true})" title="كشف غياب عرضي فارغ — 4 أسابيع × أيام مع التواريخ — بدون غلاف">🖨️ كشوف غياب عرضي فارغة (دفعة)</button>
           <button type="button" class="btn btn-outline" onclick="printMinistryAbsenceBatch({blank:false})" title="كشف غياب عرضي بالبيانات الفعلية من سجل المواظبة">🖨️ كشوف غياب عرضي ببيانات (دفعة)</button>
+          <button type="button" class="btn btn-outline" onclick="printMinistryAbsenceBatch({blank:true, portrait:true})" title="كشف غياب طولي فارغ — فصل كامل في ورقة A4">🖨️ كشوف غياب طولي فارغة (دفعة)</button>
+          <button type="button" class="btn btn-outline" onclick="printMinistryAbsenceBatch({blank:false, portrait:true})" title="كشف غياب طولي بالبيانات — فصل كامل في ورقة A4">🖨️ كشوف غياب طولي ببيانات (دفعة)</button>
         </div>
         <p class="up-hint" style="margin-top:8px">دفعة الوزارة العرضية: ورقتين A4 أفقية لكل فصل. الدفعة الطولية: فصل كامل في ورقة A4 طولية واحدة (ضغط تلقائي حسب عدد الطلاب) مع نفس تذييل التوقيعات الخمسة.</p>
       </div>
@@ -15324,8 +15365,11 @@ function renderMonthlyExportButtons() {
       const admin = escapeHtml(info.educationAdmin || 'إدارة ................ التعليمية');
       const school = escapeHtml(info.schoolName || 'مدرسة ................');
 
+      const pageCls = cfg.portrait
+        ? 'ministry-portrait-page ml-cover-page ml-cover-portrait'
+        : 'ministry-landscape-page ml-cover-page';
       const cover = `
-      <div class="ministry-landscape-page ml-cover-page">
+      <div class="${pageCls}">
         <div class="ml-cover-sheet">
           <div class="ml-cover-ornament ml-cover-ornament-top"></div>
           <div class="ml-cover-brand-row">
@@ -15355,8 +15399,11 @@ function renderMonthlyExportButtons() {
         </div>
       </div>`;
 
+      const protoCls = cfg.portrait
+        ? 'ministry-portrait-page ml-protocol-page ml-protocol-portrait'
+        : 'ministry-landscape-page ml-protocol-page';
       const protocol = `
-      <div class="ministry-landscape-page ml-protocol-page">
+      <div class="${protoCls}">
         <div class="ml-protocol-box">
           <div class="ml-protocol-title">محضر فتح سجل</div>
           <p class="ml-protocol-text">
@@ -15970,15 +16017,24 @@ function renderMonthlyExportButtons() {
           })
         : '';
 
-      const perPage = students.length <= 28 ? Math.max(students.length, 1) : Math.ceil(students.length / 2);
+      const isPortrait = !!cfg.portrait;
+      let perPage;
+      if (isPortrait) {
+        perPage = Math.max(students.length, 1);
+      } else {
+        perPage = students.length <= 28 ? Math.max(students.length, 1) : Math.ceil(students.length / 2);
+      }
       const chunks = [];
       for (let i = 0; i < students.length; i += perPage) chunks.push(students.slice(i, i + perPage));
       if (!chunks.length) chunks.push([]);
+      const pageClass = isPortrait
+        ? 'ministry-portrait-page detailed-sheet-page ds-scope'
+        : 'ministry-landscape-page detailed-sheet-page ds-scope';
 
       let pagesHtml = '';
       chunks.forEach((chunk, pageIdx) => {
         pagesHtml += `
-        <div class="ministry-landscape-page detailed-sheet-page ds-scope">
+        <div class="${pageClass}">
           <div class="ml-page-label">ورقة الملخص · ${toHindiDigits(pageIdx + 1)} / ${toHindiDigits(chunks.length)}</div>
           ${typeof buildUnifiedLetterhead === 'function' ? buildUnifiedLetterhead({
             title: (blank ? 'ملخص أعمال السنة (نموذج) — ' : 'ملخص أعمال السنة — ') + subjectName,
@@ -16251,39 +16307,114 @@ function renderMonthlyExportButtons() {
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
           }
+          /* غلاف ومحضر: ملء الصفحة + توسيط */
+          .ministry-portrait-page.ml-cover-page,
+          .ministry-portrait-page.ml-protocol-page {
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: center !important;
+            min-height: 277mm !important;
+            height: 277mm !important;
+            box-sizing: border-box !important;
+            padding: 8mm 10mm !important;
+            overflow: hidden !important;
+          }
+          .ministry-portrait-page .ml-cover-sheet,
+          .ministry-portrait-page .ml-protocol-box {
+            flex: 1 1 auto !important;
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: center !important;
+            min-height: 90% !important;
+          }
+          .ministry-portrait-page .ml-cover-headline { font-size: 34px !important; }
+          .ministry-portrait-page .ml-cover-subhead { font-size: 17px !important; }
         }
       `;
       if (!forceStyle.parentNode) document.head.appendChild(forceStyle);
 
       const MM_TO_PX = 96 / 25.4;
-      const maxHeightPx = (297 - 12) * MM_TO_PX * 0.98;
+      const pageHmm = 297 - 12; // ارتفاع قابل للطباعة تقريباً
+      const maxHeightPx = pageHmm * MM_TO_PX * 0.99;
       const printableWidthMm = 210 - 12;
       area.style.cssText = 'position:fixed; left:-9999px; top:0; display:block; width:' + printableWidthMm + 'mm; margin:0; padding:0;';
       area.innerHTML = pagesHtml;
 
-      // ضغط سريع: تقدير أولي من عدد الصفوف ثم قياس واحد أو اثنين فقط (بدل 10 إعادة تخطيط)
       const pages = area.querySelectorAll('.ministry-portrait-page');
       pages.forEach(page => {
-        const nRows = (page.querySelectorAll('tbody tr') || []).length || 20;
-        // تقدير خشن: ~22px صف + ترويسة ~120px + تذييل ~80px عند مقياس 1
-        let scale = 1;
-        if (nRows > 18) {
-          const estH = 120 + 80 + nRows * 22;
-          scale = Math.max(0.42, Math.min(1, (maxHeightPx / estH) * 0.98));
+        // غلاف / محضر: تثبيت ارتفاع الصفحة وتوسيط المحتوى
+        if (page.classList.contains('ml-cover-page') || page.classList.contains('ml-protocol-page')) {
+          page.style.height = pageHmm + 'mm';
+          page.style.minHeight = pageHmm + 'mm';
+          page.style.display = 'flex';
+          page.style.flexDirection = 'column';
+          page.style.justifyContent = 'center';
+          page.style.boxSizing = 'border-box';
+          page.style.zoom = '1';
+          return;
         }
-        page.style.zoom = String(scale);
-        // تمرير قياس واحد للضبط النهائي
-        const h = page.getBoundingClientRect().height;
-        if (h > maxHeightPx && scale > 0.42) {
-          scale = Math.max(0.42, scale * (maxHeightPx / h) * 0.98);
+
+        // كشوف الرصد / الغياب / الملخص: ملء الورقة بالكامل مهما كان عدد الطلاب
+        page.style.height = pageHmm + 'mm';
+        page.style.minHeight = pageHmm + 'mm';
+        page.style.boxSizing = 'border-box';
+        page.style.display = 'flex';
+        page.style.flexDirection = 'column';
+        page.style.overflow = 'hidden';
+        page.style.zoom = '1';
+
+        const table = page.querySelector('table.detailed-weekly-table, table.ml-absence-table, table');
+        if (!table) return;
+
+        // ارتفاع العناصر خارج الجدول (ترويسة + تسمية + تذييل)
+        let chromeH = 0;
+        Array.from(page.children).forEach(ch => {
+          if (ch === table) return;
+          chromeH += ch.getBoundingClientRect().height;
+        });
+        const avail = Math.max(80, maxHeightPx - chromeH - 4);
+        table.style.width = '100%';
+        table.style.flex = '1 1 auto';
+        table.style.height = avail + 'px';
+        table.style.tableLayout = 'fixed';
+
+        const thead = table.tHead;
+        const tbody = table.tBodies && table.tBodies[0];
+        if (!tbody || !tbody.rows.length) return;
+        let headH = thead ? thead.getBoundingClientRect().height : 0;
+        if (headH < 4) headH = (thead && thead.rows.length ? thead.rows.length * 16 : 36);
+        const bodyAvail = Math.max(40, avail - headH);
+        const n = tbody.rows.length;
+        const rowH = Math.max(11, bodyAvail / n);
+
+        Array.from(tbody.rows).forEach(tr => {
+          tr.style.height = rowH + 'px';
+          tr.style.maxHeight = rowH + 'px';
+          Array.from(tr.cells).forEach(td => {
+            td.style.height = rowH + 'px';
+            td.style.maxHeight = rowH + 'px';
+            td.style.paddingTop = '0';
+            td.style.paddingBottom = '0';
+            td.style.verticalAlign = 'middle';
+            td.style.overflow = 'hidden';
+            td.style.lineHeight = '1.1';
+            td.style.fontSize = Math.max(7, Math.min(12, rowH * 0.52)) + 'px';
+          });
+        });
+
+        // إن تجاوزت الصفحة الحد: تصغير طفيف
+        page.style.height = '';
+        let h = page.getBoundingClientRect().height;
+        if (h > maxHeightPx && h > 0) {
+          const scale = Math.max(0.55, (maxHeightPx / h) * 0.98);
           page.style.zoom = String(scale);
         }
+        page.style.height = pageHmm + 'mm';
       });
 
       area.removeAttribute('style');
-      // requestAnimationFrame يضمن اكتمال التخطيط قبل فتح حوار الطباعة
       requestAnimationFrame(() => {
-        setTimeout(() => { window.print(); }, 30);
+        setTimeout(() => { window.print(); }, 40);
       });
     }
 
@@ -16352,7 +16483,7 @@ function renderMonthlyExportButtons() {
       // لا غلاف إذا لم تتضمن الطباعة الفترة الأولى (حالة: طُبعت 1–4 من برنامج آخر)
       if (mlIncludeCover() && typeof mlShouldPrintCoverForMonths === 'function' && mlShouldPrintCoverForMonths(monthsToPrint)) {
         allHtml += buildMinistryCoverAndProtocolHtml({
-          db, subjectName, cls, term, blank
+          db, subjectName, cls, term, blank, portrait: true
         });
       }
 
@@ -16366,7 +16497,7 @@ function renderMonthlyExportButtons() {
       // ورقة الملخص (المتوسطات) في نهاية الطباعة الطولية أيضاً
       if (weekScope === 'full' || weekScope === 'from2') {
         const summary = buildMinistrySummaryPagesHtml({
-          db, subject, subjectName, cls, term, students, blank, monthCount
+          db, subject, subjectName, cls, term, students, blank, monthCount, portrait: true
         });
         if (summary) allHtml += summary;
       }
@@ -16444,7 +16575,7 @@ function renderMonthlyExportButtons() {
         if (typeof mlIncludeCover === 'function' && mlIncludeCover() &&
             (typeof mlShouldPrintCoverForMonths === 'function' ? mlShouldPrintCoverForMonths(monthsToPrint) : monthsToPrint.indexOf(1) >= 0)) {
           allHtml += buildMinistryCoverAndProtocolHtml({
-            db, subjectName: job.subjectName, cls: job.cls, term, blank
+            db, subjectName: job.subjectName, cls: job.cls, term, blank, portrait: true
           });
         }
         monthsToPrint.forEach(m => {
@@ -16457,7 +16588,7 @@ function renderMonthlyExportButtons() {
         if (weekScope === 'full' || weekScope === 'from2') {
           const summary = buildMinistrySummaryPagesHtml({
             db, subject: job.subj, subjectName: job.subjectName, cls: job.cls,
-            term, students, blank, monthCount
+            term, students, blank, monthCount, portrait: true
           });
           if (summary) allHtml += summary;
         }
@@ -16723,15 +16854,25 @@ function renderMonthlyExportButtons() {
           })
         : '';
 
-      const perPage = students.length <= 16 ? Math.max(students.length, 1) : Math.ceil(students.length / Math.ceil(students.length / 16));
+      const isPortrait = !!cfg.portrait;
+      // طولي: فصل كامل في ورقة واحدة — عرضي: تقريباً 16 طالب/ورقة
+      let perPage;
+      if (isPortrait) {
+        perPage = Math.max(students.length, 1);
+      } else {
+        perPage = students.length <= 16 ? Math.max(students.length, 1) : Math.ceil(students.length / Math.ceil(students.length / 16));
+      }
       const chunks = [];
       for (let i = 0; i < students.length; i += perPage) chunks.push(students.slice(i, i + perPage));
       if (!chunks.length) chunks.push([]);
+      const pageClass = isPortrait
+        ? 'ministry-portrait-page detailed-sheet-page ds-scope ml-absence-page'
+        : 'ministry-landscape-page detailed-sheet-page ds-scope ml-absence-page';
 
       let pagesHtml = '';
       chunks.forEach((chunk, pageIdx) => {
         pagesHtml += `
-        <div class="ministry-landscape-page detailed-sheet-page ds-scope ml-absence-page">
+        <div class="${pageClass}">
           <div class="ml-page-label">ورقة ${toHindiDigits(pageIdx + 1)} من ${toHindiDigits(chunks.length)} · كشف رصد غياب · ${escapeHtml(monthLabel)}</div>
           ${typeof buildUnifiedLetterhead === 'function' ? buildUnifiedLetterhead({
             title: (blank ? 'كشف رصد غياب (نموذج) — ' : 'كشف رصد غياب — ') + subjectName,
@@ -16848,12 +16989,14 @@ function renderMonthlyExportButtons() {
         }
         students.sort((a, b) => a.gender !== b.gender ? (a.gender === 'F' ? -1 : 1) : a.name.localeCompare(b.name));
         const pages = buildMinistryAbsencePagesHtml({
-          db, subjectName: job.subjectName, cls: job.cls, term, month, students, blank
+          db, subjectName: job.subjectName, cls: job.cls, term, month, students, blank,
+          portrait: !!opts.portrait
         });
         if (pages) allHtml += pages;
       }
       if (!allHtml) { alert('تعذّر بناء أي كشف غياب.'); return; }
-      printMinistryLandscapeHtml(allHtml);
+      if (opts.portrait) printMinistryPortraitHtml(allHtml);
+      else printMinistryLandscapeHtml(allHtml);
     }
     window.printMinistryAbsenceBatch = printMinistryAbsenceBatch;
 
