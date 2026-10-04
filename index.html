@@ -4710,12 +4710,20 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
         </div>
       </div>
 
-      <!-- ===== بطاقات الدخول (أرقام سرية) — رئيس الكنترول فقط لحماية خصوصية الأرقام السرية ===== -->
-      <div class="card pc-sec" data-pc-roles="superadmin">
-        <h2>🪪 بطاقات الدخول</h2>
-        <p style="color:#64748b;font-size:13px;margin:0 0 12px;line-height:1.7">🔒 طباعة بطاقات المعلمين ومسؤولي الحاسب ومديري المراحل متاحة <strong>لرئيس الكنترول فقط</strong> لحماية الأرقام السرية من الاطلاع غير المصرّح به.</p>
+      <!-- ===== بطاقات المعلمين — رئيس الكنترول ومسؤول الحاسب (مسؤول إدخال البيانات) ===== -->
+      <div class="card pc-sec" data-pc-roles="superadmin,stageadmin">
+        <h2>🪪 بطاقات المعلمين</h2>
+        <p style="color:#64748b;font-size:13px;margin:0 0 12px;line-height:1.7">طباعة بطاقات دخول المعلمين (الأرقام السرية) متاحة لرئيس الكنترول ومسؤول الحاسب المسؤول عن إدخال البيانات.</p>
         <div class="flex flex-wrap gap-12">
-          <button type="button" class="btn btn-outline" onclick="printAllTeacherCards()">🖨️ بطاقات المعلمين</button>
+          <button type="button" class="btn btn-outline" onclick="printAllTeacherCards()">🖨️ بطاقات جميع المعلمين</button>
+        </div>
+      </div>
+
+      <!-- ===== بطاقات مسؤولي الحاسب ومديري المراحل — رئيس الكنترول فقط ===== -->
+      <div class="card pc-sec" data-pc-roles="superadmin">
+        <h2>🪪 بطاقات مسؤولي الحاسب ومديري المراحل</h2>
+        <p style="color:#64748b;font-size:13px;margin:0 0 12px;line-height:1.7">🔒 طباعة بطاقات مسؤولي الحاسب ومديري المراحل متاحة <strong>لرئيس الكنترول فقط</strong> لحماية خصوصية الأرقام السرية بين الحسابات الإدارية.</p>
+        <div class="flex flex-wrap gap-12">
           <button type="button" class="btn btn-outline" onclick="printAllStageAdminCards()">🖨️ بطاقات مسؤولي الحاسب</button>
           <button type="button" class="btn btn-outline" onclick="printAllStageMonitorCards()">🖨️ بطاقات مديري المراحل</button>
         </div>
@@ -19092,9 +19100,9 @@ function renderMonthlyExportButtons() {
     }
 
     function printAllTeacherCards() {
-      // حماية الأرقام السرية: طباعة بطاقات المعلمين الجماعية لرئيس الكنترول فقط
-      if (currentAccountType !== 'superadmin') {
-        alert('🔒 طباعة بطاقات المعلمين (الأرقام السرية) متاحة لرئيس الكنترول فقط لحماية خصوصية الحسابات.');
+      // طباعة بطاقات المعلمين: رئيس الكنترول ومسؤول الحاسب (مسؤول إدخال بيانات المعلمين)
+      if (currentAccountType !== 'superadmin' && currentAccountType !== 'stageadmin') {
+        alert('🔒 طباعة بطاقات المعلمين متاحة لرئيس الكنترول ومسؤول الحاسب فقط.');
         return;
       }
       const db = loadDB();
@@ -19129,10 +19137,10 @@ function renderMonthlyExportButtons() {
     function loadTeachersUI() {
       if (currentRole !== 'admin') return;
      try {
-      // إخفاء زر طباعة كل بطاقات المعلمين عن غير رئيس الكنترول (حماية الأرقام السرية)
+      // زر طباعة كل بطاقات المعلمين: رئيس الكنترول ومسؤول الحاسب
       try {
         const btnPrintAll = document.getElementById('btnPrintAllTeacherCards');
-        if (btnPrintAll) btnPrintAll.style.display = (currentAccountType === 'superadmin') ? '' : 'none';
+        if (btnPrintAll) btnPrintAll.style.display = (currentAccountType === 'superadmin' || currentAccountType === 'stageadmin') ? '' : 'none';
       } catch (eHide) {}
       const db = loadDB();
       db.subjects = db.subjects || []; db.classes = db.classes || []; db.teachers = db.teachers || [];
