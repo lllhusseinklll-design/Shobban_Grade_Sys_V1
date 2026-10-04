@@ -2238,6 +2238,86 @@
         size: A4 landscape;
         margin: 6mm 7mm;
       }
+      .ministry-portrait-page {
+        page: ministry-portrait;
+        page-break-after: always;
+        page-break-inside: avoid;
+        break-inside: avoid;
+        padding: 0 1mm;
+        overflow: hidden;
+        direction: rtl;
+        box-sizing: border-box;
+      }
+      .ministry-portrait-page:last-child {
+        page-break-after: auto !important;
+      }
+      @page ministry-portrait {
+        size: A4 portrait;
+        margin: 6mm 7mm;
+      }
+      .ministry-portrait-page .ml-page-label {
+        font-size: 8px;
+        color: #64748b;
+        text-align: left;
+        margin-bottom: 1mm;
+      }
+      .ministry-portrait-page .detailed-weekly-table {
+        width: 100%;
+        border-collapse: collapse;
+        table-layout: fixed;
+        font-size: 8px;
+      }
+      .ministry-portrait-page .detailed-weekly-table th,
+      .ministry-portrait-page .detailed-weekly-table td {
+        border: 0.4pt solid #334155;
+        padding: 1px 2px;
+        text-align: center;
+        vertical-align: middle;
+        line-height: 1.15;
+      }
+      .ministry-portrait-page .detailed-weekly-table thead th {
+        background: #3f7a57;
+        color: #fff;
+        font-weight: 800;
+        font-size: 7px;
+      }
+      .ministry-portrait-page .detailed-weekly-table td.gs-name {
+        text-align: right;
+        font-size: 8px;
+        font-weight: 600;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .ministry-portrait-page .detailed-weekly-table td.serial-col,
+      .ministry-portrait-page .detailed-weekly-table th.serial-col {
+        width: 5mm;
+        font-size: 7.5px;
+      }
+      .ministry-portrait-page .detailed-sheet-footer {
+        display: flex;
+        justify-content: space-around;
+        margin-top: 4mm;
+        font-size: 8px;
+        color: #1e293b;
+      }
+      .ministry-portrait-page .detailed-sheet-footer .gs-sign {
+        text-align: center;
+        min-width: 28mm;
+      }
+      .ministry-portrait-page .detailed-sheet-footer .gs-sign-caption {
+        font-weight: 600;
+      }
+      .ministry-portrait-page .detailed-sheet-footer .gs-line {
+        margin-top: 8mm;
+        border-top: 1px dotted #64748b;
+      }
+      .ministry-portrait-page .ml-week-head .w-name { font-size: 7.5px; }
+      .ministry-portrait-page .ml-week-head .w-date { font-size: 6.5px; font-weight: 600; opacity: 0.95; }
+      .ministry-portrait-page th.ml-exam-slot .exam-title,
+      .ministry-portrait-page th.ml-grand-slot .grand-title { font-size: 7px; }
+      .ministry-portrait-page th.ml-exam-slot .exam-max,
+      .ministry-portrait-page th.ml-grand-slot .exam-max { font-size: 6.5px; }
     }
 
 
@@ -3920,13 +4000,14 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
             <button class="btn btn-outline" onclick="printDetailedGradeSheet()" title="يطبع كشفاً تفصيلياً يفرد الدرجة المرصودة على أربعة أسابيع بحيث يكون متوسطها مساوياً للدرجة الأصلية، مع تواريخ الأسابيع المحددة من بيانات المدرسة">🖨️ طباعة كشف رصد درجات تفصيلي (A4)</button>
             <div style="width:100%;display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:4px">
               <label style="font-size:12.5px;color:#334155;display:flex;align-items:center;gap:6px">نطاق الأسابيع
-                <select id="mlWeekScope" style="min-width:160px">
-                  <option value="current">الشهر الحالي فقط (4 أسابيع)</option>
+                <select id="mlWeekScope" style="min-width:200px" title="اختر كتلة الأسابيع المطابقة لتقسيم سجل الوزارة (كل 4 أسابيع = فترة/شهر)">
+                  <option value="current">الفترة الحالية فقط (4 أسابيع)</option>
+                  <option value="from2">من الأسبوع 5 حتى نهاية الفصل (بدون 1–4)</option>
                   <option value="full">الفصل كاملاً (كل الكتل + ملخص)</option>
-                  <option value="1">الأسابيع 1–4</option>
-                  <option value="2">الأسابيع 5–8</option>
-                  <option value="3">الأسابيع 9–12</option>
-                  <option value="4">الأسابيع 13–16</option>
+                  <option value="1">كتلة 1: الأسابيع 1–4</option>
+                  <option value="2">كتلة 2: الأسابيع 5–8</option>
+                  <option value="3">كتلة 3: الأسابيع 9–12</option>
+                  <option value="4">كتلة 4: الأسابيع 13–16</option>
                 </select>
               </label>
               <label style="font-size:12.5px;color:#334155;display:flex;align-items:center;gap:6px">عمود اختبار الشهر في كتلة الأسابيع
@@ -3942,6 +4023,8 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
             </div>
             <button class="btn btn-primary" onclick="printMinistryLandscapeSheet({blank:false})" title="كشف وزارة عرضي — أسبوع ثم مكوّنات — ببيانات">🖨️ كشف وزارة عرضي (ببيانات)</button>
             <button class="btn btn-outline" onclick="printMinistryLandscapeSheet({blank:true})" title="كشف وزارة عرضي فارغ">🖨️ كشف وزارة عرضي (فارغ)</button>
+            <button class="btn btn-primary" onclick="printMinistryPortraitSheet({blank:false})" title="كشف وزارة طولي A4 — فصل كامل في الورقة مهما كان عدد الطلاب — ببيانات">🖨️ كشف وزارة طولي (ببيانات)</button>
+            <button class="btn btn-outline" onclick="printMinistryPortraitSheet({blank:true})" title="كشف وزارة طولي فارغ — فصل كامل في الورقة">🖨️ كشف وزارة طولي (فارغ)</button>
             <button class="btn btn-outline" onclick="toggleMissingGradesReport()" title="يعرض قائمة كاملة بكل الخانات التي لم تُرصد بعد لهذه المادة/الفصل عبر كل شهور الفصل الدراسي - يمكنك مراجعتها في أي وقت دون الحاجة لمحاولة الطباعة أولاً">📋 تقرير الدرجات الناقصة (كل شهور الفصل)</button>
             <button class="btn btn-outline" onclick="toggleGradesTabPerformancePanel()" title="يعرض توزيع مستويات الطلاب ومتوسط الأداء الشهري لنفس المادة/الفصل المختارين أعلاه - متاح هنا لأن المعلم لا يصل لتبويب الإحصائيات">📊 أداء هذا الفصل</button>
           </div>
@@ -4421,10 +4504,12 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
           <button type="button" class="btn btn-primary" onclick="printBlankGradeSheetsBatch()">🖨️ طباعة كشوف الرصد المحددة (طولي)</button>
           <button type="button" class="btn btn-success" onclick="printMinistryLandscapeBatch({blank:true})" title="كشف وزارة عرضي فارغ — لكل توليفة فصل×مادة حسب النطاق المحدد أعلاه">🖨️ كشوف وزارة عرضي فارغة (دفعة)</button>
           <button type="button" class="btn btn-success" onclick="printMinistryLandscapeBatch({blank:false})" title="كشف وزارة عرضي بالدرجات المرصودة — لكل توليفة فصل×مادة حسب النطاق">🖨️ كشوف وزارة عرضي ببيانات (دفعة)</button>
+          <button type="button" class="btn btn-success" onclick="printMinistryPortraitBatch({blank:true})" title="كشف وزارة طولي فارغ — فصل كامل في كل ورقة A4 طولية">🖨️ كشوف وزارة طولي فارغة (دفعة)</button>
+          <button type="button" class="btn btn-success" onclick="printMinistryPortraitBatch({blank:false})" title="كشف وزارة طولي ببيانات — فصل كامل في كل ورقة A4 طولية">🖨️ كشوف وزارة طولي ببيانات (دفعة)</button>
           <button type="button" class="btn btn-outline" onclick="printMinistryAbsenceBatch({blank:true})" title="كشف غياب عرضي فارغ — 4 أسابيع × أيام مع التواريخ — بدون غلاف">🖨️ كشوف غياب عرضي فارغة (دفعة)</button>
           <button type="button" class="btn btn-outline" onclick="printMinistryAbsenceBatch({blank:false})" title="كشف غياب عرضي بالبيانات الفعلية من سجل المواظبة">🖨️ كشوف غياب عرضي ببيانات (دفعة)</button>
         </div>
-        <p class="up-hint" style="margin-top:8px">دفعة الوزارة العرضية تستخدم نفس نطاق الفصول والمواد والشهر أعلاه، وتقسم كل فصل على ورقتين A4 أفقية مع تذييل التوقيعات الخمسة.</p>
+        <p class="up-hint" style="margin-top:8px">دفعة الوزارة العرضية: ورقتين A4 أفقية لكل فصل. الدفعة الطولية: فصل كامل في ورقة A4 طولية واحدة (ضغط تلقائي حسب عدد الطلاب) مع نفس تذييل التوقيعات الخمسة.</p>
       </div>
 
       <!-- ===== أعمال السنة ===== -->
@@ -14829,7 +14914,14 @@ function renderMonthlyExportButtons() {
       const page = area.querySelector('.detailed-sheet-page');
 
       if (page) {
-        for (let i = 0; i < 8; i++) {
+        // تقدير أولي من عدد الصفوف ثم قياسان كحد أقصى
+        const nRows = (page.querySelectorAll('tbody tr') || []).length || 20;
+        if (nRows > 16) {
+          k = Math.max(0.32, Math.min(1, 18 / nRows));
+          sizes = dsSizesForScale(k);
+          styleTag.textContent = dsStyleTextFor(sizes);
+        }
+        for (let i = 0; i < 3; i++) {
           const h = page.getBoundingClientRect().height;
           if (h <= maxHeightPx || k <= 0.32) break;
           const ratio = maxHeightPx / h;
@@ -14840,7 +14932,9 @@ function renderMonthlyExportButtons() {
       }
 
       area.removeAttribute('style');
-      setTimeout(() => { window.print(); }, 50);
+      requestAnimationFrame(() => {
+        setTimeout(() => { window.print(); }, 30);
+      });
     }
 
     function gradingModeKey(term, month) { return String(term || 'first') + '|' + String(month || 1); }
@@ -14993,9 +15087,14 @@ function renderMonthlyExportButtons() {
 
       // جسم الجدول: الدرجة الشهرية للمكوّن تُكرر على الأسابيع الأربعة + المتوسط = نفس القيمة
       let bodyHtml = '';
+      const gradesIdxDet = (typeof buildGradesIndex === 'function') ? buildGradesIndex(db) : null;
       students.forEach((s, idx) => {
         const getScore = (ci) => {
           if (ci < 0) return '';
+          if (gradesIdxDet) {
+            const existing = gradesIdxDet.get(s.id + '|' + subjectName + '|' + term + '|' + month + '|' + ci);
+            return existing ? existing.score : '';
+          }
           const existing = db.grades.find(g => g.studentId === s.id && g.subjectName === subjectName && g.term === term && g.month === month && g.componentIndex === ci);
           return existing ? existing.score : '';
         };
@@ -15335,6 +15434,16 @@ function renderMonthlyExportButtons() {
       let monthsToPrint = [];
       if (weekScope === 'full') {
         for (let m = 1; m <= monthCount; m++) monthsToPrint.push(m);
+      } else if (weekScope === 'from2') {
+        // من الأسبوع 5 (الكتلة 2) حتى نهاية الفصل — للمدارس التي طبعت 1–4 من برنامج آخر
+        if (monthCount < 2 && !blank) {
+          alert('لا توجد فترات بعد الأسابيع 1–4 في روزنامة هذا الفصل. أضف فترة ثانية من تبويب بيانات المدرسة.');
+          return;
+        }
+        for (let m = 2; m <= Math.max(monthCount, 2); m++) {
+          if (m <= monthCount || blank) monthsToPrint.push(m);
+        }
+        if (!monthsToPrint.length) monthsToPrint = [2];
       } else if (weekScope === 'current') {
         monthsToPrint = [monthFromFilter || 1];
       } else {
@@ -15345,8 +15454,7 @@ function renderMonthlyExportButtons() {
             return;
           }
           monthsToPrint = [Math.min(block, Math.max(monthCount, 1))];
-          // إن طلب المستخدم كتلة أسابيع أعلى من عدد الشهور في وضع فارغ: اطبع ببيانات هيكل فقط للشهر الأخير
-          if (blank && block > monthCount) monthsToPrint = [block]; // يسمح بعرض نموذج حتى لو لم يُفعَّل الشهر
+          if (blank && block > monthCount) monthsToPrint = [block];
         } else {
           monthsToPrint = [monthFromFilter || 1];
         }
@@ -15376,8 +15484,10 @@ function renderMonthlyExportButtons() {
         if (pages) allHtml += pages;
       });
 
-      // ورقة الملخص عند طباعة الفصل كاملاً
-      if (weekScope === 'full') {
+      // ورقة الملخص (المتوسطات + المجاميع) في نهاية السجل:
+      // - الفصل كاملاً، أو
+      // - من الأسبوع 5 حتى النهاية (تكملة سجل طُبعت فيه 1–4 مسبقاً)
+      if (weekScope === 'full' || weekScope === 'from2') {
         const summary = buildMinistrySummaryPagesHtml({
           db, subject, subjectName, cls, term, students, blank, monthCount
         });
@@ -15540,11 +15650,17 @@ function renderMonthlyExportButtons() {
         const completedWeeks = (!blank && formMode === 'weekly_form' && typeof countCompletedFormWeeks === 'function')
           ? countCompletedFormWeeks(term, month, new Date()) : 4;
         const list = studentSlice.length ? studentSlice : [{ id: '', name: '' }];
+        // فهرس O(1) بدل db.grades.find في كل خانة — أهم سبب لبطء تجهيز الطباعة
+        const gradesIdx = (typeof buildGradesIndex === 'function') ? buildGradesIndex(db) : null;
 
         list.forEach((s, localIdx) => {
           const idx = startIdx + localIdx;
           const getScore = (ci) => {
             if (blank || ci < 0 || !s.id) return '';
+            if (gradesIdx) {
+              const existing = gradesIdx.get(s.id + '|' + subjectName + '|' + term + '|' + month + '|' + ci);
+              return existing ? existing.score : '';
+            }
             const existing = db.grades.find(g =>
               g.studentId === s.id && g.subjectName === subjectName &&
               g.term === term && g.month === month && g.componentIndex === ci);
@@ -15648,18 +15764,27 @@ function renderMonthlyExportButtons() {
         students = Array.from({ length: 20 }, () => ({ id: '', name: '' }));
       }
 
-      const perPage = students.length <= 16 ? Math.max(students.length, 1) : Math.ceil(students.length / Math.ceil(students.length / 16));
+      const isPortrait = !!cfg.portrait;
+      // طولي: فصل كامل في صفحة واحدة مهما كان العدد (يُضغط تلقائياً عند الطباعة)
+      // عرضي: تقريباً 16 طالباً/ورقة كما كان
+      let perPage;
+      if (isPortrait) {
+        perPage = Math.max(students.length, 1);
+      } else {
+        perPage = students.length <= 16 ? Math.max(students.length, 1) : Math.ceil(students.length / Math.ceil(students.length / 16));
+      }
       const chunks = [];
       for (let i = 0; i < students.length; i += perPage) chunks.push(students.slice(i, i + perPage));
       if (!chunks.length) chunks.push([]);
       const totalPages = chunks.length;
+      const pageClass = isPortrait ? 'ministry-portrait-page detailed-sheet-page ds-scope' : 'ministry-landscape-page detailed-sheet-page ds-scope';
 
       let pagesHtml = '';
       chunks.forEach((chunk, pageIdx) => {
         const bodyHtml = buildBodyHtml(chunk, pageIdx * perPage);
         const pageLabel = `<div class="ml-page-label">ورقة ${toHindiDigits(pageIdx + 1)} من ${toHindiDigits(totalPages)} · ${escapeHtml(weekRangeLbl)} · ${escapeHtml(monthLabel)}</div>`;
         pagesHtml += `
-        <div class="ministry-landscape-page detailed-sheet-page ds-scope">
+        <div class="${pageClass}">
           ${pageLabel}
           ${typeof buildUnifiedLetterhead === 'function' ? buildUnifiedLetterhead({
             title: (blank ? 'سجل رصد درجات (نموذج) — ' : 'سجل رصد درجات — ') + subjectName,
@@ -15713,8 +15838,13 @@ function renderMonthlyExportButtons() {
         return toHindiDigits(v);
       };
 
+      const gradesIdxSum = (typeof buildGradesIndex === 'function') ? buildGradesIndex(db) : null;
       function getScore(studentId, ci, month) {
         if (!studentId || ci < 0) return '';
+        if (gradesIdxSum) {
+          const g = gradesIdxSum.get(studentId + '|' + subjectName + '|' + term + '|' + month + '|' + ci);
+          return g ? g.score : '';
+        }
         const g = db.grades.find(x =>
           x.studentId === studentId && x.subjectName === subjectName &&
           x.term === term && x.month === month && x.componentIndex === ci);
@@ -15876,6 +16006,8 @@ function renderMonthlyExportButtons() {
       const area = document.getElementById('printGradeSheetArea');
       if (!area) { alert('منطقة الطباعة غير موجودة.'); return; }
       if (typeof clearInactivePrintAreas === 'function') clearInactivePrintAreas('printGradeSheetArea');
+      const oldPt = document.getElementById('ministryPortraitForceStyle');
+      if (oldPt) oldPt.remove();
       const forceStyle = document.getElementById('ministryLandscapeForceStyle') || document.createElement('style');
       forceStyle.id = 'ministryLandscapeForceStyle';
       forceStyle.textContent = `
@@ -16063,6 +16195,273 @@ function renderMonthlyExportButtons() {
     }
 
 
+
+    /** طباعة كشف وزارة طولي (A4 portrait) — فصل كامل في الورقة مهما كان عدد الطلاب */
+    function printMinistryPortraitHtml(pagesHtml) {
+      const area = document.getElementById('printGradeSheetArea');
+      if (!area) { alert('منطقة الطباعة غير موجودة.'); return; }
+      if (typeof clearInactivePrintAreas === 'function') clearInactivePrintAreas('printGradeSheetArea');
+      // إزالة ستايل العرضي إن وُجد حتى لا يتعارض @page
+      const oldLs = document.getElementById('ministryLandscapeForceStyle');
+      if (oldLs) oldLs.remove();
+      const forceStyle = document.getElementById('ministryPortraitForceStyle') || document.createElement('style');
+      forceStyle.id = 'ministryPortraitForceStyle';
+      forceStyle.textContent = `
+        @media print {
+          @page { size: A4 portrait !important; margin: 5mm 6mm !important; }
+          body { padding: 0 !important; }
+          body > *:not(#printGradeSheetArea) { display: none !important; }
+          #printGradeSheetArea { display: block !important; width: 100% !important; margin: 0 !important; padding: 0 !important; }
+          .ministry-portrait-page {
+            page-break-after: always !important;
+            break-after: page !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+            width: 100% !important;
+            max-height: none !important;
+            min-height: 0 !important;
+            overflow: visible !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            box-sizing: border-box !important;
+          }
+          .ministry-portrait-page:last-child {
+            page-break-after: auto !important;
+            break-after: auto !important;
+          }
+          .ministry-portrait-page table { page-break-inside: auto !important; }
+          .ministry-portrait-page tr { page-break-inside: avoid !important; break-inside: avoid !important; }
+          .ministry-portrait-page .detailed-sheet-footer {
+            margin-top: 2mm !important;
+            page-break-inside: avoid !important;
+          }
+          .ministry-portrait-page .detailed-sheet-footer .gs-line { margin-top: 5mm !important; }
+          .ml-cover-page, .ml-protocol-page {
+            page-break-after: always !important;
+            break-after: page !important;
+            min-height: 0 !important;
+            height: auto !important;
+          }
+          .ministry-portrait-page .blank-cell { min-height: 3.5mm; }
+          .ministry-portrait-page .ml-week-head { background: #3f7a57 !important; color: #fff !important; }
+          .ministry-portrait-page .detailed-weekly-table th,
+          .ministry-portrait-page .detailed-weekly-table thead th {
+            background: #3f7a57 !important;
+            color: #fff !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+        }
+      `;
+      if (!forceStyle.parentNode) document.head.appendChild(forceStyle);
+
+      const MM_TO_PX = 96 / 25.4;
+      const maxHeightPx = (297 - 12) * MM_TO_PX * 0.98;
+      const printableWidthMm = 210 - 12;
+      area.style.cssText = 'position:fixed; left:-9999px; top:0; display:block; width:' + printableWidthMm + 'mm; margin:0; padding:0;';
+      area.innerHTML = pagesHtml;
+
+      // ضغط سريع: تقدير أولي من عدد الصفوف ثم قياس واحد أو اثنين فقط (بدل 10 إعادة تخطيط)
+      const pages = area.querySelectorAll('.ministry-portrait-page');
+      pages.forEach(page => {
+        const nRows = (page.querySelectorAll('tbody tr') || []).length || 20;
+        // تقدير خشن: ~22px صف + ترويسة ~120px + تذييل ~80px عند مقياس 1
+        let scale = 1;
+        if (nRows > 18) {
+          const estH = 120 + 80 + nRows * 22;
+          scale = Math.max(0.42, Math.min(1, (maxHeightPx / estH) * 0.98));
+        }
+        page.style.zoom = String(scale);
+        // تمرير قياس واحد للضبط النهائي
+        const h = page.getBoundingClientRect().height;
+        if (h > maxHeightPx && scale > 0.42) {
+          scale = Math.max(0.42, scale * (maxHeightPx / h) * 0.98);
+          page.style.zoom = String(scale);
+        }
+      });
+
+      area.removeAttribute('style');
+      // requestAnimationFrame يضمن اكتمال التخطيط قبل فتح حوار الطباعة
+      requestAnimationFrame(() => {
+        setTimeout(() => { window.print(); }, 30);
+      });
+    }
+
+    async function printMinistryPortraitSheet(opts) {
+      opts = opts || {};
+      const blank = !!opts.blank;
+      const db = loadDB();
+      const subjectName = opts.subjectName || document.getElementById('gradeSubjectSelect').value;
+      const cls = opts.cls || document.getElementById('gradeClassSelect').value;
+      const term = opts.term || document.getElementById('gradeTermSelect').value;
+      const monthFromFilter = opts.month != null
+        ? parseInt(opts.month, 10)
+        : parseInt(document.getElementById('gradeMonthSelect').value, 10);
+      const weekScope = opts.weekScope || mlGetWeekScope();
+      const examColMode = opts.examColMode || mlGetExamColMode();
+
+      if (!subjectName || !cls) { alert('يرجى اختيار المادة والفصل أولاً من قائمة الفلاتر.'); return; }
+      const subject = db.subjects.find(s => s.name === subjectName);
+      if (!subject) { alert('المادة غير موجودة.'); return; }
+      if (!canAccessGrade(subjectName, cls)) { alert('غير مصرح لك بطباعة كشف درجات هذه المادة/الفصل.'); return; }
+
+      let students = db.students.filter(s => classSectionKey(s.class, s.section) === cls);
+      students = filterStudentsForTeacherLanguage(students, subjectName, cls);
+      if (students.length === 0 && !blank) { alert('لا يوجد طلاب في هذا الفصل.'); return; }
+      students.sort((a, b) => a.gender !== b.gender ? (a.gender === 'F' ? -1 : 1) : a.name.localeCompare(b.name));
+
+      const monthCount = mlMonthCount(term);
+      let monthsToPrint = [];
+      if (weekScope === 'full') {
+        for (let m = 1; m <= monthCount; m++) monthsToPrint.push(m);
+      } else if (weekScope === 'from2') {
+        if (monthCount < 2 && !blank) {
+          alert('لا توجد فترات بعد الأسابيع 1–4 في روزنامة هذا الفصل. أضف فترة ثانية من تبويب بيانات المدرسة.');
+          return;
+        }
+        for (let m = 2; m <= Math.max(monthCount, 2); m++) {
+          if (m <= monthCount || blank) monthsToPrint.push(m);
+        }
+        if (!monthsToPrint.length) monthsToPrint = [2];
+      } else if (weekScope === 'current') {
+        monthsToPrint = [monthFromFilter || 1];
+      } else {
+        const block = parseInt(weekScope, 10);
+        if (block >= 1 && block <= 4) {
+          if (block > monthCount && !blank) {
+            alert('هذا النطاق من الأسابيع يتجاوز عدد شهور الفصل الدراسي المحدّد في النظام (' + monthCount + ').');
+            return;
+          }
+          monthsToPrint = [Math.min(block, Math.max(monthCount, 1))];
+          if (blank && block > monthCount) monthsToPrint = [block];
+        } else {
+          monthsToPrint = [monthFromFilter || 1];
+        }
+      }
+
+      if (!blank) {
+        const checkMonths = monthsToPrint.filter(m => m >= 1 && m <= monthCount);
+        if (checkMonths.length) {
+          const printGradeCells = buildCellsForCheck(students, subjectName,
+            (subject.components || []).map((c, ci) => ({ index: ci, name: c.name })), term, checkMonths);
+          if (!(await confirmProceedDespiteMissingGrades(db, printGradeCells))) return;
+        }
+      }
+
+      let allHtml = '';
+      // لا غلاف إذا لم تتضمن الطباعة الفترة الأولى (حالة: طُبعت 1–4 من برنامج آخر)
+      if (mlIncludeCover() && typeof mlShouldPrintCoverForMonths === 'function' && mlShouldPrintCoverForMonths(monthsToPrint)) {
+        allHtml += buildMinistryCoverAndProtocolHtml({
+          db, subjectName, cls, term, blank
+        });
+      }
+
+      monthsToPrint.forEach(m => {
+        const pages = buildMinistryLandscapePagesHtml({
+          db, subject, subjectName, cls, term, month: m, students, blank, examColMode, portrait: true
+        });
+        if (pages) allHtml += pages;
+      });
+
+      // ورقة الملخص (المتوسطات) في نهاية الطباعة الطولية أيضاً
+      if (weekScope === 'full' || weekScope === 'from2') {
+        const summary = buildMinistrySummaryPagesHtml({
+          db, subject, subjectName, cls, term, students, blank, monthCount
+        });
+        if (summary) allHtml += summary;
+      }
+
+      if (!allHtml) { alert('تعذّر بناء الكشف.'); return; }
+      printMinistryPortraitHtml(allHtml);
+    }
+
+    async function printMinistryPortraitBatch(opts) {
+      opts = opts || {};
+      const blank = !!opts.blank;
+      const db = loadDB();
+      const term = document.getElementById('batchTermSelect') ? document.getElementById('batchTermSelect').value
+        : (document.getElementById('gradeTermSelect') ? document.getElementById('gradeTermSelect').value : 'first');
+      const month = parseInt((document.getElementById('batchMonthSelect') || document.getElementById('gradeMonthSelect') || {}).value || '1', 10);
+      const weekScope = (document.getElementById('mlWeekScope') && document.getElementById('mlWeekScope').value) || 'current';
+      const examColMode = mlGetExamColMode();
+      const printOrder = (document.getElementById('batchPrintOrder') && document.getElementById('batchPrintOrder').value) || 'class-first';
+
+      let classes = [];
+      let subjectNames = [];
+      try {
+        if (typeof getBatchClassList === 'function') classes = getBatchClassList();
+        else if (document.getElementById('gradeClassSelect')) classes = [document.getElementById('gradeClassSelect').value].filter(Boolean);
+        if (typeof getBatchSubjectList === 'function') subjectNames = getBatchSubjectList();
+        else if (document.getElementById('gradeSubjectSelect')) subjectNames = [document.getElementById('gradeSubjectSelect').value].filter(Boolean);
+      } catch (e) {}
+      if (!classes.length || !subjectNames.length) {
+        alert('حدّد نطاق الفصول والمواد أولاً.');
+        return;
+      }
+
+      const jobs = [];
+      function pushJob(cls, sn) {
+        const subj = db.subjects.find(s => s.name === sn);
+        if (!subj) return;
+        if (typeof subjectAppliesToClass === 'function' && !subjectAppliesToClass(subj, cls, db)) return;
+        jobs.push({ cls, subj, subjectName: sn });
+      }
+      if (printOrder === 'subject-first') {
+        subjectNames.forEach(sn => { classes.forEach(cls => pushJob(cls, sn)); });
+      } else {
+        classes.forEach(cls => { subjectNames.forEach(sn => pushJob(cls, sn)); });
+      }
+      if (!jobs.length) { alert('لا توجد توليفات صالحة.'); return; }
+      if (jobs.length > 1 && !confirm('طباعة ' + jobs.length + ' كشف وزارة طولي (' + (blank ? 'فارغ' : 'ببيانات') + ') — فصل كامل في كل ورقة؟')) return;
+
+      let allHtml = '';
+      for (const job of jobs) {
+        let students = db.students.filter(s => classSectionKey(s.class, s.section) === job.cls);
+        students = (typeof filterStudentsForTeacherLanguage === 'function')
+          ? filterStudentsForTeacherLanguage(students, job.subjectName, job.cls) : students;
+        students.sort((a, b) => a.gender !== b.gender ? (a.gender === 'F' ? -1 : 1) : a.name.localeCompare(b.name));
+
+        const monthCount = mlMonthCount(term);
+        let monthsToPrint = [];
+        if (weekScope === 'full') {
+          for (let m = 1; m <= monthCount; m++) monthsToPrint.push(m);
+        } else if (weekScope === 'from2') {
+          for (let m = 2; m <= Math.max(monthCount, 2); m++) {
+            if (m <= monthCount || blank) monthsToPrint.push(m);
+          }
+          if (!monthsToPrint.length) monthsToPrint = [2];
+        } else if (weekScope === 'current' || !weekScope) {
+          monthsToPrint = [month];
+        } else {
+          const block = parseInt(weekScope, 10);
+          monthsToPrint = [Math.min(Math.max(block || 1, 1), 4)];
+        }
+
+        if (mlIncludeCover() && (typeof mlShouldPrintCoverForMonths === 'function' ? mlShouldPrintCoverForMonths(monthsToPrint) : monthsToPrint.indexOf(1) >= 0)) {
+          allHtml += buildMinistryCoverAndProtocolHtml({
+            db, subjectName: job.subjectName, cls: job.cls, term, blank
+          });
+        }
+        monthsToPrint.forEach(m => {
+          const pages = buildMinistryLandscapePagesHtml({
+            db, subject: job.subj, subjectName: job.subjectName, cls: job.cls,
+            term, month: m, students, blank, examColMode, portrait: true
+          });
+          if (pages) allHtml += pages;
+        });
+        if (weekScope === 'full' || weekScope === 'from2') {
+          const summary = buildMinistrySummaryPagesHtml({
+            db, subject: job.subj, subjectName: job.subjectName, cls: job.cls,
+            term, students, blank, monthCount
+          });
+          if (summary) allHtml += summary;
+        }
+      }
+      if (!allHtml) { alert('تعذّر بناء أي كشف.'); return; }
+      printMinistryPortraitHtml(allHtml);
+    }
+
+
     async function printMinistryLandscapeBatch(opts) {
       opts = opts || {};
       const blank = !!opts.blank;
@@ -16115,6 +16514,11 @@ function renderMonthlyExportButtons() {
         let monthsToPrint = [];
         if (weekScope === 'full') {
           for (let m = 1; m <= monthCount; m++) monthsToPrint.push(m);
+        } else if (weekScope === 'from2') {
+          for (let m = 2; m <= Math.max(monthCount, 2); m++) {
+            if (m <= monthCount || blank) monthsToPrint.push(m);
+          }
+          if (!monthsToPrint.length) monthsToPrint = [2];
         } else if (weekScope === 'current' || !weekScope) {
           monthsToPrint = [month];
         } else {
@@ -16135,7 +16539,7 @@ function renderMonthlyExportButtons() {
           });
           if (pages) allHtml += pages;
         });
-        if (weekScope === 'full') {
+        if (weekScope === 'full' || weekScope === 'from2') {
           const summary = buildMinistrySummaryPagesHtml({
             db, subject: job.subj, subjectName: job.subjectName, cls: job.cls,
             term, students, blank, monthCount
