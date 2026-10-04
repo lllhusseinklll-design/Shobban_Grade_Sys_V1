@@ -1757,6 +1757,48 @@
     }
     .detailed-lh-meta-bar strong { color:#0f172a; }
 
+    /* ترويسة داخل thead — تتكرر مع كل صفحة مطبوعة */
+    tr.print-repeat-letterhead > th.print-lh-th {
+      background: #fff !important;
+      color: #0f172a !important;
+      border: 1px solid #cbd5e1 !important;
+      padding: 1.5mm 2mm !important;
+      text-align: center !important;
+      vertical-align: middle !important;
+      font-weight: 400 !important;
+    }
+    tr.print-repeat-letterhead .detailed-letterhead {
+      margin: 0 !important;
+      border: none !important;
+      box-shadow: none !important;
+    }
+    tr.print-repeat-letterhead .detailed-letterhead-strip {
+      font-size: 8px !important;
+      padding: 0.8mm 2mm !important;
+    }
+    tr.print-repeat-letterhead .detailed-lh-title { font-size: 13px !important; }
+    tr.print-repeat-letterhead .detailed-lh-subtitle { font-size: 9.5px !important; }
+    tr.print-repeat-letterhead .detailed-lh-side { font-size: 9px !important; white-space: normal !important; }
+    tr.print-repeat-letterhead .detailed-lh-meta-bar { font-size: 9.5px !important; padding: 1.2mm 2mm !important; }
+    tr.print-repeat-letterhead .detailed-lh-logo { width: 11mm !important; height: 11mm !important; font-size: 12px !important; }
+    @media print {
+      table.detailed-weekly-table thead,
+      table.ml-absence-table thead,
+      .ministry-portrait-page table thead,
+      .ministry-landscape-page table thead {
+        display: table-header-group !important;
+      }
+      table.detailed-weekly-table tfoot,
+      .ministry-portrait-page table tfoot,
+      .ministry-landscape-page table tfoot {
+        display: table-footer-group !important;
+      }
+      tr.print-repeat-letterhead {
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+      }
+    }
+
     /* ===== قائمة فصل (بنات / بنين) ===== */
     .class-roster-page {
       font-family: 'Cairo', 'Segoe UI', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji', 'Apple Color Emoji', Tahoma, Geneva, Verdana, sans-serif;
@@ -14496,6 +14538,20 @@ function renderMonthlyExportButtons() {
       return `<div class="detailed-sheet-footer">${signs}</div>`;
     }
 
+
+    /** يدمج الترويسة كأول صف في thead لتتكرر مع كل صفحة عند تقسيم الجدول */
+    function theadWithFixedLetterhead(letterheadHtml, theadRowsHtml, colSpan) {
+      const cols = Math.max(2, parseInt(colSpan, 10) || 40);
+      const rows = String(theadRowsHtml || '')
+        .replace(/^\s*<thead[^>]*>/i, '')
+        .replace(/<\/thead>\s*$/i, '');
+      return `<thead>
+        <tr class="print-repeat-letterhead"><th colspan="${cols}" class="print-lh-th">${letterheadHtml || ''}</th></tr>
+        ${rows}
+      </thead>`;
+    }
+    window.theadWithFixedLetterhead = theadWithFixedLetterhead;
+
     // إتاحة الترويسة والفوتر الموحّدين لباقي دوال الطباعة
     window.buildUnifiedLetterhead = buildUnifiedLetterhead;
     window.buildUnifiedFooter = buildUnifiedFooter;
@@ -15830,10 +15886,7 @@ function renderMonthlyExportButtons() {
       chunks.forEach((chunk, pageIdx) => {
         const bodyHtml = buildBodyHtml(chunk, pageIdx * perPage);
         const pageLabel = `<div class="ml-page-label">ورقة ${toHindiDigits(pageIdx + 1)} من ${toHindiDigits(totalPages)} · ${escapeHtml(weekRangeLbl)} · ${escapeHtml(monthLabel)}</div>`;
-        pagesHtml += `
-        <div class="${pageClass}">
-          ${pageLabel}
-          ${typeof buildUnifiedLetterhead === 'function' ? buildUnifiedLetterhead({
+        const lhHtml = (typeof buildUnifiedLetterhead === 'function') ? buildUnifiedLetterhead({
             title: (blank ? 'سجل رصد درجات (نموذج) — ' : 'سجل رصد درجات — ') + subjectName,
             subtitleRight: weekRangeLbl,
             subtitleLeft: termLabel,
@@ -15844,10 +15897,15 @@ function renderMonthlyExportButtons() {
             schoolName: info.schoolName || '',
             academicYear: info.academicYear || '',
             metaBarHtml: metaBarHtmlDet
-          }) : ''}
+          }) : '';
+        // تقدير عدد الأعمدة لتكرار الترويسة داخل thead مع كل صفحة
+        const colSpanEst = (typeof colgroupHtml === 'string' ? (colgroupHtml.match(/<col/gi) || []).length : 0) || 40;
+        pagesHtml += `
+        <div class="${pageClass}">
+          ${pageLabel}
           <table class="detailed-weekly-table ml-week-first-table">
             <colgroup>${colgroupHtml}</colgroup>
-            <thead>${theadHtml}</thead>
+            ${typeof theadWithFixedLetterhead === 'function' ? theadWithFixedLetterhead(lhHtml, theadHtml, colSpanEst) : ('<thead>' + theadHtml + '</thead>')}
             <tbody>${bodyHtml}</tbody>
           </table>
           ${ministryFooter}
@@ -16033,10 +16091,7 @@ function renderMonthlyExportButtons() {
 
       let pagesHtml = '';
       chunks.forEach((chunk, pageIdx) => {
-        pagesHtml += `
-        <div class="${pageClass}">
-          <div class="ml-page-label">ورقة الملخص · ${toHindiDigits(pageIdx + 1)} / ${toHindiDigits(chunks.length)}</div>
-          ${typeof buildUnifiedLetterhead === 'function' ? buildUnifiedLetterhead({
+        const lhSum = (typeof buildUnifiedLetterhead === 'function') ? buildUnifiedLetterhead({
             title: (blank ? 'ملخص أعمال السنة (نموذج) — ' : 'ملخص أعمال السنة — ') + subjectName,
             subtitleRight: 'متوسطات + اختبارات الشهور',
             subtitleLeft: termLabel,
@@ -16047,9 +16102,13 @@ function renderMonthlyExportButtons() {
             schoolName: info.schoolName || '',
             academicYear: info.academicYear || '',
             metaBarHtml: metaBarHtmlDet
-          }) : ''}
+          }) : '';
+        const sumCols = 2 + underWeekComps.length + (monthlyComp ? months.length : 0) + 1 + (monthlyComp ? 1 : 0) + 1 + 1;
+        pagesHtml += `
+        <div class="${pageClass}">
+          <div class="ml-page-label">ورقة الملخص · ${toHindiDigits(pageIdx + 1)} / ${toHindiDigits(chunks.length)}</div>
           <table class="detailed-weekly-table ml-week-first-table">
-            <thead>${theadHtml}</thead>
+            ${typeof theadWithFixedLetterhead === 'function' ? theadWithFixedLetterhead(lhSum, theadHtml, sumCols) : ('<thead>' + theadHtml + '</thead>')}
             <tbody>${buildBody(chunk, pageIdx * perPage)}</tbody>
           </table>
           ${footer}
@@ -16104,6 +16163,13 @@ function renderMonthlyExportButtons() {
             height: auto !important;
           }
           .ministry-landscape-page .blank-cell { min-height: 4.2mm; }
+          .ministry-landscape-page table thead { display: table-header-group !important; }
+          .ministry-landscape-page tr.print-repeat-letterhead { page-break-inside: avoid !important; }
+          .ministry-landscape-page tr.print-repeat-letterhead th {
+            background: #fff !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
           .ministry-landscape-page .ml-week-head { background: #3f7a57 !important; color: #fff !important; }
           .ministry-landscape-page .detailed-weekly-table th,
           .ministry-landscape-page .detailed-weekly-table td { font-size: 8px; padding: 0.45mm 0.3mm; }
@@ -16329,6 +16395,13 @@ function renderMonthlyExportButtons() {
           }
           .ministry-portrait-page .ml-cover-headline { font-size: 34px !important; }
           .ministry-portrait-page .ml-cover-subhead { font-size: 17px !important; }
+          .ministry-portrait-page table thead { display: table-header-group !important; }
+          .ministry-portrait-page tr.print-repeat-letterhead { page-break-inside: avoid !important; }
+          .ministry-portrait-page tr.print-repeat-letterhead th {
+            background: #fff !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
         }
       `;
       if (!forceStyle.parentNode) document.head.appendChild(forceStyle);
@@ -16871,10 +16944,7 @@ function renderMonthlyExportButtons() {
 
       let pagesHtml = '';
       chunks.forEach((chunk, pageIdx) => {
-        pagesHtml += `
-        <div class="${pageClass}">
-          <div class="ml-page-label">ورقة ${toHindiDigits(pageIdx + 1)} من ${toHindiDigits(chunks.length)} · كشف رصد غياب · ${escapeHtml(monthLabel)}</div>
-          ${typeof buildUnifiedLetterhead === 'function' ? buildUnifiedLetterhead({
+        const lhAbs = (typeof buildUnifiedLetterhead === 'function') ? buildUnifiedLetterhead({
             title: (blank ? 'كشف رصد غياب (نموذج) — ' : 'كشف رصد غياب — ') + subjectName,
             subtitleRight: monthLabel,
             subtitleLeft: termLabel,
@@ -16885,9 +16955,13 @@ function renderMonthlyExportButtons() {
             schoolName: info.schoolName || '',
             academicYear: info.academicYear || '',
             metaBarHtml: metaBarHtmlDet
-          }) : ''}
+          }) : '';
+        const absCols = 2 + (weekCount * daysPerWeek) + 1;
+        pagesHtml += `
+        <div class="${pageClass}">
+          <div class="ml-page-label">ورقة ${toHindiDigits(pageIdx + 1)} من ${toHindiDigits(chunks.length)} · كشف رصد غياب · ${escapeHtml(monthLabel)}</div>
           <table class="detailed-weekly-table ml-week-first-table ml-absence-table">
-            <thead>${theadHtml}</thead>
+            ${typeof theadWithFixedLetterhead === 'function' ? theadWithFixedLetterhead(lhAbs, theadHtml, absCols) : ('<thead>' + theadHtml + '</thead>')}
             <tbody>${buildBody(chunk, pageIdx * perPage)}</tbody>
           </table>
           <div style="text-align:center;font-size:9px;color:#64748b;margin-top:2mm">✓ حضور · غ غياب · ع عذر · إج إجازة — التواريخ من الروزنامة المركزية</div>
