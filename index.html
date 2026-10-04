@@ -16378,30 +16378,31 @@ function renderMonthlyExportButtons() {
     async function printMinistryPortraitBatch(opts) {
       opts = opts || {};
       const blank = !!opts.blank;
-      const db = loadDB();
-      const term = document.getElementById('batchTermSelect') ? document.getElementById('batchTermSelect').value
-        : (document.getElementById('gradeTermSelect') ? document.getElementById('gradeTermSelect').value : 'first');
-      const month = parseInt((document.getElementById('batchMonthSelect') || document.getElementById('gradeMonthSelect') || {}).value || '1', 10);
-      const weekScope = (document.getElementById('mlWeekScope') && document.getElementById('mlWeekScope').value) || 'current';
-      const examColMode = mlGetExamColMode();
-      const printOrder = (document.getElementById('batchPrintOrder') && document.getElementById('batchPrintOrder').value) || 'class-first';
-
-      let classes = [];
-      let subjectNames = [];
-      try {
-        if (typeof getBatchClassList === 'function') classes = getBatchClassList();
-        else if (document.getElementById('gradeClassSelect')) classes = [document.getElementById('gradeClassSelect').value].filter(Boolean);
-        if (typeof getBatchSubjectList === 'function') subjectNames = getBatchSubjectList();
-        else if (document.getElementById('gradeSubjectSelect')) subjectNames = [document.getElementById('gradeSubjectSelect').value].filter(Boolean);
-      } catch (e) {}
-      if (!classes.length || !subjectNames.length) {
-        alert('حدّد نطاق الفصول والمواد أولاً.');
+      if (typeof canAccessPrintCenter === 'function' && !canAccessPrintCenter()) {
+        alert('مركز الطباعة متاح للإدارة ومدير المرحلة فقط.');
         return;
       }
+      if (typeof currentAccountType !== 'undefined' && currentAccountType === 'teacher') {
+        alert('دفعة مركز الطباعة متاحة للإدارة ومدير المرحلة.');
+        return;
+      }
+      const db = loadDB();
+      // نفس مصدر التحديد المستخدم في الدفعة العرضية (قوائم مركز الطباعة)
+      const classes = (typeof pcGetChecked === 'function') ? pcGetChecked('pcClassList', 'data-class') : [];
+      const subjectNames = (typeof pcGetChecked === 'function') ? pcGetChecked('pcSubjectList', 'data-subject') : [];
+      const term = (document.getElementById('pcBlankTerm') || document.getElementById('gradeTermSelect') || {}).value || 'first';
+      const month = parseInt((document.getElementById('pcBlankMonth') || document.getElementById('gradeMonthSelect') || {}).value || '1', 10);
+      if (!classes.length || !subjectNames.length) {
+        alert('يرجى تحديد فصل واحد على الأقل ومادة واحدة على الأقل.');
+        return;
+      }
+      const printOrder = (document.getElementById('pcBlankPrintOrder') || {}).value || 'class-first';
+      const weekScope = (typeof mlGetWeekScope === 'function') ? mlGetWeekScope() : 'current';
+      const examColMode = (typeof mlGetExamColMode === 'function') ? mlGetExamColMode() : 'auto';
 
       const jobs = [];
       function pushJob(cls, sn) {
-        const subj = db.subjects.find(s => s.name === sn);
+        const subj = (db.subjects || []).find(s => s.name === sn);
         if (!subj) return;
         if (typeof subjectAppliesToClass === 'function' && !subjectAppliesToClass(subj, cls, db)) return;
         jobs.push({ cls, subj, subjectName: sn });
@@ -16411,7 +16412,10 @@ function renderMonthlyExportButtons() {
       } else {
         classes.forEach(cls => { subjectNames.forEach(sn => pushJob(cls, sn)); });
       }
-      if (!jobs.length) { alert('لا توجد توليفات صالحة.'); return; }
+      if (!jobs.length) {
+        alert('لا توجد توليفات صالحة للفصول والمواد المحددة.');
+        return;
+      }
       if (jobs.length > 1 && !confirm('طباعة ' + jobs.length + ' كشف وزارة طولي (' + (blank ? 'فارغ' : 'ببيانات') + ') — فصل كامل في كل ورقة؟')) return;
 
       let allHtml = '';
@@ -16437,7 +16441,8 @@ function renderMonthlyExportButtons() {
           monthsToPrint = [Math.min(Math.max(block || 1, 1), 4)];
         }
 
-        if (mlIncludeCover() && (typeof mlShouldPrintCoverForMonths === 'function' ? mlShouldPrintCoverForMonths(monthsToPrint) : monthsToPrint.indexOf(1) >= 0)) {
+        if (typeof mlIncludeCover === 'function' && mlIncludeCover() &&
+            (typeof mlShouldPrintCoverForMonths === 'function' ? mlShouldPrintCoverForMonths(monthsToPrint) : monthsToPrint.indexOf(1) >= 0)) {
           allHtml += buildMinistryCoverAndProtocolHtml({
             db, subjectName: job.subjectName, cls: job.cls, term, blank
           });
