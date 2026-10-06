@@ -2037,6 +2037,10 @@
       white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
       max-width:0; /* مع table-layout:fixed يجبر الخلية على احترام عرض العمود ولا تفيض */
     }
+    /* كشف الغياب: لا تُطبَّق max-width:0 حتى يظهر الاسم كاملاً قدر الإمكان */
+    table.ml-absence-table td.gs-name {
+      max-width: none !important;
+    }
     table.detailed-weekly-table th.serial-col,
     table.detailed-weekly-table td.serial-col {
       white-space: nowrap !important;
@@ -2113,6 +2117,12 @@
       overflow: hidden;
       text-overflow: ellipsis;
       letter-spacing: -0.01em;
+    }
+    .ministry-landscape-page .ml-absence-table td.gs-name {
+      font-size: 7.5px !important;
+      max-width: none !important;
+      width: 32% !important;
+      min-width: 70mm !important;
     }
     .ministry-landscape-page .detailed-weekly-table td.serial-col,
     .ministry-landscape-page .detailed-weekly-table th.serial-col {
@@ -2219,15 +2229,22 @@
             font-weight: 800 !important;
             text-align: center !important;
           }
-          .ml-absence-table td.gs-name {
-            min-width: 58mm !important;
-            width: 58mm !important;
-            font-size: 7px !important;
+          .ml-absence-table td.gs-name,
+          .ml-absence-table th.gs-name-head {
+            width: 32% !important;
+            min-width: 72mm !important;
+            max-width: none !important;
+            font-size: 7.5px !important;
+            font-weight: 700 !important;
             white-space: nowrap !important;
             text-align: right !important;
             overflow: hidden !important;
             text-overflow: ellipsis !important;
+            letter-spacing: -0.015em !important;
           }
+          .ml-absence-table col.col-name { width: 32% !important; }
+          .ml-absence-table col.col-serial { width: 3% !important; }
+          .ml-absence-table col.col-sum { width: 4% !important; }
           .ml-absence-table th.att-day-head,
           .ml-absence-table th.att-date-head,
           .ml-absence-table .ml-week-head {
@@ -2719,23 +2736,37 @@ html[data-theme="dark"] .dash-more-menu button:hover{background:#1a2338}
     }
     .ml-absence-table .ml-week-head .w-name { color: #fff !important; }
     .ml-absence-table .ml-week-head .w-date { color: #e2e8f0 !important; font-size: 6.5px !important; }
-    /* عمود الاسم عريض لاستيعاب الاسم كاملاً */
-    .ml-absence-table td.gs-name {
-      font-size: 7px !important;
-      min-width: 55mm;
-    }
+    /* عمود الاسم في كشف الغياب: أوسع ما يمكن لعرض الاسم كاملاً */
     .ml-absence-table td.gs-name,
     .ml-absence-table th.gs-name-head {
-      min-width: 42mm !important;
-      width: 42mm !important;
-      max-width: 48mm !important;
-      font-size: 8.5px !important;
+      width: 32% !important;
+      min-width: 70mm !important;
+      max-width: none !important;
+      font-size: 7.5px !important;
+      font-weight: 700 !important;
       text-align: right !important;
-      padding-right: 1.2mm !important;
+      padding-right: 1mm !important;
+      padding-left: 0.4mm !important;
       white-space: nowrap !important;
-      overflow: visible !important;
+      overflow: hidden !important;
+      text-overflow: ellipsis !important;
+      letter-spacing: -0.015em !important;
     }
-    .ml-absence-table col.col-name { width: 42mm; }
+    .ml-absence-table col.col-serial { width: 3% !important; }
+    .ml-absence-table col.col-name { width: 32% !important; }
+    .ml-absence-table col.col-day { width: auto; }
+    .ml-absence-table col.col-sum { width: 4% !important; }
+    .ml-absence-table th.att-day-head,
+    .ml-absence-table td.gs-score,
+    .ml-absence-table td.blank-cell {
+      padding-left: 0.1mm !important;
+      padding-right: 0.1mm !important;
+      font-size: 7px !important;
+    }
+    .ml-absence-table th.att-date-head {
+      font-size: 5.5px !important;
+      padding: 0.2mm 0.05mm !important;
+    }
 
 </style>
 
@@ -17046,6 +17077,12 @@ function renderMonthlyExportButtons() {
         <div class="${pageClass}">
           <div class="ml-page-label">ورقة ${toHindiDigits(pageIdx + 1)} من ${toHindiDigits(chunks.length)} · كشف رصد غياب · ${escapeHtml(monthLabel)}</div>
           <table class="detailed-weekly-table ml-week-first-table ml-absence-table">
+            <colgroup>
+              <col class="col-serial">
+              <col class="col-name">
+              ${Array.from({length: weekCount * daysPerWeek}, () => '<col class="col-day">').join('')}
+              <col class="col-sum">
+            </colgroup>
             ${typeof theadWithFixedLetterhead === 'function' ? theadWithFixedLetterhead(lhAbs, theadHtml, absCols) : ('<thead>' + theadHtml + '</thead>')}
             <tbody>${buildBody(chunk, pageIdx * perPage)}</tbody>
           </table>
