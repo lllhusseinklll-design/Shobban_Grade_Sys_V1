@@ -12258,6 +12258,8 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
         girlName: "Kid's Name",
         boyName: "Kid's Name",
         status: 'Status',
+        lang: '2nd Lang',
+        spec: 'Specialization',
         sign1: 'Class Teacher',
         sign2: 'Social Worker',
         sign3: 'Stage Principal',
@@ -12272,11 +12274,39 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
         girlName: 'اسم الطالبة',
         boyName: 'اسم الطالب',
         status: 'الحالة',
+        lang: 'اللغة الثانية',
+        spec: 'مادة التخصص',
         sign1: 'رائد / رائدة الفصل',
         sign2: 'الأخصائي الاجتماعي',
         sign3: 'وكيل / مدير المرحلة',
         signLine: 'الاسم / التوقيع'
       };
+
+      // الصف الثاني الثانوي: إظهار عمودي اللغة الثانية ومادة التخصص
+      const allInClass = (typeof getStudentsForClassKey === 'function')
+        ? getStudentsForClassKey(db, classKey)
+        : (girls.concat(boys));
+      function isSecondSecondaryClass() {
+        const labels = [];
+        if (db.classGrade && db.classGrade[classKey]) labels.push(String(db.classGrade[classKey]));
+        (allInClass || []).forEach(s => { if (s && s.grade) labels.push(String(s.grade)); });
+        labels.push(String(classKey || ''), String(classLabel || ''));
+        const t = labels.join(' | ');
+        // الثاني الثانوي / 2 ثانوي / G11 / الصف الثاني
+        if (/G\s*11\b|Grade\s*11\b/i.test(t)) return true;
+        if (/الثاني\s*الثانوي|ثانوي\s*الثاني|الصف\s*الثاني(?!\s*الابتدائي)/.test(t)) return true;
+        // مفتاح فصل شائع: 2/1 2/2 مع مرحلة ثانوي
+        if (/\b2\s*[\/\\-]\s*[0-9]/.test(String(classKey || '')) && /ثان/.test(t)) return true;
+        // إن وُجد تخصص مسجّل لأكثر من طالب في الفصل (مؤشر ثانوي 2)
+        const withSpec = (allInClass || []).filter(s => s && String(s.specialization || '').trim()).length;
+        if (withSpec >= 3 && /ثان/.test(t)) return true;
+        return false;
+      }
+      const showTrackCols = isSecondSecondaryClass();
+      // إن لم يُكتشف الصف الثاني لكن نصف الطلاب لديهم لغة ثانية — أظهر عمود اللغة فقط
+      const showLangOnly = !showTrackCols && (allInClass || []).filter(s => s && String(s.secondLanguage || '').trim()).length >= 3;
+      const showLang = showTrackCols || showLangOnly;
+      const showSpec = showTrackCols;
 
       /* فصل مختلط: بنات يسار + بنين يمين (ترقيم مستقل لكل عمود من 1).
          فصل جنس واحد: عمودان لنفس القائمة بترقيم متسلسل 1…ن (النصف الأول يسار، الباقي يمين). */
@@ -12310,6 +12340,14 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
       }
 
       const maxRows = Math.max(leftList.length, rightList.length, 1);
+      function cellLang(s) {
+        if (!s || !showLang) return '';
+        return esc(String(s.secondLanguage || '').trim());
+      }
+      function cellSpec(s) {
+        if (!s || !showSpec) return '';
+        return esc(String(s.specialization || s.path || '').trim());
+      }
       let rowsHtml = '';
       for (let i = 0; i < maxRows; i++) {
         const left = leftList[i];
@@ -12318,12 +12356,20 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
         const rNo = right ? num(rightStartNo + i) : '';
         const lName = left ? esc(left.name || '') : '';
         const rName = right ? esc(right.name || '') : '';
+        const lLang = cellLang(left);
+        const rLang = cellLang(right);
+        const lSpec = cellSpec(left);
+        const rSpec = cellSpec(right);
         rowsHtml += `<tr>
           <td class="cr-no">${lNo}</td>
           <td class="cr-name">${lName}</td>
+          ${showLang ? `<td class="cr-lang">${lLang}</td>` : ''}
+          ${showSpec ? `<td class="cr-spec">${lSpec}</td>` : ''}
           <td class="cr-status cr-divider"></td>
           <td class="cr-no">${rNo}</td>
           <td class="cr-name">${rName}</td>
+          ${showLang ? `<td class="cr-lang">${rLang}</td>` : ''}
+          ${showSpec ? `<td class="cr-spec">${rSpec}</td>` : ''}
           <td class="cr-status"></td>
         </tr>`;
       }
@@ -12362,7 +12408,25 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
           })
         : '';
 
-      const tableClass = 'class-roster-table' + (isLang ? ' is-lang' : '');
+      const tableClass = 'class-roster-table'
+        + (isLang ? ' is-lang' : '')
+        + ((showLang || showSpec) ? ' has-track-cols' : '');
+
+      function halfColgroup() {
+        let h = '<col class="cr-col-no"><col class="cr-col-name">';
+        if (showLang) h += '<col class="cr-col-lang">';
+        if (showSpec) h += '<col class="cr-col-spec">';
+        h += '<col class="cr-col-status">';
+        return h;
+      }
+      function halfHead(nameHdr, withDivider) {
+        let h = `<th class="cr-no"><span class="cr-vert">${esc(L.no)}</span></th>`
+          + `<th class="cr-name">${esc(nameHdr)}</th>`;
+        if (showLang) h += `<th class="cr-lang">${esc(L.lang)}</th>`;
+        if (showSpec) h += `<th class="cr-spec">${esc(L.spec)}</th>`;
+        h += `<th class="cr-status${withDivider ? ' cr-divider' : ''}"><span class="cr-vert">${esc(L.status)}</span></th>`;
+        return h;
+      }
 
       return `
         <div class="class-roster-page${isLang ? ' is-lang' : ''}">
@@ -12373,21 +12437,13 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
           </div>
           <table class="${tableClass}">
             <colgroup>
-              <col class="cr-col-no">
-              <col class="cr-col-name">
-              <col class="cr-col-status">
-              <col class="cr-col-no">
-              <col class="cr-col-name">
-              <col class="cr-col-status">
+              ${halfColgroup()}
+              ${halfColgroup()}
             </colgroup>
             <thead>
               <tr>
-                <th class="cr-no"><span class="cr-vert">${esc(L.no)}</span></th>
-                <th class="cr-name">${esc(leftNameHdr)}</th>
-                <th class="cr-status cr-divider"><span class="cr-vert">${esc(L.status)}</span></th>
-                <th class="cr-no"><span class="cr-vert">${esc(L.no)}</span></th>
-                <th class="cr-name">${esc(rightNameHdr)}</th>
-                <th class="cr-status"><span class="cr-vert">${esc(L.status)}</span></th>
+                ${halfHead(leftNameHdr, true)}
+                ${halfHead(rightNameHdr, false)}
               </tr>
             </thead>
             <tbody>${rowsHtml}</tbody>
