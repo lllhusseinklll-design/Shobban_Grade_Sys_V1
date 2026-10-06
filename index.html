@@ -2033,7 +2033,7 @@
       position: static !important; white-space: normal;
     }
     table.detailed-weekly-table td.gs-name {
-      text-align:right; font-weight:600; font-size:8.4px; padding-right:1.0mm; padding-left:0.4mm;
+      text-align:right; font-weight:600; font-size:7.2px; padding-right:0.8mm; padding-left:0.3mm;
       white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
       max-width:0; /* مع table-layout:fixed يجبر الخلية على احترام عرض العمود ولا تفيض */
     }
@@ -2105,11 +2105,14 @@
     }
     .ministry-landscape-page .detailed-weekly-table td.gs-name {
       text-align: right;
-      padding-right: 1.5mm;
-      font-size: 9px;
+      padding-right: 0.8mm;
+      padding-left: 0.3mm;
+      font-size: 7px !important;
+      font-weight: 600;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      letter-spacing: -0.01em;
     }
     .ministry-landscape-page .detailed-weekly-table td.serial-col,
     .ministry-landscape-page .detailed-weekly-table th.serial-col {
@@ -2217,11 +2220,13 @@
             text-align: center !important;
           }
           .ml-absence-table td.gs-name {
-            min-width: 42mm !important;
-            width: 42mm !important;
-            font-size: 8.5px !important;
+            min-width: 58mm !important;
+            width: 58mm !important;
+            font-size: 7px !important;
             white-space: nowrap !important;
             text-align: right !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
           }
           .ml-absence-table th.att-day-head,
           .ml-absence-table th.att-date-head,
@@ -2325,11 +2330,13 @@
       }
       .ministry-portrait-page .detailed-weekly-table td.gs-name {
         text-align: right;
-        font-size: 8px;
+        font-size: 6.8px !important;
         font-weight: 600;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+        padding-right: 0.6mm;
+        letter-spacing: -0.01em;
       }
       .ministry-portrait-page .detailed-weekly-table td.serial-col,
       .ministry-portrait-page .detailed-weekly-table th.serial-col {
@@ -2713,6 +2720,10 @@ html[data-theme="dark"] .dash-more-menu button:hover{background:#1a2338}
     .ml-absence-table .ml-week-head .w-name { color: #fff !important; }
     .ml-absence-table .ml-week-head .w-date { color: #e2e8f0 !important; font-size: 6.5px !important; }
     /* عمود الاسم عريض لاستيعاب الاسم كاملاً */
+    .ml-absence-table td.gs-name {
+      font-size: 7px !important;
+      min-width: 55mm;
+    }
     .ml-absence-table td.gs-name,
     .ml-absence-table th.gs-name-head {
       min-width: 42mm !important;
@@ -15138,8 +15149,8 @@ function renderMonthlyExportButtons() {
       const colsPerComp = 5; // 4 أسابيع + متوسط
       const extraCols = (attendanceComp ? 1 : 0) + (monthlyComp ? 1 : 0) + 1 /*grand*/;
       const totalDataCols = (weeklyComps.length * colsPerComp) + extraCols;
-      const namePct = 18;
-      const serialPct = 3.2;
+      const namePct = 24;
+      const serialPct = 3.0;
       const restPct = 100 - namePct - serialPct;
       const colPct = totalDataCols > 0 ? (restPct / totalDataCols) : 3;
 
@@ -15681,8 +15692,10 @@ function renderMonthlyExportButtons() {
       const colsPerWeek = underWeekComps.length + 1; // مكوّنات + مجموع الأسبوع
       const extraCols = (examComp ? 1 : 0) + 1; // اختبار؟ + المجموع الكلي
       const totalDataCols = (weekCount * colsPerWeek) + extraCols;
-      const namePct = 13;
-      const serialPct = 2.6;
+      // عمود الاسم أوسع + خط أصغر لعرض أطول قدر ممكن من الأسماء
+      const isPortraitPage = !!cfg.portrait;
+      const namePct = isPortraitPage ? 28 : 26;
+      const serialPct = isPortraitPage ? 3.2 : 2.4;
       const restPct = 100 - namePct - serialPct;
       const colPct = totalDataCols > 0 ? (restPct / totalDataCols) : 3;
       let colgroupHtml = `<col style="width:${serialPct}%"><col style="width:${namePct}%">`;
@@ -16185,7 +16198,7 @@ function renderMonthlyExportButtons() {
           .ministry-landscape-page .ml-week-head { background: #3f7a57 !important; color: #fff !important; }
           .ministry-landscape-page .detailed-weekly-table th,
           .ministry-landscape-page .detailed-weekly-table td { font-size: 8px; padding: 0.45mm 0.3mm; }
-          .ministry-landscape-page .detailed-weekly-table td.gs-name { font-size: 8.5px; text-align: right; padding-right: 1mm; }
+          .ministry-landscape-page .detailed-weekly-table td.gs-name { font-size: 7px !important; text-align: right; padding-right: 0.7mm; letter-spacing: -0.01em; }
           .ministry-landscape-page .detailed-sheet-footer { margin-top: 3mm; }
           .ministry-landscape-page .detailed-sheet-footer .gs-line { margin-top: 7mm; }
           .ministry-landscape-page .detailed-sheet-footer .gs-sign-caption { font-size: 8px; }
@@ -16483,7 +16496,11 @@ function renderMonthlyExportButtons() {
             td.style.verticalAlign = 'middle';
             td.style.overflow = 'hidden';
             td.style.lineHeight = '1.1';
-            td.style.fontSize = Math.max(7, Math.min(12, rowH * 0.52)) + 'px';
+            if (td.classList.contains('gs-name')) {
+              td.style.fontSize = Math.max(6, Math.min(8.5, rowH * 0.42)) + 'px';
+            } else {
+              td.style.fontSize = Math.max(6.5, Math.min(11, rowH * 0.48)) + 'px';
+            }
           });
         });
 
@@ -17134,10 +17151,10 @@ function renderMonthlyExportButtons() {
       // - امتحان/تقييم شهري: ش1 ش2 + متوسط فقط (بدون ش3 فارغ)
       const colCountFor = (x) => isExamLikeComponent(x.comp) ? 3 : 4;
       const totalDataCols = components.reduce((s, x) => s + colCountFor(x), 0) + 1; // + أعمال السنة
-      const namePct = 16;
-      const serialPct = 3.2;
+      const namePct = 24;
+      const serialPct = 3.0;
       const restPct = 100 - namePct - serialPct;
-      const colPct = restPct / totalDataCols;
+      const colPct = totalDataCols > 0 ? (restPct / totalDataCols) : 3;
 
       let colgroupHtml = `<col style="width:${serialPct}%"><col style="width:${namePct}%">`;
       for (let i = 0; i < totalDataCols; i++) colgroupHtml += `<col style="width:${colPct}%">`;
