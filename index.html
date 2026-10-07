@@ -1830,6 +1830,58 @@
     table.class-roster-table col.cr-col-no { width: 3%; }
     table.class-roster-table col.cr-col-name { width: 39%; }
     table.class-roster-table col.cr-col-status { width: 5%; }
+    table.class-roster-table col.cr-col-lang { width: 8%; }
+    table.class-roster-table col.cr-col-spec { width: 14%; }
+    /* ثاني ثانوي: اسم أوسع + تخصص بدون عمود حالة/لغة */
+    table.class-roster-table.has-spec-only col.cr-col-name { width: 40%; }
+    table.class-roster-table.has-spec-only col.cr-col-spec { width: 16%; }
+    table.class-roster-table.has-spec-only col.cr-col-no { width: 4%; }
+    table.class-roster-table th.cr-spec,
+    table.class-roster-table td.cr-spec {
+      text-align: center !important;
+      vertical-align: middle !important;
+      font-size: 8.5px !important;
+      font-weight: 700 !important;
+      line-height: 1.25 !important;
+      white-space: normal !important;
+      word-break: break-word !important;
+      overflow-wrap: anywhere !important;
+      overflow: hidden !important;
+      max-width: 0; /* مع table-layout:fixed يحترم عرض العمود */
+      padding: 1mm 0.8mm !important;
+      box-sizing: border-box !important;
+    }
+    table.class-roster-table th.cr-spec {
+      background: #3f7a57 !important;
+      color: #fff !important;
+      font-size: 8px !important;
+      font-weight: 800 !important;
+      white-space: normal !important;
+      hyphens: auto;
+    }
+    table.class-roster-table td.cr-spec {
+      color: #166534;
+      background: #f0fdf4 !important;
+      font-size: 9px !important;
+      max-width: none;
+    }
+    table.class-roster-table th.cr-lang,
+    table.class-roster-table td.cr-lang {
+      text-align: center !important;
+      font-size: 9px !important;
+      font-weight: 700 !important;
+      white-space: nowrap !important;
+      overflow: hidden !important;
+      padding: 1mm 0.5mm !important;
+    }
+    table.class-roster-table th.cr-lang {
+      background: #3f7a57 !important;
+      color: #fff !important;
+    }
+    table.class-roster-table td.cr-lang {
+      color: #1e40af;
+      background: #eff6ff !important;
+    }
     table.class-roster-table th {
       background: #3f7a57 !important;
       color: #fff !important;
@@ -12313,7 +12365,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
         signLine: 'الاسم / التوقيع'
       };
 
-      // الصف الثاني الثانوي: إظهار عمودي اللغة الثانية ومادة التخصص
+      // الصف الثاني الثانوي: مادة التخصص فقط (بدون لغة ثانية وبدون حالة)
       const allInClass = (typeof getStudentsForClassKey === 'function')
         ? getStudentsForClassKey(db, classKey)
         : (girls.concat(boys));
@@ -12334,10 +12386,11 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
         return false;
       }
       const showTrackCols = isSecondSecondaryClass();
-      // إن لم يُكتشف الصف الثاني لكن نصف الطلاب لديهم لغة ثانية — أظهر عمود اللغة فقط
-      const showLangOnly = !showTrackCols && (allInClass || []).filter(s => s && String(s.secondLanguage || '').trim()).length >= 3;
-      const showLang = showTrackCols || showLangOnly;
+      // الثاني الثانوي: مادة التخصص فقط — بدون لغة ثانية وبدون عمود الحالة
       const showSpec = showTrackCols;
+      const showLangOnly = !showTrackCols && (allInClass || []).filter(s => s && String(s.secondLanguage || '').trim()).length >= 3;
+      const showLang = showLangOnly; // لا تُعرض اللغة في الثاني الثانوي
+      const showStatus = !showSpec; // إخفاء الحالة في قوائم الثاني الثانوي
 
       /* فصل مختلط: بنات يسار + بنين يمين (ترقيم مستقل لكل عمود من 1).
          فصل جنس واحد: عمودان لنفس القائمة بترقيم متسلسل 1…ن (النصف الأول يسار، الباقي يمين). */
@@ -12391,17 +12444,19 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
         const rLang = cellLang(right);
         const lSpec = cellSpec(left);
         const rSpec = cellSpec(right);
+        const leftDividerCls = showStatus ? 'cr-status cr-divider' : (showSpec ? 'cr-spec cr-divider' : (showLang ? 'cr-lang cr-divider' : 'cr-status cr-divider'));
+        // فاصل بين العمودين: على آخر خلية في النصف الأيسر
         rowsHtml += `<tr>
           <td class="cr-no">${lNo}</td>
           <td class="cr-name">${lName}</td>
-          ${showLang ? `<td class="cr-lang">${lLang}</td>` : ''}
-          ${showSpec ? `<td class="cr-spec">${lSpec}</td>` : ''}
-          <td class="cr-status cr-divider"></td>
+          ${showLang ? `<td class="cr-lang${showStatus || showSpec ? '' : ' cr-divider'}">${lLang}</td>` : ''}
+          ${showSpec ? `<td class="cr-spec cr-divider">${lSpec}</td>` : ''}
+          ${showStatus ? `<td class="cr-status cr-divider"></td>` : ''}
           <td class="cr-no">${rNo}</td>
           <td class="cr-name">${rName}</td>
           ${showLang ? `<td class="cr-lang">${rLang}</td>` : ''}
           ${showSpec ? `<td class="cr-spec">${rSpec}</td>` : ''}
-          <td class="cr-status"></td>
+          ${showStatus ? `<td class="cr-status"></td>` : ''}
         </tr>`;
       }
 
@@ -12441,21 +12496,26 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
 
       const tableClass = 'class-roster-table'
         + (isLang ? ' is-lang' : '')
+        + (showSpec && !showLang && !showStatus ? ' has-spec-only' : '')
         + ((showLang || showSpec) ? ' has-track-cols' : '');
 
       function halfColgroup() {
         let h = '<col class="cr-col-no"><col class="cr-col-name">';
         if (showLang) h += '<col class="cr-col-lang">';
         if (showSpec) h += '<col class="cr-col-spec">';
-        h += '<col class="cr-col-status">';
+        if (showStatus) h += '<col class="cr-col-status">';
         return h;
       }
       function halfHead(nameHdr, withDivider) {
         let h = `<th class="cr-no"><span class="cr-vert">${esc(L.no)}</span></th>`
           + `<th class="cr-name">${esc(nameHdr)}</th>`;
         if (showLang) h += `<th class="cr-lang">${esc(L.lang)}</th>`;
-        if (showSpec) h += `<th class="cr-spec">${esc(L.spec)}</th>`;
-        h += `<th class="cr-status${withDivider ? ' cr-divider' : ''}"><span class="cr-vert">${esc(L.status)}</span></th>`;
+        if (showSpec) {
+          // عنوان داخل الخلية بالكامل — سطرين إن لزم
+          const divCls = withDivider && !showStatus ? ' cr-divider' : '';
+          h += `<th class="cr-spec${divCls}"><span class="cr-spec-label">${esc(L.spec)}</span></th>`;
+        }
+        if (showStatus) h += `<th class="cr-status${withDivider ? ' cr-divider' : ''}"><span class="cr-vert">${esc(L.status)}</span></th>`;
         return h;
       }
 
