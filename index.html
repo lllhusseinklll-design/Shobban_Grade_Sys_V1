@@ -1412,11 +1412,13 @@
     }
     .grade-sheet-table td.gs-name {
       text-align: right;
-      font-weight: 600;
+      font-weight: 700;
+      font-size: 10px;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
       max-width: 0;
+      letter-spacing: 0;
     }
     .grade-sheet-table th .gs-comp-name,
     .grade-sheet-table th .gs-comp-max {
@@ -2085,9 +2087,10 @@
       position: static !important; white-space: normal;
     }
     table.detailed-weekly-table td.gs-name {
-      text-align:right; font-weight:600; font-size:7.2px; padding-right:0.8mm; padding-left:0.3mm;
+      text-align:right; font-weight:700; font-size:9.5px; padding-right:0.8mm; padding-left:0.3mm;
       white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
       max-width:0; /* مع table-layout:fixed يجبر الخلية على احترام عرض العمود ولا تفيض */
+      letter-spacing: 0;
     }
     /* كشف الغياب: لا تُطبَّق max-width:0 حتى يظهر الاسم كاملاً قدر الإمكان */
     table.ml-absence-table td.gs-name {
@@ -2163,18 +2166,19 @@
       text-align: right;
       padding-right: 0.8mm;
       padding-left: 0.3mm;
-      font-size: 7px !important;
-      font-weight: 600;
+      font-size: 9.5px !important;
+      font-weight: 700;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      letter-spacing: -0.01em;
+      letter-spacing: 0;
     }
     .ministry-landscape-page .ml-absence-table td.gs-name {
-      font-size: 7.5px !important;
+      font-size: 9.5px !important;
       max-width: none !important;
       width: 32% !important;
       min-width: 70mm !important;
+      font-weight: 700 !important;
     }
     .ministry-landscape-page .detailed-weekly-table td.serial-col,
     .ministry-landscape-page .detailed-weekly-table th.serial-col {
@@ -2286,13 +2290,13 @@
             width: 32% !important;
             min-width: 72mm !important;
             max-width: none !important;
-            font-size: 7.5px !important;
+            font-size: 9.5px !important;
             font-weight: 700 !important;
             white-space: nowrap !important;
             text-align: right !important;
             overflow: hidden !important;
             text-overflow: ellipsis !important;
-            letter-spacing: -0.015em !important;
+            letter-spacing: 0 !important;
           }
           .ml-absence-table col.col-name { width: 32% !important; }
           .ml-absence-table col.col-serial { width: 3% !important; }
@@ -2399,13 +2403,13 @@
       }
       .ministry-portrait-page .detailed-weekly-table td.gs-name {
         text-align: right;
-        font-size: 6.8px !important;
-        font-weight: 600;
+        font-size: 9px !important;
+        font-weight: 700;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
         padding-right: 0.6mm;
-        letter-spacing: -0.01em;
+        letter-spacing: 0;
       }
       .ministry-portrait-page .detailed-weekly-table td.serial-col,
       .ministry-portrait-page .detailed-weekly-table th.serial-col {
@@ -2794,7 +2798,7 @@ html[data-theme="dark"] .dash-more-menu button:hover{background:#1a2338}
       width: 32% !important;
       min-width: 70mm !important;
       max-width: none !important;
-      font-size: 7.5px !important;
+      font-size: 9.5px !important;
       font-weight: 700 !important;
       text-align: right !important;
       padding-right: 1mm !important;
@@ -2802,7 +2806,7 @@ html[data-theme="dark"] .dash-more-menu button:hover{background:#1a2338}
       white-space: nowrap !important;
       overflow: hidden !important;
       text-overflow: ellipsis !important;
-      letter-spacing: -0.015em !important;
+      letter-spacing: 0 !important;
     }
     .ml-absence-table col.col-serial { width: 3% !important; }
     .ml-absence-table col.col-name { width: 32% !important; }
@@ -12693,7 +12697,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
         const colsPerComp = 5; // 4 أسابيع + متوسط
         const extraCols = (attendanceComp ? 1 : 0) + (monthlyComp ? 1 : 0) + 1;
         const totalDataCols = (weeklyComps.length * colsPerComp) + extraCols;
-        const namePct = 16;
+        const namePct = 20;
         const serialPct = 3;
         const seatPct = 5;
         const restPct = 100 - namePct - serialPct - seatPct;
@@ -15101,7 +15105,7 @@ function renderMonthlyExportButtons() {
         tableFontSize: lerp(8.8, 4.5),
         cellPadV: lerp(0.7, 0.12),
         cellPadH: lerp(0.2, 0.08),
-        nameFontSize: lerp(8.4, 4.6),
+        nameFontSize: lerp(10.5, 6.8),
         scoreFontSize: lerp(8.2, 4.4),
         serialFontSize: lerp(8, 4.5),
         compHeaderH: lerp(26, 12),
@@ -15296,7 +15300,7 @@ function renderMonthlyExportButtons() {
       const colsPerComp = 5; // 4 أسابيع + متوسط
       const extraCols = (attendanceComp ? 1 : 0) + (monthlyComp ? 1 : 0) + 1 /*grand*/;
       const totalDataCols = (weeklyComps.length * colsPerComp) + extraCols;
-      const namePct = 24;
+      const namePct = 26;
       const serialPct = 3.0;
       const restPct = 100 - namePct - serialPct;
       const colPct = totalDataCols > 0 ? (restPct / totalDataCols) : 3;
@@ -15839,9 +15843,9 @@ function renderMonthlyExportButtons() {
       const colsPerWeek = underWeekComps.length + 1; // مكوّنات + مجموع الأسبوع
       const extraCols = (examComp ? 1 : 0) + 1; // اختبار؟ + المجموع الكلي
       const totalDataCols = (weekCount * colsPerWeek) + extraCols;
-      // عمود الاسم أوسع + خط أصغر لعرض أطول قدر ممكن من الأسماء
+      // عمود الاسم بعرض ثابت + خط أكبر وأوضح لقراءة الأسماء عند الطباعة
       const isPortraitPage = !!cfg.portrait;
-      const namePct = isPortraitPage ? 28 : 26;
+      const namePct = isPortraitPage ? 30 : 28;
       const serialPct = isPortraitPage ? 3.2 : 2.4;
       const restPct = 100 - namePct - serialPct;
       const colPct = totalDataCols > 0 ? (restPct / totalDataCols) : 3;
@@ -16345,7 +16349,7 @@ function renderMonthlyExportButtons() {
           .ministry-landscape-page .ml-week-head { background: #3f7a57 !important; color: #fff !important; }
           .ministry-landscape-page .detailed-weekly-table th,
           .ministry-landscape-page .detailed-weekly-table td { font-size: 8px; padding: 0.45mm 0.3mm; }
-          .ministry-landscape-page .detailed-weekly-table td.gs-name { font-size: 7px !important; text-align: right; padding-right: 0.7mm; letter-spacing: -0.01em; }
+          .ministry-landscape-page .detailed-weekly-table td.gs-name { font-size: 9.5px !important; font-weight: 700 !important; text-align: right; padding-right: 0.7mm; letter-spacing: 0; }
           .ministry-landscape-page .detailed-sheet-footer { margin-top: 3mm; }
           .ministry-landscape-page .detailed-sheet-footer .gs-line { margin-top: 7mm; }
           .ministry-landscape-page .detailed-sheet-footer .gs-sign-caption { font-size: 8px; }
@@ -17304,7 +17308,7 @@ function renderMonthlyExportButtons() {
       // - امتحان/تقييم شهري: ش1 ش2 + متوسط فقط (بدون ش3 فارغ)
       const colCountFor = (x) => isExamLikeComponent(x.comp) ? 3 : 4;
       const totalDataCols = components.reduce((s, x) => s + colCountFor(x), 0) + 1; // + أعمال السنة
-      const namePct = 24;
+      const namePct = 26;
       const serialPct = 3.0;
       const restPct = 100 - namePct - serialPct;
       const colPct = totalDataCols > 0 ? (restPct / totalDataCols) : 3;
