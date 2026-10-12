@@ -2220,11 +2220,24 @@
     }
     .ministry-landscape-page .ml-week-head .w-name { font-size: 9px; }
     .ministry-landscape-page .ml-week-head .w-date { font-size: 7.5px; font-weight: 600; opacity: 0.95; }
+    .ministry-landscape-page .detailed-weekly-table thead .c-vert,
     .ministry-landscape-page .ml-week-first-table .c-vert {
       display: inline-block;
+      writing-mode: vertical-rl;
+      transform: rotate(180deg);
+      white-space: nowrap;
       max-width: 100%;
       line-height: 1.15;
+      font-size: 8px;
+      font-weight: 800;
+    }
+    .ministry-portrait-page .detailed-weekly-table thead .c-vert {
+      display: inline-block;
+      writing-mode: vertical-rl;
+      transform: rotate(180deg);
+      white-space: nowrap;
       font-size: 7.5px;
+      font-weight: 800;
     }
     .ministry-landscape-page th.week-sep-left,
     .ministry-landscape-page td.week-sep-left {
@@ -2312,15 +2325,14 @@
           .ml-absence-table th.att-date-head { background: #2f5f43 !important; font-size: 6px !important; }
           .ml-absence-table .ml-week-head { background: #3f7a57 !important; }
 .ministry-landscape-page th.ml-week-sum-head .week-sum-label {
-      display: block;
-      writing-mode: horizontal-tb !important;
-      transform: none !important;
-      font-size: 6.5px !important;
+      display: inline-block;
+      writing-mode: vertical-rl !important;
+      transform: rotate(180deg) !important;
+      font-size: 7.5px !important;
       font-weight: 800;
       line-height: 1.15;
-      white-space: normal;
-      word-break: keep-all;
-      max-width: 100%;
+      white-space: nowrap;
+      max-height: 22mm;
       text-align: center;
       color: #ffffff !important;
     }
@@ -12697,7 +12709,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
         const colsPerComp = 5; // 4 أسابيع + متوسط
         const extraCols = (attendanceComp ? 1 : 0) + (monthlyComp ? 1 : 0) + 1;
         const totalDataCols = (weeklyComps.length * colsPerComp) + extraCols;
-        const namePct = 20;
+        const namePct = 14;
         const serialPct = 3;
         const seatPct = 5;
         const restPct = 100 - namePct - serialPct - seatPct;
@@ -15300,7 +15312,7 @@ function renderMonthlyExportButtons() {
       const colsPerComp = 5; // 4 أسابيع + متوسط
       const extraCols = (attendanceComp ? 1 : 0) + (monthlyComp ? 1 : 0) + 1 /*grand*/;
       const totalDataCols = (weeklyComps.length * colsPerComp) + extraCols;
-      const namePct = 26;
+      const namePct = 16;
       const serialPct = 3.0;
       const restPct = 100 - namePct - serialPct;
       const colPct = totalDataCols > 0 ? (restPct / totalDataCols) : 3;
@@ -15843,9 +15855,9 @@ function renderMonthlyExportButtons() {
       const colsPerWeek = underWeekComps.length + 1; // مكوّنات + مجموع الأسبوع
       const extraCols = (examComp ? 1 : 0) + 1; // اختبار؟ + المجموع الكلي
       const totalDataCols = (weekCount * colsPerWeek) + extraCols;
-      // عمود الاسم بعرض ثابت + خط أكبر وأوضح لقراءة الأسماء عند الطباعة
+      // عمود الاسم أضيق لاستغلال المساحة في خانات الدرجات — مع الإبقاء على حجم خط الاسم
       const isPortraitPage = !!cfg.portrait;
-      const namePct = isPortraitPage ? 30 : 28;
+      const namePct = isPortraitPage ? 18 : 16;
       const serialPct = isPortraitPage ? 3.2 : 2.4;
       const restPct = 100 - namePct - serialPct;
       const colPct = totalDataCols > 0 ? (restPct / totalDataCols) : 3;
@@ -15889,8 +15901,8 @@ function renderMonthlyExportButtons() {
           const shortN = escapeHtml(x.comp.name || '');
           compHeaderRow += `<th${sep}><span class="c-vert">${shortN}</span></th>`;
         });
-        // مجموع الأسبوع أفقياً على سطرين بخط صغير لا يتجاوز عرض العمود
-        compHeaderRow += `<th class="avg-col ml-week-sum-head${out}" title="مجموع درجات هذا الأسبوع"><span class="week-sum-label">مجموع<br>الأسبوع</span></th>`;
+        // مجموع الأسبوع رأسياً مثل باقي رؤوس الأعمدة
+        compHeaderRow += `<th class="avg-col ml-week-sum-head${out}" title="مجموع درجات هذا الأسبوع"><span class="c-vert week-sum-label">مجموع الأسبوع</span></th>`;
       }
 
       // --- صف 3: الدرجات القصوى (بدون خلايا للامتحان/الكلي لأن rowspan=3) ---
@@ -16361,13 +16373,14 @@ function renderMonthlyExportButtons() {
             print-color-adjust: exact !important;
           }
           .ministry-landscape-page th.ml-week-sum-head .week-sum-label {
-            display: block !important;
-            writing-mode: horizontal-tb !important;
-            transform: none !important;
-            font-size: 6.5px !important;
+            display: inline-block !important;
+            writing-mode: vertical-rl !important;
+            transform: rotate(180deg) !important;
+            font-size: 7.5px !important;
             font-weight: 800 !important;
-            line-height: 1.12 !important;
-            white-space: normal !important;
+            line-height: 1.15 !important;
+            white-space: nowrap !important;
+            max-height: 22mm !important;
             text-align: center !important;
             color: #ffffff !important;
           }
@@ -17308,7 +17321,7 @@ function renderMonthlyExportButtons() {
       // - امتحان/تقييم شهري: ش1 ش2 + متوسط فقط (بدون ش3 فارغ)
       const colCountFor = (x) => isExamLikeComponent(x.comp) ? 3 : 4;
       const totalDataCols = components.reduce((s, x) => s + colCountFor(x), 0) + 1; // + أعمال السنة
-      const namePct = 26;
+      const namePct = 16;
       const serialPct = 3.0;
       const restPct = 100 - namePct - serialPct;
       const colPct = totalDataCols > 0 ? (restPct / totalDataCols) : 3;
