@@ -6787,6 +6787,18 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
       } catch (e) { return base; }
     }
 
+    // يعزل مقاطع الحروف اللاتينية (مثل «G 4 A») داخل نص عربي RTL حتى لا ينعكس ترتيبها في الطباعة
+    // (كانت تظهر «A ٤ G»). تُدخَل على نص HTML مُهرَّب مسبقاً.
+    function isolateLatinRuns(html) {
+      return String(html == null ? '' : html).replace(/[A-Za-z](?:[A-Za-z0-9 ._\/\-]*[A-Za-z0-9])?/g,
+        function (m) { return '<bdi dir="ltr" style="unicode-bidi:isolate;direction:ltr">' + m + '</bdi>'; });
+    }
+    // اسم الفصل للطباعة: الأسماء اللاتينية (G 4 A) بأرقام غربية ومعزولة LTR، وغيرها بالأرقام الهندية كما كان.
+    function classNameForPrintHtml(name) {
+      var t = String(name == null ? '' : name);
+      return /[A-Za-z]/.test(t) ? isolateLatinRuns(escapeHtml(t)) : toHindiDigits(t);
+    }
+
     function classSectionLabel(key) {
       const SECTION_SHORT = { arabic: 'عربي', languages: 'لغات' };
       const i = (key || '').lastIndexOf('§');
@@ -12811,7 +12823,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
 
         const metaBarHtml = [
           `<span><strong>المادة:</strong> ${escapeHtml(subjectName)}</span>`,
-          `<span><strong>الفصل:</strong> ${escapeHtml(classLabel)}</span>`,
+          `<span><strong>الفصل:</strong> ${isolateLatinRuns(escapeHtml(classLabel))}</span>`,
           `<span><strong>${termLabel}</strong> — ${escapeHtml(monthLabel)}</span>`,
           teacherName ? `<span><strong>المعلم:</strong> ${escapeHtml(teacherName)}</span>` : ''
         ].filter(Boolean).join('');
@@ -14960,7 +14972,7 @@ function renderMonthlyExportButtons() {
       const entityLbl = getActiveStageEntityLabel() || stageEntityLabelFromParts(info.stageType, clsSection || info.classLanguage);
       if (entityLbl) metaParts.push(`<span><strong>المرحلة:</strong> ${escapeHtml(entityLbl)}</span>`);
       if (classGradeLabelForPrint) metaParts.push(`<span><strong>الصف:</strong> ${escapeHtml(classGradeLabelForPrint)}</span>`);
-      metaParts.push(`<span><strong>الفصل/الشعبة:</strong> ${toHindiDigits(clsPlain)}</span>`);
+      metaParts.push(`<span><strong>الفصل/الشعبة:</strong> ${classNameForPrintHtml(clsPlain)}</span>`);
       metaParts.push(`<span><strong>المادة:</strong> ${escapeHtml(subjectName)}</span>`);
       if (teacherName) metaParts.push(`<span><strong>المعلم:</strong> ${teacherName}</span>`);
 
@@ -18300,7 +18312,7 @@ function renderMonthlyExportButtons() {
       // إن وُجدت تسمية الكيان الثابت نستخدمها بدل تكرار «القسم العربي/لغات» بصيغة قديمة
       const gradePart = classGradeLabel ? escapeHtml(classGradeLabel) : '';
       const stagePart = stageLbl ? escapeHtml(stageLbl) : (sec ? escapeHtml(sec) : '');
-      const classPart = clsPlain != null && clsPlain !== '' ? ('فصل/شعبة ' + toHindiDigits(clsPlain)) : '';
+      const classPart = clsPlain != null && clsPlain !== '' ? ('فصل/شعبة ' + classNameForPrintHtml(clsPlain)) : '';
       const bits = [];
       if (stagePart) bits.push(stagePart);
       if (gradePart) bits.push(gradePart);
