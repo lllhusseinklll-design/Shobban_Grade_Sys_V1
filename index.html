@@ -6765,6 +6765,28 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
       if (i === -1) return { cls: key || '', section: '' };
       return { cls: key.slice(0, i), section: key.slice(i + 1) };
     }
+    // يُرجع اسم الصف للطباعة. اسم الفصل بصيغة «G 4 A» يحمل رقم الصف (1–6 ابتدائي، 7–9 إعدادي، 10–12 ثانوي)،
+    // فإن كان الصف المسجَّل في classGrade (أو الصف العام في بيانات المدرسة) يذكر ترتيباً مختلفاً
+    // (مثل «الخامس» لفصل G 4) يُصحَّح الترتيب فقط مع الإبقاء على بقية الاسم (الابتدائي/الإعدادي/الثانوي).
+    function resolveClassGradeLabel(db, cls, info, fallback) {
+      var base = ((db && db.classGrade && db.classGrade[cls]) || (info && info.grade) || fallback || '');
+      try {
+        var plain = (typeof splitClassSectionKey === 'function') ? splitClassSectionKey(cls).cls : String(cls || '');
+        var m = /^\s*G\s*(\d{1,2})(?!\d)/i.exec(String(plain || ''));
+        if (!m || !base) return base;
+        var n = parseInt(m[1], 10);
+        var rel = n <= 6 ? n : (n <= 9 ? n - 6 : (n <= 12 ? n - 9 : 0));
+        if (rel < 1) return base;
+        var ORD = ['الأول', 'الثاني', 'الثالث', 'الرابع', 'الخامس', 'السادس'];
+        var rx = /(الأول|الاول|الثاني|الثانى|الثالث|الرابع|الخامس|السادس)/;
+        var found = rx.exec(base);
+        if (!found) return base;
+        var norm = function (w) { return w.replace('الاول', 'الأول').replace('الثانى', 'الثاني'); };
+        if (norm(found[1]) === ORD[rel - 1]) return base;
+        return base.replace(rx, ORD[rel - 1]);
+      } catch (e) { return base; }
+    }
+
     function classSectionLabel(key) {
       const SECTION_SHORT = { arabic: 'عربي', languages: 'لغات' };
       const i = (key || '').lastIndexOf('§');
@@ -14934,7 +14956,7 @@ function renderMonthlyExportButtons() {
       if (info.academicYear) metaParts.push(`<span><strong>العام الدراسي:</strong> ${toHindiDigits(info.academicYear)}</span>`);
       metaParts.push(`<span><strong>الفصل الدراسي:</strong> ${termLabel}</span>`);
       metaParts.push(`<span><strong>الشهر:</strong> ${monthLabel}</span>`);
-      const classGradeLabelForPrint = (db.classGrade && db.classGrade[cls]) || info.grade || '';
+      const classGradeLabelForPrint = resolveClassGradeLabel(db, cls, info);
       const entityLbl = getActiveStageEntityLabel() || stageEntityLabelFromParts(info.stageType, clsSection || info.classLanguage);
       if (entityLbl) metaParts.push(`<span><strong>المرحلة:</strong> ${escapeHtml(entityLbl)}</span>`);
       if (classGradeLabelForPrint) metaParts.push(`<span><strong>الصف:</strong> ${escapeHtml(classGradeLabelForPrint)}</span>`);
@@ -15447,7 +15469,7 @@ function renderMonthlyExportButtons() {
       const printedBy = currentRole === 'admin' ? 'مدير النظام' : ((currentTeacher && currentTeacher.name) || 'المعلم');
       const now = new Date();
       const printDate = now.toLocaleDateString('ar-EG');
-      const classGradeLabelForPrint = (db.classGrade && db.classGrade[cls]) || info.grade || '';
+      const classGradeLabelForPrint = resolveClassGradeLabel(db, cls, info);
       const metaBarHtmlDet = [
         `<span>${formatClassSectionForPrint(classGradeLabelForPrint, clsSection, clsPlain)}</span>`,
         `<span><strong>المادة:</strong> ${escapeHtml(subjectName)}${teacherName ? ' — <strong>المعلم:</strong> ' + teacherName : ''}</span>`
@@ -15591,7 +15613,7 @@ function renderMonthlyExportButtons() {
       const year = info.academicYear || '';
       const { cls: clsPlain, section: clsSection } = (typeof splitClassSectionKey === 'function')
         ? splitClassSectionKey(cls) : { cls: cls, section: '' };
-      const classGradeLabel = (db.classGrade && db.classGrade[cls]) || info.grade || clsPlain || '';
+      const classGradeLabel = resolveClassGradeLabel(db, cls, info, clsPlain);
       const classLabel = (typeof formatClassSectionForPrint === 'function')
         ? formatClassSectionForPrint(classGradeLabel, clsSection, clsPlain)
         : escapeHtml(String(cls || ''));
@@ -16029,7 +16051,7 @@ function renderMonthlyExportButtons() {
         : '';
       const printedBy = (typeof resolvePrintedByName === 'function') ? resolvePrintedByName() : 'المستخدم';
       const printDate = new Date().toLocaleDateString('ar-EG');
-      const classGradeLabelForPrint = (db.classGrade && db.classGrade[cls]) || info.grade || '';
+      const classGradeLabelForPrint = resolveClassGradeLabel(db, cls, info);
       const activeWeeks = [];
       for (let wi = 0; wi < weekCount; wi++) if (!isWeekOut(wi)) activeWeeks.push(globalWeeks[wi]);
       const weekRangeLbl = activeWeeks.length
@@ -16249,7 +16271,7 @@ function renderMonthlyExportButtons() {
         ? assignedTeachers.map(t => escapeHtml(t.name)).join('، ') : '';
       const printedBy = (typeof resolvePrintedByName === 'function') ? resolvePrintedByName() : 'المستخدم';
       const printDate = new Date().toLocaleDateString('ar-EG');
-      const classGradeLabelForPrint = (db.classGrade && db.classGrade[cls]) || info.grade || '';
+      const classGradeLabelForPrint = resolveClassGradeLabel(db, cls, info);
       const metaBarHtmlDet = [
         `<span>${(typeof formatClassSectionForPrint === 'function') ? formatClassSectionForPrint(classGradeLabelForPrint, clsSection, clsPlain) : escapeHtml(cls)}</span>`,
         `<span><strong>المادة:</strong> ${escapeHtml(subjectName)}${teacherName ? ' — <strong>المعلم:</strong> ' + teacherName : ''}</span>`,
@@ -17103,7 +17125,7 @@ function renderMonthlyExportButtons() {
         ? assignedTeachers.map(t => escapeHtml(t.name)).join('، ') : '';
       const printedBy = (typeof resolvePrintedByName === 'function') ? resolvePrintedByName() : '';
       const printDate = new Date().toLocaleDateString('ar-EG');
-      const classGradeLabelForPrint = (db.classGrade && db.classGrade[cls]) || info.grade || '';
+      const classGradeLabelForPrint = resolveClassGradeLabel(db, cls, info);
       const classLabel = (typeof formatClassSectionForPrint === 'function')
         ? formatClassSectionForPrint(classGradeLabelForPrint, clsSection, clsPlain)
         : escapeHtml(cls);
@@ -17437,7 +17459,7 @@ function renderMonthlyExportButtons() {
       const printedBy = currentRole === 'admin' ? 'مدير النظام' : ((currentTeacher && currentTeacher.name) || 'المعلم');
       const now = new Date();
       const printDate = now.toLocaleDateString('ar-EG');
-      const classGradeLabelForPrint = (db.classGrade && db.classGrade[cls]) || info.grade || '';
+      const classGradeLabelForPrint = resolveClassGradeLabel(db, cls, info);
       const metaBarHtml = [
         `<span>${formatClassSectionForPrint(classGradeLabelForPrint, clsSection, clsPlain)}</span>`,
         `<span><strong>المادة:</strong> ${escapeHtml(subjectName)}${teacherName ? ' — <strong>المعلم:</strong> ' + teacherName : ''}</span>`

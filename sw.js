@@ -1,5 +1,5 @@
 /* رصد — Service Worker: تخزين أساسي لواجهة التطبيق */
-const CACHE_NAME = 'rasd-static-v1';
+const CACHE_NAME = 'rasd-static-v2';
 const APP_SHELL = [
   './',
   './index.html',
