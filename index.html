@@ -6787,8 +6787,12 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
       // 4/A أو 4-أ أو 4 أ
       m = raw.match(/^([1-6])\s*[\/\-\s]/);
       if (m) return parseInt(m[1], 10);
-      // أرقام عربية-هندية
-      const hindi = raw.replace(/[٠-٩]/d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d));
+      // أرقام عربية-هندية → لاتينية ثم إعادة المحاولة
+      const hindiMap = {'٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9'};
+      let hindi = '';
+      for (let hi = 0; hi < raw.length; hi++) {
+        hindi += (hindiMap[raw[hi]] !== undefined ? hindiMap[raw[hi]] : raw[hi]);
+      }
       m = hindi.match(/\bG\s*([1-6])\b/i) || hindi.match(/^([1-6])\s*[\/\-\s]/);
       if (m) return parseInt(m[1], 10);
       const arOrd = {
