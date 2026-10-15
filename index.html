@@ -5534,14 +5534,15 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
      try {
       _rootDBCache = root;
       const saveBadge = document.getElementById('autosaveStatus'); if (saveBadge) { saveBadge.textContent='🟠 جاري الحفظ...'; saveBadge.className='autosave-status autosave-saving'; }
-      idbSet(ROOT_DB_KEY, root).then(()=>{ const b=document.getElementById('autosaveStatus'); if(b){b.textContent='🟢 تم الحفظ';b.className='autosave-status autosave-saved';} }).catch(e => {
+      return idbSet(ROOT_DB_KEY, root).then(()=>{ const b=document.getElementById('autosaveStatus'); if(b){b.textContent='🟢 تم الحفظ';b.className='autosave-status autosave-saved';} }).catch(e => {
         console.error('تعذّرت الكتابة في IndexedDB:', e);
         showStorageWarning('⚠️ تعذّر حفظ آخر تعديل في مساحة تخزين المتصفح. أعد المحاولة، أو تأكد أن وضع "التصفح الخاص/الخفي" غير مُفعّل، فهو يحدّ من مساحة IndexedDB في بعض المتصفحات.'); const b=document.getElementById('autosaveStatus'); if(b){b.textContent='🔴 فشل الحفظ';b.className='autosave-status autosave-error';}
+        throw e;
       });
-    
      } catch (e) {
        console.error('persistRootDB failed:', e);
        alert('⚠️ حدث خطأ أثناء حفظ قاعدة البيانات الرئيسية.\n' + (e && e.message ? e.message : e));
+       return Promise.reject(e);
      }
     }
 
@@ -5621,14 +5622,16 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
     window.markAllStagesCloudDirty = markAllStagesCloudDirty;
     function saveRootDB(root, protectKeys) {
      try {
-      if (currentAccountType === 'monitor') return;
+      if (currentAccountType === 'monitor') return Promise.resolve();
       root.lastUpdated = new Date().toISOString();
       if (currentStageId) markStageCloudDirty(currentStageId);
-      persistRootDB(root, protectKeys);
-      scheduleCloudPush(); 
+      const p = persistRootDB(root, protectKeys);
+      scheduleCloudPush();
+      return p || Promise.resolve();
      } catch (e) {
        console.error('saveRootDB failed:', e);
        alert('⚠️ حدث خطأ أثناء حفظ قاعدة البيانات الرئيسية.\n' + (e && e.message ? e.message : e));
+       return Promise.reject(e);
      }
     }
 
@@ -5682,10 +5685,18 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
       // إبطال الفهارس والكاش عند أي حفظ حتى لا تُستخدم نتائج قديمة في لوحة التحكم/التحليلات
       if (data && typeof data === 'object') data._gradesIndex = null;
       if (typeof window.invalidateCompletionCache === 'function') window.invalidateCompletionCache();
+      // تطبيع مفاتيح الدرجات حتى لا تُفقد عند الدمج (month/componentIndex أرقام)
+      if (data && Array.isArray(data.grades)) {
+        data.grades.forEach(function(g) {
+          if (!g) return;
+          if (g.month != null && g.month !== '') g.month = parseInt(g.month, 10) || g.month;
+          if (g.componentIndex != null && g.componentIndex !== '') g.componentIndex = parseInt(g.componentIndex, 10);
+        });
+      }
       st.data = data;
       st.updatedAt = new Date().toISOString();
       markStageCloudDirty(currentStageId);
-      saveRootDB(root, protectKeys);
+      return saveRootDB(root, protectKeys);
     }
 
     function loadDB() {
@@ -6284,7 +6295,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
       const local = (localData && localData.grades) || [];
       const remote = (remoteData && remoteData.grades) || [];
       const map = new Map();
-      const keyOf = (g) => [g.studentId, g.subjectName, g.term, g.month, g.componentIndex].join('|');
+      const keyOf = (g) => [g.studentId, g.subjectName, g.term, String(parseInt(g.month,10)||g.month), String(parseInt(g.componentIndex,10))].join('|');
       const ts = (g) => {
         try { return g && g.updatedAt ? new Date(g.updatedAt).getTime() : 0; } catch (e) { return 0; }
       };
@@ -6488,14 +6499,18 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
                 const mg = mergeStageDataCollaborative(localCopy, remoteCopy);
                 st.data = mg.data;
                 if (mg.localGradeWins > 0) {
+                  // درجات محلية أحدث: لا تعتمد updatedAt السحابة حتى لا تُعتبر نسختنا قديمة
+                  st.updatedAt = new Date().toISOString();
                   markStageCloudDirty(currentStageId);
                   scheduleCloudPush();
+                } else {
+                  st.updatedAt = stageRow.updated_at;
                 }
               } catch (e) {
                 console.warn('mergeStageDataCollaborative failed', e);
                 st.data = remoteCopy;
+                st.updatedAt = stageRow.updated_at;
               }
-              st.updatedAt = stageRow.updated_at;
             }
             changed = true;
           } else if (st && st.data && stageRow.data) {
@@ -6669,9 +6684,14 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
           });
           root.lastUpdated = now;
           const { error } = await supabaseClient.from('grade_system_state').upsert(rows);
-          if (error) { console.error('Supabase push error:', error); setConnBadge(null, 'error'); }
-          else {
-            persistRootDB(root);
+          if (error) {
+            console.error('Supabase push error:', error);
+            setConnBadge(null, 'error');
+            // أعد تعليم المراحل متسخة حتى تُرفع لاحقاً ولا تُفقد التعديلات
+            uniqueIds.forEach(function(sid) { markStageCloudDirty(sid); });
+            cloudPushPending = true;
+          } else {
+            await persistRootDB(root);
             setConnBadge('تمت المزامنة ' + new Date().toLocaleTimeString('ar-EG'));
             maybeAutoVersionSnapshot();
           }
@@ -17970,7 +17990,8 @@ function renderMonthlyExportButtons() {
           filled++;
         });
       });
-      saveDB(db);
+      try { await saveDB(db); } catch (e) { console.error(e); }
+      try { if (typeof runCloudPush === 'function' && isOnline) { clearTimeout(cloudSyncTimer); await runCloudPush(); } } catch (e) {}
       loadGradesUI();
       const status = document.getElementById('gradesStatus');
       status.textContent = `✅ تم رصد الدرجة النهائية تلقائياً في ${filled} خانة، وتم ترك ${skippedExisting} خانة كانت مُدخَلة مسبقاً كما هي`;
@@ -18120,7 +18141,8 @@ function renderMonthlyExportButtons() {
         });
         filled++;
       });
-      saveDB(db);
+      try { await saveDB(db); } catch (e) { console.error(e); }
+      try { if (typeof runCloudPush === 'function' && isOnline) { clearTimeout(cloudSyncTimer); await runCloudPush(); } } catch (e) {}
       loadGradesUI();
       const status = document.getElementById('gradesStatus');
       status.textContent = isPF ?
@@ -18261,7 +18283,14 @@ function renderMonthlyExportButtons() {
         saved++;
       });
       recordAudit('رصد درجات', `تم حفظ ${saved} درجة في مادة ${subjectName} للفصل ${term} والشهر ${month}`);
-      saveDB(db);
+      try { await saveDB(db); } catch (e) { console.error('saveDB await', e); }
+      // رفع فوري بعد حفظ الدرجات حتى لا تُستبدل عند التحديث قبل انتهاء الرفع المؤجّل
+      try {
+        if (typeof runCloudPush === 'function' && isOnline) {
+          clearTimeout(cloudSyncTimer);
+          await runCloudPush();
+        }
+      } catch (e) { console.warn('push after grade save', e); }
       const status = document.getElementById('gradesStatus');
       status.textContent = skipped ?
         `✅ تم حفظ ${saved} درجة، وتم تجاهل ${skipped} قيمة غير صحيحة (تحقق من الحد الأقصى أو القيم السالبة)` :
@@ -18358,7 +18387,13 @@ function renderMonthlyExportButtons() {
         saved++;
       });
       recordAudit('رصد درجات', `تم حفظ ${saved} درجة في مادة ${subjectName} للفصل ${term} والشهر ${month}`);
-      saveDB(db);
+      try { await saveDB(db); } catch (e) { console.error('saveDB await', e); }
+      try {
+        if (typeof runCloudPush === 'function' && isOnline) {
+          clearTimeout(cloudSyncTimer);
+          await runCloudPush();
+        }
+      } catch (e) { console.warn('push after saveAll', e); }
       const status = document.getElementById('gradesStatus');
       status.textContent = skipped ?
         `✅ تم حفظ ${saved} درجة، وتم تجاهل ${skipped} قيمة غير صحيحة` :
