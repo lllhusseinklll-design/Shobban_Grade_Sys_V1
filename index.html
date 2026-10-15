@@ -15027,7 +15027,7 @@ function renderMonthlyExportButtons() {
       const entityLbl = getActiveStageEntityLabel() || stageEntityLabelFromParts(info.stageType, clsSection || info.classLanguage);
       if (entityLbl) metaParts.push(`<span><strong>المرحلة:</strong> ${escapeHtml(entityLbl)}</span>`);
       if (classGradeLabelForPrint) metaParts.push(`<span><strong>الصف:</strong> ${escapeHtml(classGradeLabelForPrint)}</span>`);
-      metaParts.push(`<span><strong>الفصل/الشعبة:</strong> ${toHindiDigits(clsPlain)}</span>`);
+      metaParts.push(`<span><strong>الفصل/الشعبة:</strong> ${escapeHtml(typeof formatClassCodeForPrint === 'function' ? formatClassCodeForPrint(clsPlain) : clsPlain)}</span>`);
       metaParts.push(`<span><strong>المادة:</strong> ${escapeHtml(subjectName)}</span>`);
       if (teacherName) metaParts.push(`<span><strong>المعلم:</strong> ${teacherName}</span>`);
 
@@ -18366,13 +18366,30 @@ function renderMonthlyExportButtons() {
         return stageEntityLabelFromParts(info.stageType, info.classLanguage);
       } catch (e) { return ''; }
     }
+    // رموز الفصول (مثل G 4 B) تبقى بأرقام لاتينية ومسافات واضحة — لا تُحوَّل لأرقام هندية
+    function formatClassCodeForPrint(clsPlain) {
+      let s = String(clsPlain == null ? '' : clsPlain).trim();
+      if (!s) return '';
+      if (typeof toWesternDigits === 'function') s = toWesternDigits(s);
+      else {
+        s = s.replace(/[٠-٩]/g, function(d) { return String(d.charCodeAt(0) - 0x0660); })
+             .replace(/[۰-۹]/g, function(d) { return String(d.charCodeAt(0) - 0x06F0); });
+      }
+      // توحيد أشكال مثل G4B / G4 B / g-4-b → G 4 B
+      s = s.replace(/\s+/g, ' ').trim();
+      const m = s.match(/^([A-Za-z]+)\s*[-_]?\s*(\d+)\s*[-_]?\s*([A-Za-z]+)$/);
+      if (m) return (m[1].toUpperCase() + ' ' + m[2] + ' ' + m[3].toUpperCase());
+      return s;
+    }
+
     function formatClassSectionForPrint(classGradeLabel, clsSection, clsPlain) {
       const stageLbl = getActiveStageEntityLabel();
       const sec = clsSection ? (CLASS_LANG_LABELS[clsSection] || '') : '';
       // إن وُجدت تسمية الكيان الثابت نستخدمها بدل تكرار «القسم العربي/لغات» بصيغة قديمة
       const gradePart = classGradeLabel ? escapeHtml(classGradeLabel) : '';
       const stagePart = stageLbl ? escapeHtml(stageLbl) : (sec ? escapeHtml(sec) : '');
-      const classPart = clsPlain != null && clsPlain !== '' ? ('فصل/شعبة ' + toHindiDigits(clsPlain)) : '';
+      const code = formatClassCodeForPrint(clsPlain);
+      const classPart = code ? ('فصل/شعبة ' + escapeHtml(code)) : '';
       const bits = [];
       if (stagePart) bits.push(stagePart);
       if (gradePart) bits.push(gradePart);
