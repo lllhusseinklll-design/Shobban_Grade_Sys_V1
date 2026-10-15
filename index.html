@@ -10685,6 +10685,63 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
       return isExamComponent(compOrName);
     }
 
+    // هل يظهر المكوّن لهذا الفصل؟ يدعم forGradeNums الصريح، وقاعدة المنهج:
+    // «مشروع» في الثانوي لا يُطبَّق على الصف الأول (يبدأ من الثاني).
+    function isProjectLikeComponent(compOrName) {
+      const n = normalizeArabic(
+        (compOrName && typeof compOrName === 'object') ? (compOrName.name || '') : (compOrName || '')
+      );
+      return /مشروع/.test(n);
+    }
+    function resolveGradeNumberForClass(classKey, db) {
+      let num = (typeof inferGradeNumberFromClassName === 'function')
+        ? inferGradeNumberFromClassName(classKey) : 0;
+      if (num > 0) return num;
+      try {
+        const label = (typeof resolveClassGradeLabel === 'function')
+          ? resolveClassGradeLabel(classKey, db)
+          : ((db && db.classGrade && db.classGrade[classKey]) || '');
+        const s = String(label || '');
+        if (/الأول|الاول/.test(s)) return 1;
+        if (/الثاني/.test(s)) return 2;
+        if (/الثالث/.test(s)) return 3;
+        if (/الرابع/.test(s)) return 4;
+        if (/الخامس/.test(s)) return 5;
+        if (/السادس/.test(s)) return 6;
+        const m = s.match(/(?:KG|kg)\s*([12])/);
+        if (m) return parseInt(m[1], 10);
+      } catch (e) {}
+      return 0;
+    }
+    function componentAppliesToClass(comp, classKey, db) {
+      if (!comp) return false;
+      const num = resolveGradeNumberForClass(classKey, db);
+      if (Array.isArray(comp.forGradeNums) && comp.forGradeNums.length) {
+        if (num > 0) return comp.forGradeNums.map(Number).includes(Number(num));
+        return true;
+      }
+      try {
+        const stageType = (typeof getCurrentStageTypeForGrades === 'function')
+          ? getCurrentStageTypeForGrades(db) : ((db && db.schoolInfo && db.schoolInfo.stageType) || '');
+        // منهج الثانوي: مكوّن المشروع للصف الثاني فقط
+        if (stageType === 'secondary' && isProjectLikeComponent(comp) && num !== 2) return false;
+      } catch (e) {}
+      return true;
+    }
+    // عمود المشروع مرة واحدة في آخر فترة الترم فقط (قبل المجموع النهائي) — وليس تحت كل أسبوع
+    function shouldShowProjectColumn(db, term, month, classKey) {
+      try {
+        const labels = (typeof getMonthLabels === 'function') ? getMonthLabels(term) : [];
+        const lastM = labels.length || 0;
+        if (lastM > 0 && Number(month) !== lastM) return false;
+        if (classKey) return componentAppliesToClass({ name: 'مشروع' }, classKey, db);
+        return true;
+      } catch (e) { return false; }
+    }
+    window.componentAppliesToClass = componentAppliesToClass;
+    window.resolveGradeNumberForClass = resolveGradeNumberForClass;
+    window.shouldShowProjectColumn = shouldShowProjectColumn;
+
     // مكوّنات "الحضور/الغياب" (بدون درجة عظمى): تُكتشف تلقائياً من اسم المكوّن ولا تحتاج
     // إدخال درجة عظمى عند إضافتها. نوعان:
     // - نسبة الحضور (أو نسبة الغياب): قيمة نسبة مئوية، يُحسب متوسطها بين شهور الفصل (وليس مجموعها).
@@ -12763,16 +12820,27 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
         // التقييم الشهري مرة واحدة فقط (ليس تحت كل أسبوع) — بالعلم isMonthlyGrade أو الاسم
         const weeklyComps = [];
         let attendanceComp = null, monthlyComp = null;
+        let projectCompBlank = null;
         (subject.components || []).forEach((comp, ci) => {
+          if (typeof componentAppliesToClass === 'function' && !componentAppliesToClass(comp, cls, db)) return;
+          if (typeof isProjectLikeComponent === 'function' && isProjectLikeComponent(comp)) {
+            if (!projectCompBlank) projectCompBlank = { comp, ci };
+            return;
+          }
           if (comp.type === 'attendance') attendanceComp = { comp, ci };
           else if (comp.isMonthlyGrade || (typeof isExamLikeComponent === 'function' && isExamLikeComponent(comp))) {
             if (!monthlyComp) monthlyComp = { comp, ci };
           } else weeklyComps.push({ comp, ci });
         });
+        if (!(typeof shouldShowProjectColumn === 'function' && shouldShowProjectColumn(db, term, month, cls))) {
+          projectCompBlank = null;
+        }
         // إن لم تُصنَّف أي مكوّنات أسبوعية ولا شهري، نعرض كل المكوّنات غير الحضور كأسبوعية
         if (!weeklyComps.length && !monthlyComp) {
           (subject.components || []).forEach((comp, ci) => {
+            if (typeof componentAppliesToClass === 'function' && !componentAppliesToClass(comp, cls, db)) return;
             if (comp.type === 'attendance') return;
+            if (typeof isProjectLikeComponent === 'function' && isProjectLikeComponent(comp)) return;
             if (typeof isExamLikeComponent === 'function' && isExamLikeComponent(comp)) {
               if (!monthlyComp) monthlyComp = { comp, ci };
               return;
@@ -12781,6 +12849,13 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
           });
         }
         if (!periodExam) monthlyComp = null;
+        // مشروع: عمود واحد قبل المجموع الكلي إن وُجد
+        if (projectCompBlank) monthlyComp = monthlyComp; // يُبقى الامتحان كما هو؛ المشروع يُضاف لاحقاً عبر monthly إن لزم
+        // نضع المشروع كعمود منفصل بعد التقييم الشهري عبر إعادة استخدام مسار monthly إن لم يوجد شهري
+        if (projectCompBlank && !monthlyComp) monthlyComp = projectCompBlank;
+        else if (projectCompBlank && monthlyComp) {
+          // سيُعرض الشهري فقط في هذا المسار البسيط؛ المشروع يظهر في كشف الوزارة الرئيسي
+        }
 
         const weekliesMaxSum = weeklyComps.reduce((s, x) => s + (Number(x.comp.maxScore) || 0), 0);
         const attMax = attendanceComp ? (Number(attendanceComp.comp.maxScore) || 0) : 0;
@@ -14416,6 +14491,10 @@ function renderMonthlyExportButtons() {
         : '<th class="col-index">#</th><th class="col-id">رقم الجلوس</th><th class="col-name">اسم الطالب</th>';
       if (isSecondLangSubject) headerRow.innerHTML += '<th class="col-lang">اللغة الثانية</th>';
       subject.components.forEach((c, ci) => {
+        if (typeof componentAppliesToClass === 'function' && !componentAppliesToClass(c, cls, db)) return;
+        // المشروع: رصد في آخر فترة الترم فقط (الصف الثاني الثانوي)
+        if (typeof isProjectLikeComponent === 'function' && isProjectLikeComponent(c) &&
+            typeof shouldShowProjectColumn === 'function' && !shouldShowProjectColumn(db, term, month, cls)) return;
         if (c.isMonthlyGrade && !periodExamNow) return; // لا اختبار شهري لهذه الفترة — إخفاء العمود
         const isPF = c.type === 'passfail';
         headerRow.innerHTML +=
@@ -14442,6 +14521,9 @@ function renderMonthlyExportButtons() {
         // رُصد فعلياً حتى الآن فقط)، حتى يكتشف المعلم الطلاب المتعثرين بنظرة واحدة أثناء الرصد.
         let enteredSum = 0, enteredMax = 0;
         subject.components.forEach((comp, ci) => {
+          if (typeof componentAppliesToClass === 'function' && !componentAppliesToClass(comp, cls, db)) return;
+          if (typeof isProjectLikeComponent === 'function' && isProjectLikeComponent(comp) &&
+              typeof shouldShowProjectColumn === 'function' && !shouldShowProjectColumn(db, term, month, cls)) return;
           if (comp.type === 'attendance') return;
           if (comp.isMonthlyGrade && !periodExamNow) return; // لا اختبار شهري لهذه الفترة
           const existing0 = db.grades.find(g => g.studentId === s.id && g.subjectName === subjectName && g
@@ -14454,6 +14536,9 @@ function renderMonthlyExportButtons() {
         });
         const tier = enteredMax > 0 ? getGradeTier((enteredSum / enteredMax) * 100, stageType) : null;
         subject.components.forEach((comp, ci) => {
+          if (typeof componentAppliesToClass === 'function' && !componentAppliesToClass(comp, cls, db)) return;
+          if (typeof isProjectLikeComponent === 'function' && isProjectLikeComponent(comp) &&
+              typeof shouldShowProjectColumn === 'function' && !shouldShowProjectColumn(db, term, month, cls)) return;
           if (comp.isMonthlyGrade && !periodExamNow) return; // لا اختبار شهري لهذه الفترة — لا نعرض خانة إدخال ولا نحتسبها ضمن "الناقص"
           const existing = db.grades.find(g => g.studentId === s.id && g.subjectName === subjectName && g
             .term === term && g.month === month && g.componentIndex === ci);
@@ -15378,12 +15463,26 @@ function renderMonthlyExportButtons() {
       // تصنيف المكوّنات: أسبوعية الشكل + حضور + تقييم شهري (مرة واحدة وليس تحت كل أسبوع)
       const weeklyComps = []; // {comp, ci}
       let attendanceComp = null, monthlyComp = null;
+      let projectCompDet = null;
       (subject.components || []).forEach((c, ci) => {
+        if (typeof componentAppliesToClass === 'function' && !componentAppliesToClass(c, cls, db)) return;
+        if (typeof isProjectLikeComponent === 'function' && isProjectLikeComponent(c)) {
+          if (!projectCompDet) projectCompDet = { comp: c, ci };
+          return;
+        }
         if (c.type === 'attendance') attendanceComp = { comp: c, ci };
         else if (c.isMonthlyGrade || (typeof isExamLikeComponent === 'function' && isExamLikeComponent(c))) {
           if (!monthlyComp) monthlyComp = { comp: c, ci };
         } else weeklyComps.push({ comp: c, ci });
       });
+      if (!(typeof shouldShowProjectColumn === 'function' && shouldShowProjectColumn(db, term, month, cls))) {
+        projectCompDet = null;
+      }
+      // مشروع آخر الترم: عمود واحد قبل المجموع (إن لم يوجد تقييم شهري يُعرض مكانه)
+      if (projectCompDet && !monthlyComp) monthlyComp = projectCompDet;
+      else if (projectCompDet && monthlyComp) {
+        // يُضاف كعمود إضافي عبر monthlyComp في هذا المسار إن لم يُعرض؛ كشف الوزارة يعالجه بالكامل
+      }
 
       if (!periodExam) monthlyComp = null;
       if (!weeklyComps.length && !attendanceComp && !monthlyComp) {
@@ -15916,17 +16015,27 @@ function renderMonthlyExportButtons() {
         examAfterGlobal = periodEndW || globalWeeks[scopeWeeks - 1] || globalWeeks[3];
       }
 
-      // التقييم/الامتحان الشهري عمود واحد بعد الأسبوع المحدد — لا يُكرَّر تحت كل أسبوع
+      // التقييم الشهري مرة واحدة؛ المشروع مرة واحدة في آخر الترم قبل المجموع — لا يُكرَّران تحت الأسابيع
       const underWeekComps = [];
       let monthlyComp = null;
+      let projectComp = null;
       (subject.components || []).forEach((c, ci) => {
-        if (c.type === 'attendance') return; // المواظبة النوعية تُعالج منفصلاً إن لزم
+        if (typeof componentAppliesToClass === 'function' && !componentAppliesToClass(c, cls, db)) return;
+        if (c.type === 'attendance') return;
+        if (typeof isProjectLikeComponent === 'function' && isProjectLikeComponent(c)) {
+          if (!projectComp) projectComp = { comp: c, ci };
+          return;
+        }
         if (c.isMonthlyGrade || (typeof isExamLikeComponent === 'function' && isExamLikeComponent(c))) {
           if (!monthlyComp) monthlyComp = { comp: c, ci };
         } else underWeekComps.push({ comp: c, ci });
       });
       const examComp = (showExam && monthlyComp) ? monthlyComp : null;
-      if (!underWeekComps.length && !examComp) return '';
+      // المشروع يظهر فقط في آخر فترة الترم وللصف الثاني الثانوي
+      if (!(typeof shouldShowProjectColumn === 'function' && shouldShowProjectColumn(db, term, month, cls))) {
+        projectComp = null;
+      }
+      if (!underWeekComps.length && !examComp && !projectComp) return '';
 
       // فهرس الأسبوع (0-based داخل الكتلة) الذي يليه عمود الامتحان
       let examAfterLocalIdx = -1;
@@ -15937,7 +16046,6 @@ function renderMonthlyExportButtons() {
             break;
           }
         }
-        // إن لم يُطابق أسبوعاً داخل الكتلة: ضعه بعد آخر أسبوع داخل النطاق
         if (examAfterLocalIdx < 0) {
           for (let wi = weekCount - 1; wi >= 0; wi--) {
             if (!isWeekOut(wi)) { examAfterLocalIdx = wi; break; }
@@ -15946,7 +16054,7 @@ function renderMonthlyExportButtons() {
       }
 
       const colsPerWeek = underWeekComps.length + 1; // مكوّنات + مجموع الأسبوع
-      const extraCols = (examComp ? 1 : 0) + 1; // اختبار؟ + المجموع الكلي
+      const extraCols = (examComp ? 1 : 0) + (projectComp ? 1 : 0) + 1; // اختبار؟ + مشروع؟ + المجموع الكلي
       const totalDataCols = (weekCount * colsPerWeek) + extraCols;
       // عمود الاسم أضيق لاستغلال المساحة في خانات الدرجات — مع الإبقاء على حجم خط الاسم
       const isPortraitPage = !!cfg.portrait;
@@ -15977,11 +16085,18 @@ function renderMonthlyExportButtons() {
         const examMax = examComp.comp.maxScore == null ? '' : toHindiDigits(examComp.comp.maxScore);
         weekHeaderRow += `<th rowspan="3" class="month-eval-col ml-exam-slot"><div class="exam-title">${examTitle}</div>${examMax ? `<div class="exam-max">/${examMax}</div>` : ''}</th>`;
       }
+      // المشروع مرة واحدة قبل المجموع الكلي (آخر الترم — الصف الثاني الثانوي)
+      if (projectComp) {
+        const pTitle = escapeHtml(projectComp.comp.name || 'المشروع');
+        const pMax = projectComp.comp.maxScore == null ? '' : toHindiDigits(projectComp.comp.maxScore);
+        weekHeaderRow += `<th rowspan="3" class="month-eval-col ml-exam-slot" style="background:#fef3c7;"><div class="exam-title">${pTitle}</div>${pMax ? `<div class="exam-max">/${pMax}</div>` : ''}</th>`;
+      }
       {
         let underWeekMaxSum = 0;
         underWeekComps.forEach(x => { underWeekMaxSum += Number(x.comp.maxScore) || 0; });
         const monMax = examComp ? (Number(examComp.comp.maxScore) || 0) : 0;
-        const grandMax = underWeekMaxSum + monMax;
+        const projMax = projectComp ? (Number(projectComp.comp.maxScore) || 0) : 0;
+        const grandMax = underWeekMaxSum + monMax + projMax;
         weekHeaderRow += `<th rowspan="3" class="grand-total-col ml-grand-slot"><div class="grand-title">المجموع الكلي</div><div class="exam-max">/${toHindiDigits(grandMax)}</div></th>`;
       }
 
@@ -16052,10 +16167,11 @@ function renderMonthlyExportButtons() {
           };
           const compScores = underWeekComps.map(x => getScore(x.ci));
           const monScore = examComp ? getScore(examComp.ci) : '';
+          const projScore = projectComp ? getScore(projectComp.ci) : '';
 
           let grand = '';
           if (!blank) {
-            const parts = compScores.concat(examComp ? [monScore] : []);
+            const parts = compScores.concat(examComp ? [monScore] : []).concat(projectComp ? [projScore] : []);
             let hasAny = false, hasNum = false, sum = 0;
             parts.forEach(v => {
               if (v === '' || v === undefined || v === null) return;
@@ -16100,6 +16216,9 @@ function renderMonthlyExportButtons() {
           }
           if (examComp && examAfterLocalIdx < 0) {
             row += blank ? emptyCell('month-eval-col') : cell(monScore, 'month-eval-col');
+          }
+          if (projectComp) {
+            row += blank ? emptyCell('month-eval-col') : cell(projScore, 'month-eval-col');
           }
           row += blank ? emptyCell('grand-total-col') : cell(grand, 'grand-total-col');
           bodyHtml += `<tr>${row}</tr>`;
@@ -16206,6 +16325,7 @@ function renderMonthlyExportButtons() {
       const underWeekComps = [];
       let monthlyComp = null;
       (subject.components || []).forEach((c, ci) => {
+        if (typeof componentAppliesToClass === 'function' && !componentAppliesToClass(c, cls, db)) return;
         if (c.isMonthlyGrade || (typeof isExamLikeComponent === 'function' && isExamLikeComponent(c))) {
           if (!monthlyComp) monthlyComp = { comp: c, ci };
         } else underWeekComps.push({ comp: c, ci });
