@@ -5797,10 +5797,9 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
     //  بدون إنترنت بالكامل، ثم يزامن أي تغيير مع Supabase في الخلفية عند توفر الاتصال، ويسحب أحدث
     //  نسخة من السحابة عند فتح التطبيق وكل فترة قصيرة أثناء الاستخدام، ليتمكن مدير النظام ومديرو
     //  المراحل والمعلمون من العمل من أي جهاز متصل بالإنترنت وتظل بياناتهم متزامنة فيما بينهم.
-    //  ⚠️ ملاحظة أمان مهمة: هذه المزامنة "أحدث نسخة تفوز" (last write wins) على مستوى قاعدة البيانات
-    //  كاملة، وليست دمجاً حقلاً بحقل. إن قام شخصان بحفظ تعديلين مختلفين في نفس اللحظة تقريباً، فإن آخر
-    //  عملية حفظ تصل للسحابة هي التي تبقى. هذا مناسب للاستخدام المعتاد (معلم يدخل درجاته، ثم آخر بعده)
-    //  لكن لا يصلح كنظام تعاون لحظي حقيقي لعدة أشخاص يعدّلون نفس السجل بالضبط في نفس الثانية.
+    //  ✅ الدرجات: دمج خانة بخانة (studentId+مادة+فصل+شهر+مكوّن) — الأحدث حسب updatedAt يفوز.
+    //  عدة معلمين يرصدون في نفس الوقت من أجهزة مختلفة دون أن تُمسَح درجات بعضهم.
+    //  باقي بيانات المرحلة (طلاب/مواد/…) ما زالت تُزامَن كنسخة مرحلة مع دمج حذر للأقفال.
     // ============================================================
     const SUPABASE_URL = 'https://jkjdvzgiggczrkcykhrp.supabase.co';
     const SUPABASE_ANON_KEY =
@@ -6272,8 +6271,150 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
     }
     window.softRefreshAfterCloudPull = softRefreshAfterCloudPull;
 
+    // دمج درجات مرحلتين خانة بخانة: الأحدث حسب updatedAt يفوز (لا تُمسَح تعديلات محلية أحدث)
+    function mergeStageGradesPreferNewer(localData, remoteData) {
+      const local = (localData && localData.grades) || [];
+      const remote = (remoteData && remoteData.grades) || [];
+      const map = new Map();
+      const keyOf = (g) => [g.studentId, g.subjectName, g.term, g.month, g.componentIndex].join('|');
+      const ts = (g) => {
+        try { return g && g.updatedAt ? new Date(g.updatedAt).getTime() : 0; } catch (e) { return 0; }
+      };
+      remote.forEach(g => { if (g) map.set(keyOf(g), g); });
+      let localWon = 0;
+      local.forEach(g => {
+        if (!g) return;
+        const k = keyOf(g);
+        const r = map.get(k);
+        if (!r) { map.set(k, g); localWon++; return; }
+        if (ts(g) >= ts(r)) {
+          if (String(g.score) !== String(r.score) || ts(g) > ts(r)) localWon++;
+          map.set(k, g);
+        }
+      });
+      return { grades: Array.from(map.values()), localWon };
+    }
+
+    // دمج المعلمين بالـ id + اتحاد التعيينات — حتى لا يُمسح تسجيل مسؤول الحاسب عند رصد معلم
+    function mergeTeachersCollaborative(localList, remoteList) {
+      const map = new Map();
+      const ts = (x) => { try { return x && x.updatedAt ? new Date(x.updatedAt).getTime() : 0; } catch (e) { return 0; } };
+      const put = (t) => {
+        if (!t) return;
+        const id = t.id != null ? String(t.id) : ('name:' + String(t.name || '').trim().toLowerCase());
+        if (!id || id === 'name:') return;
+        const prev = map.get(id);
+        if (!prev) { map.set(id, Object.assign({}, t)); return; }
+        const asg = [];
+        const seen = new Set();
+        const addAsg = (list) => {
+          (list || []).forEach(a => {
+            if (!a) return;
+            const k = String(a.subjectName || '') + '|' + JSON.stringify(a.classes || []) + '|' + String(a.languageType || '') + '|' + String(a.specializationType || '');
+            if (seen.has(k)) return;
+            seen.add(k);
+            asg.push(a);
+          });
+        };
+        addAsg(prev.assignments);
+        addAsg(t.assignments);
+        const prefer = ts(t) >= ts(prev) ? t : prev;
+        const other = prefer === t ? prev : t;
+        map.set(id, Object.assign({}, other, prefer, {
+          assignments: asg.length ? asg : (prefer.assignments || other.assignments || [])
+        }));
+      };
+      (remoteList || []).forEach(put);
+      (localList || []).forEach(put);
+      return Array.from(map.values());
+    }
+
+    function mergeStudentsCollaborative(localList, remoteList) {
+      const map = new Map();
+      const keyOf = (s) => {
+        if (!s) return '';
+        if (s.id != null && String(s.id) !== '') return String(s.id);
+        return 'nid:' + String(s.nationalId || '') + '|seat:' + String(s.seat || '') + '|n:' + String(s.name || '').trim().toLowerCase();
+      };
+      const ts = (x) => { try { return x && x.updatedAt ? new Date(x.updatedAt).getTime() : 0; } catch (e) { return 0; } };
+      (remoteList || []).forEach(s => { const k = keyOf(s); if (k) map.set(k, s); });
+      (localList || []).forEach(s => {
+        const k = keyOf(s);
+        if (!k) return;
+        const r = map.get(k);
+        if (!r || ts(s) >= ts(r)) map.set(k, s);
+      });
+      return Array.from(map.values());
+    }
+
+    function mergeSubjectsCollaborative(localList, remoteList) {
+      const map = new Map();
+      const keyOf = (s) => String((s && s.name) || '').trim();
+      (remoteList || []).forEach(s => { const k = keyOf(s); if (k) map.set(k, s); });
+      (localList || []).forEach(s => {
+        const k = keyOf(s);
+        if (!k) return;
+        const r = map.get(k);
+        if (!r) { map.set(k, s); return; }
+        const comps = [];
+        const seen = new Set();
+        const add = (list) => {
+          (list || []).forEach(c => {
+            const ck = String((c && c.name) || '').trim();
+            if (!ck || seen.has(ck)) return;
+            seen.add(ck);
+            comps.push(c);
+          });
+        };
+        add(r.components);
+        add(s.components);
+        map.set(k, Object.assign({}, r, s, {
+          components: comps.length ? comps : (s.components || r.components || []),
+          exportName: s.exportName || r.exportName || s.name || r.name
+        }));
+      });
+      return Array.from(map.values());
+    }
+
+    function mergeClassesCollaborative(localList, remoteList) {
+      const set = new Set();
+      (remoteList || []).forEach(c => { if (c != null && c !== '') set.add(String(c)); });
+      (localList || []).forEach(c => { if (c != null && c !== '') set.add(String(c)); });
+      return Array.from(set);
+    }
+
+    function mergeStageDataCollaborative(localData, remoteData) {
+      const local = localData || {};
+      const remote = remoteData || {};
+      const out = Object.assign({}, remote);
+      const mg = mergeStageGradesPreferNewer(local, remote);
+      out.grades = mg.grades;
+      out.teachers = mergeTeachersCollaborative(local.teachers, remote.teachers);
+      out.students = mergeStudentsCollaborative(local.students, remote.students);
+      out.subjects = mergeSubjectsCollaborative(local.subjects, remote.subjects);
+      out.classes = mergeClassesCollaborative(local.classes, remote.classes);
+      out.classGrade = Object.assign({}, remote.classGrade || {}, local.classGrade || {});
+      if (remote.monthLocks || local.monthLocks) {
+        out.monthLocks = Object.assign({}, remote.monthLocks || {}, local.monthLocks || {});
+      }
+      if (remote.termLocks || local.termLocks) {
+        out.termLocks = Object.assign({}, remote.termLocks || {}, local.termLocks || {});
+      }
+      if (local.globalLock === true || remote.globalLock === true) out.globalLock = true;
+      if (local.schoolInfo || remote.schoolInfo) {
+        out.schoolInfo = Object.assign({}, remote.schoolInfo || {}, local.schoolInfo || {});
+      }
+      return { data: out, localGradeWins: mg.localWon };
+    }
+    window.mergeStageDataCollaborative = mergeStageDataCollaborative;
+
     async function pullFromCloud(refreshUi) {
       if (!cloudAvailable || !isOnline) return;
+      // لا تسحب أثناء رفع معلّق حتى لا تُستبدل التعديلات المحلية قبل وصولها للسحابة
+      if (cloudPushInFlight || cloudPushPending) {
+        setConnBadge('بانتظار رفع التعديلات المحلية…');
+        return;
+      }
 
       const metaRow = await cloudFetchRow('root_meta');
 
@@ -6323,10 +6464,42 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
           const remoteStageIsNewer = !localStageUpdated ||
             (stageRow.updated_at && new Date(stageRow.updated_at) > new Date(localStageUpdated));
           if (remoteStageIsNewer) {
-            if (st) { st.data = stageRow.data; st.updatedAt = stageRow.updated_at; }
+            if (st) {
+              // دمج تعاوني: درجات + معلمون + طلاب + مواد + فصول (لا مسح لتسجيل مسؤول الحاسب)
+              const localCopy = st.data || emptyStageData();
+              const remoteCopy = stageRow.data;
+              try {
+                const mg = mergeStageDataCollaborative(localCopy, remoteCopy);
+                st.data = mg.data;
+                if (mg.localGradeWins > 0) {
+                  markStageCloudDirty(currentStageId);
+                  scheduleCloudPush();
+                }
+              } catch (e) {
+                console.warn('mergeStageDataCollaborative failed', e);
+                st.data = remoteCopy;
+              }
+              st.updatedAt = stageRow.updated_at;
+            }
             changed = true;
           } else if (st && st.data && stageRow.data) {
             const remote = stageRow.data; let merged = false;
+            // المحلية أحدث زمنياً: ادمج أيضاً معلمين/طلاب/درجات من أجهزة أخرى
+            try {
+              const beforeT = (st.data.teachers || []).length;
+              const beforeG = (st.data.grades || []).length;
+              const mg = mergeStageDataCollaborative(st.data, remote);
+              st.data = mg.data;
+              if ((st.data.teachers || []).length !== beforeT || (st.data.grades || []).length !== beforeG || mg.localGradeWins >= 0) {
+                merged = true;
+              }
+            } catch (e) {
+              try {
+                const mg = mergeStageGradesPreferNewer(st.data, remote);
+                st.data.grades = mg.grades;
+                merged = true;
+              } catch (e2) {}
+            }
             if (remote.monthLocks && typeof remote.monthLocks === 'object') {
               st.data.monthLocks = Object.assign({}, st.data.monthLocks || {}, remote.monthLocks); merged = true;
             }
@@ -6359,7 +6532,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
 
       if (changed) {
         persistRootDB(root);
-        setConnBadge('تم تحميل أحدث تعديلات من جهاز آخر');
+        setConnBadge('تم دمج أحدث التعديلات من السحابة (الدرجات الأحدث محفوظة)');
         if (refreshUi && currentAccountType) {
           _refreshSessionRefs();
           try { softRefreshAfterCloudPull(); } catch (e) { applyRoleUI(); }
@@ -6392,7 +6565,15 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
         const local = root.stages.find(s => s.id === id);
         if (local) {
           local.name = name;
-          if (row && row.data) { local.data = row.data; local.updatedAt = row.updated_at; }
+          if (row && row.data) {
+            try {
+              const mg = mergeStageDataCollaborative(local.data || emptyStageData(), row.data);
+              local.data = mg.data;
+            } catch (e) {
+              local.data = row.data;
+            }
+            local.updatedAt = row.updated_at;
+          }
         } else {
           root.stages.push({ id, name, data: (row && row.data) ? row.data : emptyStageData(),
             updatedAt: row ? row.updated_at : null });
@@ -6410,8 +6591,8 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
       cloudSyncTimer = setTimeout(runCloudPush, 1200);
     }
 
-    // يرفع فقط: root_meta + بيانات المرحلة الحالية (بدل الكل)
-    // قبل الرفع: إن كانت السحابة أحدث من النسخة المحلية يُعرض تنبيه (سحب الأحدث أو فرض الرفع)
+    // يرفع root_meta + المراحل المعدَّلة بعد دمج الدرجات خانة بخانة مع السحابة
+    // حتى يعمل عدة معلمين في نفس الوقت دون مسح درجات بعضهم
     async function runCloudPush() {
       if (!cloudAvailable || !isOnline) return;
       if (cloudPushInFlight) { cloudPushPending = true; return; }
@@ -6421,31 +6602,6 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
       try {
         const root = _rootDBCache;
         if (root) {
-          // فحص تعارض زمني على مستوى المرحلة قبل الكتابة فوق السحابة
-          if (currentStageId) {
-            const st = root.stages.find(s => s.id === currentStageId);
-            const localUpdated = st && st.updatedAt;
-            if (localUpdated) {
-              let stageRow = null;
-              try { stageRow = await cloudFetchRow('stage_' + currentStageId); } catch (e) { /* تجاهل */ }
-              if (stageRow && stageRow.updated_at && new Date(stageRow.updated_at) > new Date(localUpdated)) {
-                // السحابة أحدث — اسأل المستخدم
-                cloudPushInFlight = false;
-                setConnBadge('تنبيه: توجد نسخة أحدث على السحابة');
-                const choice = await showStalePushModal();
-                if (choice === 'pull') {
-                  await pullFromCloud(true);
-                  setConnBadge('تم تحميل النسخة الأحدث — راجع بياناتك ثم احفظ مجدداً إن لزم');
-                  if (cloudPushPending) setTimeout(runCloudPush, 1000);
-                  return;
-                }
-                // choice === 'force' → نكمل الرفع
-                cloudPushInFlight = true;
-                setConnBadge(null, 'syncing');
-              }
-            }
-          }
-
           const now = new Date().toISOString();
           const rows = [{ id: 'root_meta', data: buildRootMeta(root), updated_at: now }];
           let dirtyIds = (typeof consumeDirtyStageIds === 'function') ? consumeDirtyStageIds() : [];
@@ -6464,12 +6620,34 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
             });
           }
           if (!dirtyIds.length && currentStageId) dirtyIds.push(String(currentStageId));
-          const seenPush = Object.create(null);
+
+          const uniqueIds = [];
+          const seenId = Object.create(null);
           dirtyIds.forEach(sid => {
-            if (!sid || seenPush[sid]) return;
-            seenPush[sid] = true;
-            const st = (root.stages || []).find(s => String(s.id) === String(sid));
+            if (!sid || seenId[sid]) return;
+            seenId[sid] = true;
+            uniqueIds.push(String(sid));
+          });
+          const remoteRows = await Promise.all(uniqueIds.map(sid =>
+            cloudFetchRow('stage_' + sid).catch(function () { return null; })
+          ));
+
+          uniqueIds.forEach(function (sid, i) {
+            const st = (root.stages || []).find(function (s) { return String(s.id) === String(sid); });
             if (!st || !st.data) return;
+            const stageRow = remoteRows[i];
+            if (stageRow && stageRow.data) {
+              try {
+                const mg = mergeStageDataCollaborative(st.data, stageRow.data);
+                st.data = mg.data;
+              } catch (e) {
+                console.warn('merge before push failed', sid, e);
+                try {
+                  const mg = mergeStageGradesPreferNewer(st.data, stageRow.data);
+                  st.data.grades = mg.grades;
+                } catch (e2) {}
+              }
+            }
             rows.push({ id: 'stage_' + sid, data: st.data, updated_at: now });
             st.updatedAt = now;
           });
@@ -6487,8 +6665,10 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
       if (cloudPushPending) setTimeout(runCloudPush, 1000);
     }
 
-    // فحص دوري خفيف كل 25 ثانية — يجلب root_meta + المرحلة الحالية فقط
-    setInterval(() => { if (isOnline && !cloudPushInFlight) pullFromCloud(true); }, 25000);
+    // فحص دوري — لا يسحب أثناء رفع معلّق
+    setInterval(function () {
+      if (isOnline && !cloudPushInFlight && !cloudPushPending) pullFromCloud(true);
+    }, 25000);
 
     // ============================================================
     //  رفع/تنزيل/حذف نسخ ملفات Excel الأصلية من Supabase Storage
@@ -10741,6 +10921,30 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
     window.componentAppliesToClass = componentAppliesToClass;
     window.resolveGradeNumberForClass = resolveGradeNumberForClass;
     window.shouldShowProjectColumn = shouldShowProjectColumn;
+
+    // أسماء المعلمين على الكشوف: إزالة التكرار (نفس الاسم مرتين بسبب سجل مزدوج أو تعيين مكرر)
+    function formatAssignedTeachersForPrint(teachers, subjectName, cls) {
+      const list = Array.isArray(teachers) ? teachers : [];
+      const seen = new Set();
+      const parts = [];
+      list.forEach(t => {
+        const raw = String((t && t.name) || '').trim();
+        if (!raw) return;
+        const key = raw.replace(/\s+/g, ' ').toLowerCase();
+        if (seen.has(key)) return;
+        seen.add(key);
+        let label = escapeHtml(raw);
+        try {
+          if (subjectName && typeof teacherLanguageTypeForSubject === 'function') {
+            const lt = teacherLanguageTypeForSubject(t, subjectName, cls);
+            if (lt) label += ' (' + escapeHtml(lt) + ')';
+          }
+        } catch (e) {}
+        parts.push(label);
+      });
+      return parts.join('، ');
+    }
+    window.formatAssignedTeachersForPrint = formatAssignedTeachersForPrint;
 
     // مكوّنات "الحضور/الغياب" (بدون درجة عظمى): تُكتشف تلقائياً من اسم المكوّن ولا تحتاج
     // إدخال درجة عظمى عند إضافتها. نوعان:
@@ -15091,8 +15295,7 @@ function renderMonthlyExportButtons() {
       const assignedTeachers = (db.teachers || []).filter(t => (t.assignments || []).some(a => a.subjectName ===
         subjectName && (a.classes || []).includes(cls)));
       const teacherName = assignedTeachers.length ?
-        assignedTeachers.map(t => { const lt = teacherLanguageTypeForSubject(t, subjectName, cls);
-          return lt ? `${escapeHtml(t.name)} (${escapeHtml(lt)})` : escapeHtml(t.name); }).join('، ') :
+        ((typeof formatAssignedTeachersForPrint === 'function') ? formatAssignedTeachersForPrint(assignedTeachers, subjectName, cls) : assignedTeachers.map(t=>escapeHtml(t.name||'')).join('، ')) :
         (currentRole === 'teacher' && currentTeacher ? escapeHtml(currentTeacher.name) : '');
       // اسم/صفة من قام بالطباعة فعلياً الآن (مدير النظام أو المعلم الذي سجّل دخوله)
       const printedBy = currentRole === 'admin' ? 'مدير النظام' : escapeHtml((currentTeacher && currentTeacher.name) || 'المعلم');
@@ -15631,7 +15834,7 @@ function renderMonthlyExportButtons() {
       const termLabel = term === 'first' ? 'الفصل الدراسي الأول' : 'الفصل الدراسي الثاني';
       const assignedTeachers = (db.teachers || []).filter(t => (t.assignments || []).some(a => a.subjectName === subjectName && (a.classes || []).includes(cls)));
       const teacherName = assignedTeachers.length ?
-        assignedTeachers.map(t => { const lt = teacherLanguageTypeForSubject(t, subjectName, cls); return lt ? `${escapeHtml(t.name)} (${escapeHtml(lt)})` : escapeHtml(t.name); }).join('، ') :
+        ((typeof formatAssignedTeachersForPrint === 'function') ? formatAssignedTeachersForPrint(assignedTeachers, subjectName, cls) : assignedTeachers.map(t=>escapeHtml(t.name||'')).join('، ')) :
         (currentRole === 'teacher' && currentTeacher ? escapeHtml(currentTeacher.name) : '');
       const printedBy = currentRole === 'admin' ? 'مدير النظام' : ((currentTeacher && currentTeacher.name) || 'المعلم');
       const now = new Date();
@@ -15787,9 +15990,9 @@ function renderMonthlyExportButtons() {
       const stageLabel = escapeHtml(classGradeLabel || info.grade || 'المرحلة');
       const assignedTeachers = (db.teachers || []).filter(t =>
         (t.assignments || []).some(a => a.subjectName === subjectName && (a.classes || []).includes(cls)));
-      const teacherName = assignedTeachers.length
-        ? assignedTeachers.map(t => escapeHtml(t.name)).join('، ')
-        : '';
+      const teacherName = (typeof formatAssignedTeachersForPrint === 'function')
+        ? formatAssignedTeachersForPrint(assignedTeachers, subjectName, cls)
+        : (assignedTeachers.map(t => escapeHtml(t.name || '')).filter(Boolean).join('، '));
       const printedBy = (typeof resolvePrintedByName === 'function') ? resolvePrintedByName() : '';
       const printDate = new Date().toLocaleDateString('ar-EG');
       const gov = escapeHtml(info.governorate || '................');
@@ -16233,12 +16436,9 @@ function renderMonthlyExportButtons() {
       const termLabel = term === 'first' ? 'الفصل الدراسي الأول' : 'الفصل الدراسي الثاني';
       const assignedTeachers = (db.teachers || []).filter(t =>
         (t.assignments || []).some(a => a.subjectName === subjectName && (a.classes || []).includes(cls)));
-      const teacherName = assignedTeachers.length
-        ? assignedTeachers.map(t => {
-            const lt = (typeof teacherLanguageTypeForSubject === 'function') ? teacherLanguageTypeForSubject(t, subjectName, cls) : '';
-            return lt ? `${escapeHtml(t.name)} (${escapeHtml(lt)})` : escapeHtml(t.name);
-          }).join('، ')
-        : '';
+      const teacherName = (typeof formatAssignedTeachersForPrint === 'function')
+        ? formatAssignedTeachersForPrint(assignedTeachers, subjectName, cls)
+        : (assignedTeachers.map(t => escapeHtml(t.name || '')).filter(Boolean).join('، '));
       const printedBy = (typeof resolvePrintedByName === 'function') ? resolvePrintedByName() : 'المستخدم';
       const printDate = new Date().toLocaleDateString('ar-EG');
       const classGradeLabelForPrint = (db.classGrade && db.classGrade[cls]) || info.grade || '';
@@ -16459,8 +16659,7 @@ function renderMonthlyExportButtons() {
       const termLabel = term === 'first' ? 'الفصل الدراسي الأول' : 'الفصل الدراسي الثاني';
       const assignedTeachers = (db.teachers || []).filter(t =>
         (t.assignments || []).some(a => a.subjectName === subjectName && (a.classes || []).includes(cls)));
-      const teacherName = assignedTeachers.length
-        ? assignedTeachers.map(t => escapeHtml(t.name)).join('، ') : '';
+      const teacherName = (typeof formatAssignedTeachersForPrint === 'function') ? formatAssignedTeachersForPrint(assignedTeachers, subjectName, cls) : assignedTeachers.map(t=>escapeHtml(t.name||'')).join('، ');
       const printedBy = (typeof resolvePrintedByName === 'function') ? resolvePrintedByName() : 'المستخدم';
       const printDate = new Date().toLocaleDateString('ar-EG');
       const classGradeLabelForPrint = (db.classGrade && db.classGrade[cls]) || info.grade || '';
@@ -17313,8 +17512,7 @@ function renderMonthlyExportButtons() {
       const termLabel = term === 'first' ? 'الفصل الدراسي الأول' : 'الفصل الدراسي الثاني';
       const assignedTeachers = (db.teachers || []).filter(t =>
         (t.assignments || []).some(a => a.subjectName === subjectName && (a.classes || []).includes(cls)));
-      const teacherName = assignedTeachers.length
-        ? assignedTeachers.map(t => escapeHtml(t.name)).join('، ') : '';
+      const teacherName = (typeof formatAssignedTeachersForPrint === 'function') ? formatAssignedTeachersForPrint(assignedTeachers, subjectName, cls) : assignedTeachers.map(t=>escapeHtml(t.name||'')).join('، ');
       const printedBy = (typeof resolvePrintedByName === 'function') ? resolvePrintedByName() : '';
       const printDate = new Date().toLocaleDateString('ar-EG');
       const classGradeLabelForPrint = (db.classGrade && db.classGrade[cls]) || info.grade || '';
@@ -17646,7 +17844,7 @@ function renderMonthlyExportButtons() {
       const monthsSubtitle = 'ثلاث أشهر';
       const assignedTeachers = (db.teachers || []).filter(t => (t.assignments || []).some(a => a.subjectName === subjectName && (a.classes || []).includes(cls)));
       const teacherName = assignedTeachers.length ?
-        assignedTeachers.map(t => { const lt = teacherLanguageTypeForSubject(t, subjectName, cls); return lt ? `${escapeHtml(t.name)} (${escapeHtml(lt)})` : escapeHtml(t.name); }).join('، ') :
+        ((typeof formatAssignedTeachersForPrint === 'function') ? formatAssignedTeachersForPrint(assignedTeachers, subjectName, cls) : assignedTeachers.map(t=>escapeHtml(t.name||'')).join('، ')) :
         (currentRole === 'teacher' && currentTeacher ? escapeHtml(currentTeacher.name) : '');
       const printedBy = currentRole === 'admin' ? 'مدير النظام' : ((currentTeacher && currentTeacher.name) || 'المعلم');
       const now = new Date();
@@ -19038,6 +19236,7 @@ function renderMonthlyExportButtons() {
           msg.style.color = '#b91c1c'; cancelTeacherEdit(); loadTeachersUI(); return; }
         t.name = name;
         t.assignments = assignments;
+        t.updatedAt = new Date().toISOString();
         {
           const periodsRaw = document.getElementById('newTeacherPeriods');
           const periods = periodsRaw ? Math.max(0, parseInt(periodsRaw.value, 10) || 0) : (t.assignedPeriods || 0);
@@ -19073,7 +19272,10 @@ function renderMonthlyExportButtons() {
       const newTeacherId = 't_' + Date.now();
       const periodsRaw = document.getElementById('newTeacherPeriods');
       const periods = periodsRaw ? Math.max(0, parseInt(periodsRaw.value, 10) || 0) : 0;
-      db.teachers.push({ id: newTeacherId, name, assignments, section: defaultSection, pin, pinHash, assignedPeriods: periods });
+      db.teachers.push({
+        id: newTeacherId, name, assignments, section: defaultSection, pin, pinHash, assignedPeriods: periods,
+        createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
+      });
       if (!db.teacherFeedback || typeof db.teacherFeedback !== 'object') db.teacherFeedback = { points: {}, log: [], basePoints: {} };
       if (!db.teacherFeedback.basePoints) db.teacherFeedback.basePoints = {};
       if (!db.teacherFeedback.points) db.teacherFeedback.points = {};
