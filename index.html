@@ -18222,7 +18222,29 @@ function renderMonthlyExportButtons() {
       return confirm(msg);
     }
 
+    // طابور حفظ الدرجات: يمنع تداخل عدة saveStudentRow في نفس اللحظة
+    // وبعد انتهاء الطابور يُرفع للسحابة مرة واحدة (وليس مع كل خانة)
+    var _gradeSaveChain = Promise.resolve();
+    var _gradePushTimer = null;
+    function enqueueGradeSave(fn) {
+      _gradeSaveChain = _gradeSaveChain.then(function () {
+        return Promise.resolve().then(fn);
+      }).catch(function (e) {
+        console.error('grade save queue error', e);
+      });
+      clearTimeout(_gradePushTimer);
+      _gradePushTimer = setTimeout(function () {
+        _gradeSaveChain.then(function () {
+          if (typeof runCloudPush === 'function' && typeof isOnline !== 'undefined' && isOnline) {
+            return runCloudPush();
+          }
+        }).catch(function (e) { console.warn('grade queue push', e); });
+      }, 500);
+      return _gradeSaveChain;
+    }
+
     async function saveStudentRow(studentId) {
+      return enqueueGradeSave(async function () {
      try {
       const db = loadDB();
       const subjectName = document.getElementById('gradeSubjectSelect').value;
@@ -18284,13 +18306,7 @@ function renderMonthlyExportButtons() {
       });
       recordAudit('رصد درجات', `تم حفظ ${saved} درجة في مادة ${subjectName} للفصل ${term} والشهر ${month}`);
       try { await saveDB(db); } catch (e) { console.error('saveDB await', e); }
-      // رفع فوري بعد حفظ الدرجات حتى لا تُستبدل عند التحديث قبل انتهاء الرفع المؤجّل
-      try {
-        if (typeof runCloudPush === 'function' && isOnline) {
-          clearTimeout(cloudSyncTimer);
-          await runCloudPush();
-        }
-      } catch (e) { console.warn('push after grade save', e); }
+      // الرفع يتم مرة واحدة بعد انتهاء طابور الحفظ (enqueueGradeSave)
       const status = document.getElementById('gradesStatus');
       status.textContent = skipped ?
         `✅ تم حفظ ${saved} درجة، وتم تجاهل ${skipped} قيمة غير صحيحة (تحقق من الحد الأقصى أو القيم السالبة)` :
@@ -18302,6 +18318,7 @@ function renderMonthlyExportButtons() {
        console.error('saveStudentRow failed:', e);
        alert('⚠️ حدث خطأ أثناء حفظ درجات هذا الطالب.\n' + (e && e.message ? e.message : e));
      }
+      }); // end enqueueGradeSave
     }
 
     async function saveAllGrades() {
