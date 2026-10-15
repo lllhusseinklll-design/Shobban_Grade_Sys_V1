@@ -10670,9 +10670,9 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
     }
 
     function isExamComponent(name) {
-      // يشمل: امتحان / اختبار / تقييم شهري / اختبارات شهرية / امتحانات شهرية
+      // يشمل: امتحان / اختبار / تقييم شهري / اختبارات شهرية / امتحانات شهرية / درجة شهرية
       const n = normalizeArabic(name || '');
-      return /امتحان|اختبار|تقييم\s*شهري/.test(n);
+      return /امتحان|اختبار|تقييم\s*شهري|اختبارات\s*شهري|امتحانات\s*شهري|درجه?\s*شهري/.test(n);
     }
 
     // مكوّنات الامتحانات/التقييم الشهري: دائماً امتحانان في الفصل الدراسي (وليس بعدد شهور الفصل 2 أو 3)
@@ -12760,17 +12760,23 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
         );
 
         // تصنيف المكوّنات ككشف الرصد التفصيلي: أسبوعية + مواظبة + تقييم/امتحان شهري
+        // التقييم الشهري مرة واحدة فقط (ليس تحت كل أسبوع) — بالعلم isMonthlyGrade أو الاسم
         const weeklyComps = [];
         let attendanceComp = null, monthlyComp = null;
         (subject.components || []).forEach((comp, ci) => {
           if (comp.type === 'attendance') attendanceComp = { comp, ci };
-          else if (comp.isMonthlyGrade) monthlyComp = { comp, ci };
-          else weeklyComps.push({ comp, ci });
+          else if (comp.isMonthlyGrade || (typeof isExamLikeComponent === 'function' && isExamLikeComponent(comp))) {
+            if (!monthlyComp) monthlyComp = { comp, ci };
+          } else weeklyComps.push({ comp, ci });
         });
         // إن لم تُصنَّف أي مكوّنات أسبوعية ولا شهري، نعرض كل المكوّنات غير الحضور كأسبوعية
         if (!weeklyComps.length && !monthlyComp) {
           (subject.components || []).forEach((comp, ci) => {
             if (comp.type === 'attendance') return;
+            if (typeof isExamLikeComponent === 'function' && isExamLikeComponent(comp)) {
+              if (!monthlyComp) monthlyComp = { comp, ci };
+              return;
+            }
             weeklyComps.push({ comp, ci });
           });
         }
@@ -15369,13 +15375,14 @@ function renderMonthlyExportButtons() {
       const periodExam = (typeof periodHasMonthlyExam === 'function') ? periodHasMonthlyExam(term, month - 1) : true;
       const weekOutCls = (wi) => (typeof isWeekExcluded === 'function' ? isWeekExcluded(term, month - 1, wi) : (wi >= scopeWeeks)) ? ' week-out-of-scope' : '';
 
-      // تصنيف المكوّنات: أسبوعية الشكل (تُكرر الدرجة على أسابيع الفترة) + حضور + تقييم شهري
+      // تصنيف المكوّنات: أسبوعية الشكل + حضور + تقييم شهري (مرة واحدة وليس تحت كل أسبوع)
       const weeklyComps = []; // {comp, ci}
       let attendanceComp = null, monthlyComp = null;
       (subject.components || []).forEach((c, ci) => {
         if (c.type === 'attendance') attendanceComp = { comp: c, ci };
-        else if (c.isMonthlyGrade) monthlyComp = { comp: c, ci };
-        else weeklyComps.push({ comp: c, ci });
+        else if (c.isMonthlyGrade || (typeof isExamLikeComponent === 'function' && isExamLikeComponent(c))) {
+          if (!monthlyComp) monthlyComp = { comp: c, ci };
+        } else weeklyComps.push({ comp: c, ci });
       });
 
       if (!periodExam) monthlyComp = null;
@@ -15909,11 +15916,14 @@ function renderMonthlyExportButtons() {
         examAfterGlobal = periodEndW || globalWeeks[scopeWeeks - 1] || globalWeeks[3];
       }
 
+      // التقييم/الامتحان الشهري عمود واحد بعد الأسبوع المحدد — لا يُكرَّر تحت كل أسبوع
       const underWeekComps = [];
       let monthlyComp = null;
       (subject.components || []).forEach((c, ci) => {
-        if (c.isMonthlyGrade) monthlyComp = { comp: c, ci };
-        else underWeekComps.push({ comp: c, ci });
+        if (c.type === 'attendance') return; // المواظبة النوعية تُعالج منفصلاً إن لزم
+        if (c.isMonthlyGrade || (typeof isExamLikeComponent === 'function' && isExamLikeComponent(c))) {
+          if (!monthlyComp) monthlyComp = { comp: c, ci };
+        } else underWeekComps.push({ comp: c, ci });
       });
       const examComp = (showExam && monthlyComp) ? monthlyComp : null;
       if (!underWeekComps.length && !examComp) return '';
@@ -16196,8 +16206,9 @@ function renderMonthlyExportButtons() {
       const underWeekComps = [];
       let monthlyComp = null;
       (subject.components || []).forEach((c, ci) => {
-        if (c.isMonthlyGrade) monthlyComp = { comp: c, ci };
-        else underWeekComps.push({ comp: c, ci });
+        if (c.isMonthlyGrade || (typeof isExamLikeComponent === 'function' && isExamLikeComponent(c))) {
+          if (!monthlyComp) monthlyComp = { comp: c, ci };
+        } else underWeekComps.push({ comp: c, ci });
       });
 
       const months = [];
