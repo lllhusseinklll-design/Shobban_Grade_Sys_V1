@@ -6249,8 +6249,16 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
         if (prev === 'attendance' && typeof loadAttendanceUI === 'function') {
           try { loadAttendanceUI(); } catch (e) {}
         }
+        // لا تعِد بناء جدول الرصد أثناء الكتابة في خانة درجة (يحفظ الإدخال غير المحفوظ)
         if (prev === 'grades' && typeof loadGradesUI === 'function') {
-          try { loadGradesUI(); } catch (e) {}
+          try {
+            const ae = document.activeElement;
+            if (ae && ae.classList && ae.classList.contains('grade-input')) {
+              /* تأجيل التحديث حتى يخرج المستخدم من الخانة */
+            } else {
+              loadGradesUI();
+            }
+          } catch (e) {}
         }
         if (prev === 'teachers' && typeof loadTeachersUI === 'function') {
           try { loadTeachersUI(); } catch (e) {}
@@ -6287,8 +6295,16 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
         const k = keyOf(g);
         const r = map.get(k);
         if (!r) { map.set(k, g); localWon++; return; }
-        if (ts(g) >= ts(r)) {
-          if (String(g.score) !== String(r.score) || ts(g) > ts(r)) localWon++;
+        const lt = ts(g), rt = ts(r);
+        // إن لم يكن للمحلية طابع زمني وللسحابة طابع: احتفظ بالمحلية إذا اختلفت الدرجة
+        // (درجات رُصدت جماعياً قبل إصلاح updatedAt لا يجب أن تُمسَح)
+        if (lt === 0 && rt > 0 && String(g.score) !== String(r.score)) {
+          map.set(k, Object.assign({}, g, { updatedAt: g.updatedAt || new Date().toISOString() }));
+          localWon++;
+          return;
+        }
+        if (lt >= rt) {
+          if (String(g.score) !== String(r.score) || lt > rt) localWon++;
           map.set(k, g);
         }
       });
@@ -17940,12 +17956,17 @@ function renderMonthlyExportButtons() {
 
       let filled = 0,
         skippedExisting = 0;
+      const nowIso = new Date().toISOString();
+      const actorName = (typeof currentUserLabel === 'function') ? currentUserLabel() : '';
       students.forEach(s => {
         fillComponents.forEach(({ c, ci }) => {
           const existing = db.grades.find(g => g.studentId === s.id && g.subjectName === subjectName && g.term === term && g.month === month && g.componentIndex === ci);
           if (existing) { skippedExisting++;
             return; }
-          db.grades.push({ studentId: s.id, subjectName, term, month, componentIndex: ci, score: c.maxScore });
+          db.grades.push({
+            studentId: s.id, subjectName, term, month, componentIndex: ci, score: c.maxScore,
+            createdAt: nowIso, updatedAt: nowIso, updatedBy: actorName, editCount: 0
+          });
           filled++;
         });
       });
@@ -17995,11 +18016,16 @@ function renderMonthlyExportButtons() {
       if (!(await showConfirm(`سيتم رصد الدرجة النهائية (الدرجة العظمى) في مكوّن الاختبار/التقييم الشهري التالي لكل طلاب فصل "${classSectionLabel(cls)}" في مادة "${subjectName}" لهذا الشهر:\n${compNames}\n\nلن يتم لمس أي درجة مُدخَلة بالفعل. عدد الطلاب: ${students.length}. متابعة؟`))) return;
 
       let filled = 0, skippedExisting = 0;
+      const nowIso = new Date().toISOString();
+      const actorName = (typeof currentUserLabel === 'function') ? currentUserLabel() : '';
       students.forEach(s => {
         fillComponents.forEach(({ c, ci }) => {
           const existing = db.grades.find(g => g.studentId === s.id && g.subjectName === subjectName && g.term === term && g.month === month && g.componentIndex === ci);
           if (existing) { skippedExisting++; return; }
-          db.grades.push({ studentId: s.id, subjectName, term, month, componentIndex: ci, score: c.maxScore });
+          db.grades.push({
+            studentId: s.id, subjectName, term, month, componentIndex: ci, score: c.maxScore,
+            createdAt: nowIso, updatedAt: nowIso, updatedBy: actorName, editCount: 0
+          });
           filled++;
         });
       });
@@ -18082,11 +18108,16 @@ function renderMonthlyExportButtons() {
 
       let filled = 0,
         skippedExisting = 0;
+      const nowIso = new Date().toISOString();
+      const actorName = (typeof currentUserLabel === 'function') ? currentUserLabel() : '';
       students.forEach(s => {
         const existing = db.grades.find(g => g.studentId === s.id && g.subjectName === subjectName && g.term === term && g.month === month && g.componentIndex === ci);
         if (existing) { skippedExisting++;
           return; }
-        db.grades.push({ studentId: s.id, subjectName, term, month, componentIndex: ci, score: comp.maxScore });
+        db.grades.push({
+          studentId: s.id, subjectName, term, month, componentIndex: ci, score: comp.maxScore,
+          createdAt: nowIso, updatedAt: nowIso, updatedBy: actorName, editCount: 0
+        });
         filled++;
       });
       saveDB(db);
