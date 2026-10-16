@@ -5255,67 +5255,6 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
       return inferred === fs.stageType;
     }
 
-    // قسم المرحلة الثابتة (arabic / languages) من معرّفها أو سجلها؛ null إن لم يكن معروفاً.
-    function stageSectionOf(stageOrId) {
-      const id = (stageOrId && typeof stageOrId === 'object') ? stageOrId.id : stageOrId;
-      const fs = FIXED_STAGES.find(f => f.id === id);
-      if (fs) return fs.section;
-      const sec = stageOrId && typeof stageOrId === 'object' ? stageOrId.section : null;
-      return (sec === 'arabic' || sec === 'languages') ? sec : null;
-    }
-
-    // حاجز سلامة: يزيل من بيانات المرحلة أي طالب/معلم/فصل/مادة ينتمي لقسم مختلف عن قسم المرحلة
-    // (مثلاً طلاب «عربي» داخل «ثانوي لغات»). يعدّل الكائن في مكانه ويُرجع true إن حذف شيئاً.
-    function purgeForeignSectionData(data, section) {
-      if (!data || (section !== 'arabic' && section !== 'languages')) return false;
-      const other = section === 'arabic' ? 'languages' : 'arabic';
-      const suffix = '§' + other;
-      let changed = false;
-      if (Array.isArray(data.students)) {
-        const n = data.students.length;
-        data.students = data.students.filter(x => !(x && x.section === other));
-        if (data.students.length !== n) changed = true;
-      }
-      let removedTeacherIds = null;
-      if (Array.isArray(data.teachers)) {
-        removedTeacherIds = new Set();
-        data.teachers = data.teachers.filter(t => {
-          if (t && t.section === other) { removedTeacherIds.add(t.id); return false; }
-          return true;
-        });
-        if (removedTeacherIds.size) changed = true;
-      }
-      if (Array.isArray(data.classes)) {
-        const n = data.classes.length;
-        data.classes = data.classes.filter(c => !String(c).endsWith(suffix));
-        if (data.classes.length !== n) changed = true;
-      }
-      if (data.classGrade && typeof data.classGrade === 'object') {
-        Object.keys(data.classGrade).forEach(k => { if (k.endsWith(suffix)) { delete data.classGrade[k]; changed = true; } });
-      }
-      if (data.metaByGrade && typeof data.metaByGrade === 'object') {
-        Object.keys(data.metaByGrade).forEach(k => { if (k.endsWith(suffix)) { delete data.metaByGrade[k]; changed = true; } });
-      }
-      if (Array.isArray(data.subjects)) {
-        data.subjects = data.subjects.filter(sub => {
-          const ap = Array.isArray(sub && sub.appliesTo) ? sub.appliesTo : null;
-          if (!ap || !ap.length) return true;
-          const kept = ap.filter(x => !String(x).endsWith('|' + other));
-          if (kept.length === ap.length) return true;
-          changed = true;
-          if (!kept.length) return false;
-          sub.appliesTo = kept;
-          return true;
-        });
-      }
-      if (changed && Array.isArray(data.grades) && Array.isArray(data.students)) {
-        const ids = new Set(data.students.map(x => x.id));
-        data.grades = data.grades.filter(g => ids.has(g.studentId));
-        data._gradesIndex = null;
-      }
-      return changed;
-    }
-
     // يدمج بيانات مرحلة قديمة داخل مرحلة ثابتة (إن كانت الثابتة فارغة أو أضعف)، ثم يُهمل القديمة.
     function _absorbStageData(target, source) {
       if (!source || !source.data) return false;
@@ -5325,7 +5264,6 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
       if (sw <= 0) return false;
       if (tw === 0 || sw > tw) {
         target.data = source.data;
-        purgeForeignSectionData(target.data, stageSectionOf(target));
         if (source.updatedAt) target.updatedAt = source.updatedAt;
         return true;
       }
@@ -5433,11 +5371,6 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
         }
         changed = true;
       }
-
-      // شفاء ذاتي: لا يجوز أن تحتوي مرحلة «عربي» على بيانات «لغات» أو العكس
-      root.stages.forEach(st => {
-        if (st && st.data && purgeForeignSectionData(st.data, stageSectionOf(st))) changed = true;
-      });
 
       const order = FIXED_STAGES.map(s => s.id);
       root.stages.sort((a, b) => {
@@ -6477,7 +6410,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
       return Array.from(set);
     }
 
-    function mergeStageDataCollaborative(localData, remoteData, stageSection) {
+    function mergeStageDataCollaborative(localData, remoteData) {
       const local = localData || {};
       const remote = remoteData || {};
       const out = Object.assign({}, remote);
@@ -6498,8 +6431,6 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
       if (local.schoolInfo || remote.schoolInfo) {
         out.schoolInfo = Object.assign({}, remote.schoolInfo || {}, local.schoolInfo || {});
       }
-      // لا تُعيد بيانات قسم آخر من السحابة (تمنع عودة طلاب «عربي» إلى مرحلة «لغات» بعد التنظيف)
-      purgeForeignSectionData(out, stageSection);
       return { data: out, localGradeWins: mg.localWon };
     }
     window.mergeStageDataCollaborative = mergeStageDataCollaborative;
@@ -6565,7 +6496,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
               const localCopy = st.data || emptyStageData();
               const remoteCopy = stageRow.data;
               try {
-                const mg = mergeStageDataCollaborative(localCopy, remoteCopy, stageSectionOf(currentStageId));
+                const mg = mergeStageDataCollaborative(localCopy, remoteCopy);
                 st.data = mg.data;
                 if (mg.localGradeWins > 0) {
                   // درجات محلية أحدث: لا تعتمد updatedAt السحابة حتى لا تُعتبر نسختنا قديمة
@@ -6588,7 +6519,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
             try {
               const beforeT = (st.data.teachers || []).length;
               const beforeG = (st.data.grades || []).length;
-              const mg = mergeStageDataCollaborative(st.data, remote, stageSectionOf(st));
+              const mg = mergeStageDataCollaborative(st.data, remote);
               st.data = mg.data;
               if ((st.data.teachers || []).length !== beforeT || (st.data.grades || []).length !== beforeG || mg.localGradeWins >= 0) {
                 merged = true;
@@ -6667,7 +6598,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
           local.name = name;
           if (row && row.data) {
             try {
-              const mg = mergeStageDataCollaborative(local.data || emptyStageData(), row.data, stageSectionOf(local));
+              const mg = mergeStageDataCollaborative(local.data || emptyStageData(), row.data);
               local.data = mg.data;
             } catch (e) {
               local.data = row.data;
@@ -6738,7 +6669,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
             const stageRow = remoteRows[i];
             if (stageRow && stageRow.data) {
               try {
-                const mg = mergeStageDataCollaborative(st.data, stageRow.data, stageSectionOf(st));
+                const mg = mergeStageDataCollaborative(st.data, stageRow.data);
                 st.data = mg.data;
               } catch (e) {
                 console.warn('merge before push failed', sid, e);
@@ -6752,13 +6683,31 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
             st.updatedAt = now;
           });
           root.lastUpdated = now;
-          const { error } = await supabaseClient.from('grade_system_state').upsert(rows);
-          if (error) {
-            console.error('Supabase push error:', error);
-            setConnBadge(null, 'error');
-            // أعد تعليم المراحل متسخة حتى تُرفع لاحقاً ولا تُفقد التعديلات
+          // root_meta بيانات إدارية منفصلة؛ أما كل مرحلة فتُحفظ عبر RPC ذري
+          // لدمج الدرجات داخل قاعدة البيانات نفسها، لتجنب سباق read/merge/upsert
+          // الذي قد يُسقط تعديلات معلمين يعملان من جهازين مختلفين.
+          let pushError = null;
+          const rootRow = rows.find(function (r) { return r.id === 'root_meta'; });
+          if (rootRow) {
+            const rootResult = await supabaseClient.from('grade_system_state').upsert(rootRow);
+            if (rootResult.error) pushError = rootResult.error;
+          }
+          if (!pushError) {
+            for (const stageRow of rows.filter(function (r) { return String(r.id).indexOf('stage_') === 0; })) {
+              const rpcResult = await supabaseClient.rpc('merge_grade_system_state', {
+                p_id: stageRow.id,
+                p_data: stageRow.data,
+                p_updated_at: stageRow.updated_at
+              });
+              if (rpcResult.error) { pushError = rpcResult.error; break; }
+            }
+          }
+          if (pushError) {
+            console.error('Supabase atomic push error:', pushError);
+            setConnBadge('تعذر الحفظ السحابي — يلزم تطبيق تحديث قاعدة البيانات', 'error');
+            // لا نستخدم upsert القديم كبديل؛ لأنه يعيد خطر فقد تعديلات متزامنة.
             uniqueIds.forEach(function(sid) { markStageCloudDirty(sid); });
-            cloudPushPending = true;
+            cloudPushPending = false;
           } else {
             await persistRootDB(root);
             setConnBadge('تمت المزامنة ' + new Date().toLocaleTimeString('ar-EG'));
@@ -9319,13 +9268,9 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
       if (currentAccountType !== 'stageadmin' || !currentStageAdmin) {
         const curSec = sectionSel.value;
         const curStage = stageTypeSel.value;
-        const _curStageRec = typeof getStageRecord === 'function' ? getStageRecord(currentStageId) : null;
-        const _fixedSec = _curStageRec ? stageSectionOf(_curStageRec) : null;
-        sectionSel.innerHTML = (_fixedSec ? '' : '<option value="">-- اختر القسم --</option>') +
-          SECTION_OPTS.filter(o => !_fixedSec || o.value === _fixedSec)
-            .map(o => `<option value="${o.value}">${o.label}</option>`).join('');
-        if (_fixedSec) sectionSel.value = _fixedSec;
-        else if (curSec) sectionSel.value = curSec;
+        sectionSel.innerHTML = '<option value="">-- اختر القسم --</option>' +
+          SECTION_OPTS.map(o => `<option value="${o.value}">${o.label}</option>`).join('');
+        if (curSec) sectionSel.value = curSec;
         stageTypeSel.innerHTML = '<option value="">-- اختر المرحلة --</option>' +
           STAGE_OPTS.map(o => `<option value="${o.value}">${o.label}</option>`).join('');
         if (curStage) { stageTypeSel.value = curStage; if (typeof onImportStageChange === 'function') onImportStageChange(); }
@@ -11859,25 +11804,6 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
         const assigned = currentStageAdmin.stageIds || [];
         if (currentStageId && assigned.length && !assigned.includes(currentStageId)) {
           status.textContent = '⚠️ غير مصرح لك بالرفع في هذه المرحلة التنظيمية.';
-          status.style.color = '#b91c1c';
-          return;
-        }
-      }
-
-      // حاجز لكل الحسابات (ومنها رئيس الكنترول): قسم الملف ونوع المرحلة لازم يطابقا المرحلة الحالية،
-      // حتى لا تختلط بيانات «عربي» داخل مرحلة «لغات» أو العكس.
-      {
-        const curStage = typeof getStageRecord === 'function' ? getStageRecord(currentStageId) : null;
-        const curSec = curStage ? stageSectionOf(curStage) : null;
-        if (curSec && importSection !== curSec) {
-          status.textContent = '⚠️ المرحلة الحالية («' + (curStage.name || '') + '») قسمها ' + (curSec === 'arabic' ? 'عربي' : 'لغات') +
-            '، ولا يمكن رفع ملف قسم ' + (importSection === 'arabic' ? 'عربي' : 'لغات') + ' داخلها. بدّل إلى المرحلة الصحيحة أولاً.';
-          status.style.color = '#b91c1c';
-          return;
-        }
-        const curType = curStage ? (curStage.stageType || inferEducationalStageTypeFromName(curStage.name)) : null;
-        if (curType && importStage !== curType) {
-          status.textContent = '⚠️ نوع المرحلة المختار لا يطابق المرحلة الحالية («' + (curStage.name || '') + '»). بدّل إلى المرحلة الصحيحة أولاً.';
           status.style.color = '#b91c1c';
           return;
         }
