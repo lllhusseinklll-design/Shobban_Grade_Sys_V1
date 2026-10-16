@@ -5255,6 +5255,67 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
       return inferred === fs.stageType;
     }
 
+    // قسم المرحلة الثابتة (arabic / languages) من معرّفها أو سجلها؛ null إن لم يكن معروفاً.
+    function stageSectionOf(stageOrId) {
+      const id = (stageOrId && typeof stageOrId === 'object') ? stageOrId.id : stageOrId;
+      const fs = FIXED_STAGES.find(f => f.id === id);
+      if (fs) return fs.section;
+      const sec = stageOrId && typeof stageOrId === 'object' ? stageOrId.section : null;
+      return (sec === 'arabic' || sec === 'languages') ? sec : null;
+    }
+
+    // حاجز سلامة: يزيل من بيانات المرحلة أي طالب/معلم/فصل/مادة ينتمي لقسم مختلف عن قسم المرحلة
+    // (مثلاً طلاب «عربي» داخل «ثانوي لغات»). يعدّل الكائن في مكانه ويُرجع true إن حذف شيئاً.
+    function purgeForeignSectionData(data, section) {
+      if (!data || (section !== 'arabic' && section !== 'languages')) return false;
+      const other = section === 'arabic' ? 'languages' : 'arabic';
+      const suffix = '§' + other;
+      let changed = false;
+      if (Array.isArray(data.students)) {
+        const n = data.students.length;
+        data.students = data.students.filter(x => !(x && x.section === other));
+        if (data.students.length !== n) changed = true;
+      }
+      let removedTeacherIds = null;
+      if (Array.isArray(data.teachers)) {
+        removedTeacherIds = new Set();
+        data.teachers = data.teachers.filter(t => {
+          if (t && t.section === other) { removedTeacherIds.add(t.id); return false; }
+          return true;
+        });
+        if (removedTeacherIds.size) changed = true;
+      }
+      if (Array.isArray(data.classes)) {
+        const n = data.classes.length;
+        data.classes = data.classes.filter(c => !String(c).endsWith(suffix));
+        if (data.classes.length !== n) changed = true;
+      }
+      if (data.classGrade && typeof data.classGrade === 'object') {
+        Object.keys(data.classGrade).forEach(k => { if (k.endsWith(suffix)) { delete data.classGrade[k]; changed = true; } });
+      }
+      if (data.metaByGrade && typeof data.metaByGrade === 'object') {
+        Object.keys(data.metaByGrade).forEach(k => { if (k.endsWith(suffix)) { delete data.metaByGrade[k]; changed = true; } });
+      }
+      if (Array.isArray(data.subjects)) {
+        data.subjects = data.subjects.filter(sub => {
+          const ap = Array.isArray(sub && sub.appliesTo) ? sub.appliesTo : null;
+          if (!ap || !ap.length) return true;
+          const kept = ap.filter(x => !String(x).endsWith('|' + other));
+          if (kept.length === ap.length) return true;
+          changed = true;
+          if (!kept.length) return false;
+          sub.appliesTo = kept;
+          return true;
+        });
+      }
+      if (changed && Array.isArray(data.grades) && Array.isArray(data.students)) {
+        const ids = new Set(data.students.map(x => x.id));
+        data.grades = data.grades.filter(g => ids.has(g.studentId));
+        data._gradesIndex = null;
+      }
+      return changed;
+    }
+
     // يدمج بيانات مرحلة قديمة داخل مرحلة ثابتة (إن كانت الثابتة فارغة أو أضعف)، ثم يُهمل القديمة.
     function _absorbStageData(target, source) {
       if (!source || !source.data) return false;
@@ -5264,6 +5325,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
       if (sw <= 0) return false;
       if (tw === 0 || sw > tw) {
         target.data = source.data;
+        purgeForeignSectionData(target.data, stageSectionOf(target));
         if (source.updatedAt) target.updatedAt = source.updatedAt;
         return true;
       }
@@ -5371,6 +5433,11 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
         }
         changed = true;
       }
+
+      // شفاء ذاتي: لا يجوز أن تحتوي مرحلة «عربي» على بيانات «لغات» أو العكس
+      root.stages.forEach(st => {
+        if (st && st.data && purgeForeignSectionData(st.data, stageSectionOf(st))) changed = true;
+      });
 
       const order = FIXED_STAGES.map(s => s.id);
       root.stages.sort((a, b) => {
@@ -5513,7 +5580,18 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
 
     // تُستدعى مرة واحدة فقط عند بدء التطبيق (قبل init()) لتحميل البيانات إلى الكاش من IndexedDB، أو
     // ترحيلها تلقائياً من localStorage إن كانت موجودة هناك من نسخة سابقة من النظام.
+    // ⚠️ حماية من فقدان التعديلات: قبل اكتمال القراءة الأولى من IndexedDB لا يُسمح بأي كتابة ولا بإنشاء
+    // جذر افتراضي مخزَّن. كان استدعاء مبكر لـ getRootDB() (أثناء تحميل السكربت، قبل bootstrap) يُنشئ جذراً
+    // فارغاً ويكتبه فوق البيانات المحفوظة، فتعود المرحلة فارغة بعد التحديث ثم تُستبدل بنسخة السحابة الأقدم
+    // (فتبدو الدرجات المعدَّلة وكأنها «ترتد» لما كانت عليه).
+    var _rootDBReady = false;
+
     async function loadRootDBIntoCache() {
+      try { return await _loadRootDBIntoCacheInner(); }
+      finally { _rootDBReady = true; }
+    }
+
+    async function _loadRootDBIntoCacheInner() {
       try {
         const fromIdb = await idbGet(ROOT_DB_KEY);
         if (fromIdb) { _rootDBCache = fromIdb; return; }
@@ -5532,6 +5610,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
 
     function persistRootDB(root, protectKeys) {
      try {
+      if (!_rootDBReady) return Promise.resolve(); // لا كتابة قبل اكتمال القراءة الأولى (انظر _rootDBReady)
       _rootDBCache = root;
       const saveBadge = document.getElementById('autosaveStatus'); if (saveBadge) { saveBadge.textContent='🟠 جاري الحفظ...'; saveBadge.className='autosave-status autosave-saving'; }
       return idbSet(ROOT_DB_KEY, root).then(()=>{ const b=document.getElementById('autosaveStatus'); if(b){b.textContent='🟢 تم الحفظ';b.className='autosave-status autosave-saved';} }).catch(e => {
@@ -5551,6 +5630,8 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
     function getRootDB() {
      try {
       if (_rootDBCache) return _rootDBCache;
+      // قبل اكتمال القراءة الأولى: جذر مؤقت فارغ غير مخزَّن ولا مخبَّأ (لا يُكتب فوق البيانات الحقيقية)
+      if (!_rootDBReady) return { stages: [], stageAdmins: [], stageMonitors: [], superAdminPasswordHash: null, lastUpdated: null };
       // يجب ألا يصل التنفيذ هنا فعلياً، لأن loadRootDBIntoCache() تُنتظَر (await) قبل استدعاء init()
       // بالأسفل، فيكون _rootDBCache قد امتلأ دائماً قبل أي استدعاء آخر لـ getRootDB(). هذا فقط شبكة أمان.
       let root = { stages: [], stageAdmins: [], stageMonitors: [], superAdminPasswordHash: null, lastUpdated: null };
@@ -5694,7 +5775,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
         });
       }
       st.data = data;
-      st.updatedAt = new Date().toISOString();
+      st.updatedAt = gcNowIso();
       markStageCloudDirty(currentStageId);
       return saveRootDB(root, protectKeys);
     }
@@ -6026,6 +6107,8 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
       }
       if (kind === 'syncing') { badge.textContent = '🔄 جارٍ المزامنة مع السحابة...';
         badge.style.background = '#1e3a5f'; return; }
+      if (kind === 'nogc') { badge.textContent = '🟠 الدرجات محفوظة على هذا الجهاز فقط — جدول الدرجات السحابي (grade_cells) غير مفعّل بعد، شغّل ملف SQL على Supabase';
+        badge.style.background = '#c2410c'; return; }
       if (kind === 'error') { badge.textContent = '🟠 متصل — لكن حدث خطأ أثناء آخر مزامنة، سيُعاد المحاولة';
         badge.style.background = '#c2410c'; return; }
       badge.textContent = '🟢 متصل بالإنترنت' + (text ? ' — ' + text : ' — البيانات متزامنة');
@@ -6168,6 +6251,8 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
     // pendingCells: [{ studentId, studentName, componentIndex, componentName, newScore }]
     async function detectAndResolveGradeConflicts(db, subjectName, term, month, pendingCells) {
       if (!cloudAvailable || !isOnline || !currentStageId || !pendingCells.length) return true;
+      if (typeof gradeCellsEnabled === 'function' && await gradeCellsEnabled()) return await detectGradeConflictsCells(db, subjectName, term, month, pendingCells);
+      return true; // الدرجات لم تعد تُخزَّن في صف المرحلة، فلا مقارنة ممكنة قبل تفعيل grade_cells
       let stageRow;
       try { stageRow = await cloudFetchRow('stage_' + currentStageId); }
       catch (e) { return true; }
@@ -6310,7 +6395,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
         // إن لم يكن للمحلية طابع زمني وللسحابة طابع: احتفظ بالمحلية إذا اختلفت الدرجة
         // (درجات رُصدت جماعياً قبل إصلاح updatedAt لا يجب أن تُمسَح)
         if (lt === 0 && rt > 0 && String(g.score) !== String(r.score)) {
-          map.set(k, Object.assign({}, g, { updatedAt: g.updatedAt || new Date().toISOString() }));
+          map.set(k, Object.assign({}, g, { updatedAt: g.updatedAt || gcNowIso() }));
           localWon++;
           return;
         }
@@ -6410,7 +6495,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
       return Array.from(set);
     }
 
-    function mergeStageDataCollaborative(localData, remoteData) {
+    function mergeStageDataCollaborative(localData, remoteData, stageSection) {
       const local = localData || {};
       const remote = remoteData || {};
       const out = Object.assign({}, remote);
@@ -6431,6 +6516,8 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
       if (local.schoolInfo || remote.schoolInfo) {
         out.schoolInfo = Object.assign({}, remote.schoolInfo || {}, local.schoolInfo || {});
       }
+      // لا تُعيد بيانات قسم آخر من السحابة (تمنع عودة طلاب «عربي» إلى مرحلة «لغات» بعد التنظيف)
+      purgeForeignSectionData(out, stageSection);
       return { data: out, localGradeWins: mg.localWon };
     }
     window.mergeStageDataCollaborative = mergeStageDataCollaborative;
@@ -6484,7 +6571,21 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
       }
 
       if (currentStageId) {
-        const stageRow = await cloudFetchRow('stage_' + currentStageId);
+        // فحص خفيف أولاً: لا نحمّل صف المرحلة الكبير (طلاب/معلمون) كل 25 ثانية من مئات الأجهزة
+        // إلا إذا تغيّر فعلاً في السحابة (يكفي استعلام صغير عن وقت آخر تحديث).
+        let stageRow = null;
+        let _skipStageRow = false;
+        try {
+          if (await gradeCellsEnabled()) {
+            const stc0 = root.stages.find(s => s.id === currentStageId);
+            const stamp = await supabaseClient.from('grade_system_state').select('updated_at').eq('id', 'stage_' + currentStageId).maybeSingle();
+            if (!stamp.error && stamp.data && stc0 && stc0._remoteStamp === stamp.data.updated_at) _skipStageRow = true;
+          }
+        } catch (e) {}
+        if (!_skipStageRow) {
+          stageRow = await cloudFetchRow('stage_' + currentStageId);
+          try { const stc1 = root.stages.find(s => s.id === currentStageId); if (stc1 && stageRow) stc1._remoteStamp = stageRow.updated_at; } catch (e) {}
+        }
         if (stageRow && stageRow.data) {
           const st = root.stages.find(s => s.id === currentStageId);
           const localStageUpdated = st && st.updatedAt;
@@ -6496,11 +6597,11 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
               const localCopy = st.data || emptyStageData();
               const remoteCopy = stageRow.data;
               try {
-                const mg = mergeStageDataCollaborative(localCopy, remoteCopy);
+                const mg = mergeStageDataCollaborative(localCopy, remoteCopy, stageSectionOf(currentStageId));
                 st.data = mg.data;
                 if (mg.localGradeWins > 0) {
                   // درجات محلية أحدث: لا تعتمد updatedAt السحابة حتى لا تُعتبر نسختنا قديمة
-                  st.updatedAt = new Date().toISOString();
+                  st.updatedAt = gcNowIso();
                   markStageCloudDirty(currentStageId);
                   scheduleCloudPush();
                 } else {
@@ -6519,7 +6620,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
             try {
               const beforeT = (st.data.teachers || []).length;
               const beforeG = (st.data.grades || []).length;
-              const mg = mergeStageDataCollaborative(st.data, remote);
+              const mg = mergeStageDataCollaborative(st.data, remote, stageSectionOf(st));
               st.data = mg.data;
               if ((st.data.teachers || []).length !== beforeT || (st.data.grades || []).length !== beforeG || mg.localGradeWins >= 0) {
                 merged = true;
@@ -6561,6 +6662,14 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
         }
       }
 
+      // درجات المرحلة الحالية خانة بخانة (سحب تفاضلي: ما تغيّر منذ آخر سحب فقط)
+      try {
+        if (currentStageId && await gradeCellsEnabled()) {
+          const stc = root.stages.find(s => s.id === currentStageId);
+          if (stc) { const n = await pullGradeCells(stc); if (n >= 0) changed = true; }
+        }
+      } catch (e) { console.warn('pull grade cells', e); }
+
       if (changed) {
         persistRootDB(root);
         setConnBadge('تم دمج أحدث التعديلات من السحابة (الدرجات الأحدث محفوظة)');
@@ -6598,7 +6707,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
           local.name = name;
           if (row && row.data) {
             try {
-              const mg = mergeStageDataCollaborative(local.data || emptyStageData(), row.data);
+              const mg = mergeStageDataCollaborative(local.data || emptyStageData(), row.data, stageSectionOf(local));
               local.data = mg.data;
             } catch (e) {
               local.data = row.data;
@@ -6633,8 +6742,12 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
       try {
         const root = _rootDBCache;
         if (root) {
-          const now = new Date().toISOString();
-          const rows = [{ id: 'root_meta', data: buildRootMeta(root), updated_at: now }];
+          const now = gcNowIso();
+          // root_meta (حسابات المديرين وكلمة السر...) لا يرفعه إلا المديرون، حتى لا تكتب نسخة معلم قديمة فوقه
+          const _isAdminAcct = currentAccountType === 'superadmin' || currentAccountType === 'stageadmin';
+          const rows = _isAdminAcct ? [{ id: 'root_meta', data: buildRootMeta(root), updated_at: now }] : [];
+          const _gcOn = await gradeCellsEnabled();
+          let _gcAllOk = true;
           let dirtyIds = (typeof consumeDirtyStageIds === 'function') ? consumeDirtyStageIds() : [];
           try {
             if (_rootDBCache && _rootDBCache._cloudDirtyStageIds) {
@@ -6645,11 +6758,6 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
             }
           } catch (e) {}
           if (currentStageId && dirtyIds.indexOf(String(currentStageId)) < 0) dirtyIds.push(String(currentStageId));
-          if (currentAccountType === 'superadmin' || currentAccountType === 'stageadmin') {
-            (root.stages || []).forEach(s => {
-              if (s && s.id && dirtyIds.indexOf(String(s.id)) < 0) dirtyIds.push(String(s.id));
-            });
-          }
           if (!dirtyIds.length && currentStageId) dirtyIds.push(String(currentStageId));
 
           const uniqueIds = [];
@@ -6659,56 +6767,71 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
             seenId[sid] = true;
             uniqueIds.push(String(sid));
           });
-          const remoteRows = await Promise.all(uniqueIds.map(sid =>
-            cloudFetchRow('stage_' + sid).catch(function () { return null; })
-          ));
+          // 1) صيغة الخانات: ارفع الدرجات المتغيّرة فقط إلى grade_cells. إن فشلت يُرفع صف المرحلة بدرجاته
+          //    كالسابق حتى لا يضيع شيء. وإن لم يتغيّر غير الدرجات فلا حاجة لجلب/رفع صف المرحلة إطلاقاً.
+          const stageObjs = uniqueIds.map(function (sid) { return (root.stages || []).find(function (s) { return String(s.id) === String(sid); }); })
+            .filter(function (st) { return st && st.data; });
+          const rowPlan = [];
+          for (const st of stageObjs) {
+            let cellsOk = false;
+            if (_gcOn) {
+              try { cellsOk = await pushGradeCells(st); } catch (e) { console.error('pushGradeCells', e); }
+              if (!cellsOk) _gcAllOk = false;
+            }
+            let needRow = true, hash = null;
+            if (_gcOn && cellsOk) {
+              try { hash = gcRowHash(st.data); } catch (e) { hash = null; }
+              if (hash !== null && gcStageState(st).rowHash === hash) needRow = false;
+            }
+            if (needRow) rowPlan.push({ st, cellsOk });
+          }
 
-          uniqueIds.forEach(function (sid, i) {
-            const st = (root.stages || []).find(function (s) { return String(s.id) === String(sid); });
-            if (!st || !st.data) return;
+          // 2) المراحل التي تغيّرت بياناتها غير الدرجات: ادمج مع السحابة ثم ارفع
+          const remoteRows = await Promise.all(rowPlan.map(function (x) {
+            return cloudFetchRow('stage_' + x.st.id).catch(function () { return null; });
+          }));
+          rowPlan.forEach(function (x, i) {
+            const st = x.st;
             const stageRow = remoteRows[i];
             if (stageRow && stageRow.data) {
               try {
-                const mg = mergeStageDataCollaborative(st.data, stageRow.data);
+                const mg = mergeStageDataCollaborative(st.data, stageRow.data, stageSectionOf(st));
                 st.data = mg.data;
               } catch (e) {
-                console.warn('merge before push failed', sid, e);
+                console.warn('merge before push failed', st.id, e);
                 try {
                   const mg = mergeStageGradesPreferNewer(st.data, stageRow.data);
                   st.data.grades = mg.grades;
                 } catch (e2) {}
               }
             }
-            rows.push({ id: 'stage_' + sid, data: st.data, updated_at: now });
+            // الدرجات لا تُكتب إلى grade_system_state إطلاقاً: مصدرها الوحيد في السحابة هو جدول grade_cells
+            const rowData = Object.assign({}, st.data, { grades: [], _gradesIndex: null, _gradesInCells: true });
+            rows.push({ id: 'stage_' + st.id, data: rowData, updated_at: now, _hashFor: st });
             st.updatedAt = now;
           });
           root.lastUpdated = now;
-          // root_meta بيانات إدارية منفصلة؛ أما كل مرحلة فتُحفظ عبر RPC ذري
-          // لدمج الدرجات داخل قاعدة البيانات نفسها، لتجنب سباق read/merge/upsert
-          // الذي قد يُسقط تعديلات معلمين يعملان من جهازين مختلفين.
-          let pushError = null;
-          const rootRow = rows.find(function (r) { return r.id === 'root_meta'; });
-          if (rootRow) {
-            const rootResult = await supabaseClient.from('grade_system_state').upsert(rootRow);
-            if (rootResult.error) pushError = rootResult.error;
-          }
-          if (!pushError) {
-            for (const stageRow of rows.filter(function (r) { return String(r.id).indexOf('stage_') === 0; })) {
-              const rpcResult = await supabaseClient.rpc('merge_grade_system_state', {
-                p_id: stageRow.id,
-                p_data: stageRow.data,
-                p_updated_at: stageRow.updated_at
-              });
-              if (rpcResult.error) { pushError = rpcResult.error; break; }
-            }
-          }
-          if (pushError) {
-            console.error('Supabase atomic push error:', pushError);
-            setConnBadge('تعذر الحفظ السحابي — يلزم تطبيق تحديث قاعدة البيانات', 'error');
-            // لا نستخدم upsert القديم كبديل؛ لأنه يعيد خطر فقد تعديلات متزامنة.
+          const hashTargets = rows.filter(function (r) { return r._hashFor; }).map(function (r) { return r._hashFor; });
+          const sendRows = rows.map(function (r) { return { id: r.id, data: r.data, updated_at: r.updated_at }; });
+          const { error } = sendRows.length ? await supabaseClient.from('grade_system_state').upsert(sendRows) : { error: null };
+          if (error) {
+            console.error('Supabase push error:', error);
+            setConnBadge(null, 'error');
+            // أعد تعليم المراحل متسخة حتى تُرفع لاحقاً ولا تُفقد التعديلات
             uniqueIds.forEach(function(sid) { markStageCloudDirty(sid); });
-            cloudPushPending = false;
+            cloudPushPending = true;
+          } else if (!_gcOn) {
+            // جدول grade_cells غير مفعّل بعد: تبقى الدرجات محفوظة على هذا الجهاز (ولا تُفقد) وتُرفع تلقائياً
+            // فور تشغيل ملف supabase/grade_cells.sql على Supabase
+            await persistRootDB(root);
+            uniqueIds.forEach(function(sid) { markStageCloudDirty(sid); });
+            setConnBadge(null, 'nogc');
+          } else if (!_gcAllOk) {
+            setConnBadge(null, 'error');
+            uniqueIds.forEach(function(sid) { markStageCloudDirty(sid); });
+            cloudPushPending = true;
           } else {
+            if (_gcOn) hashTargets.forEach(function (st) { try { gcStageState(st).rowHash = gcRowHash(st.data); } catch (e) {} });
             await persistRootDB(root);
             setConnBadge('تمت المزامنة ' + new Date().toLocaleTimeString('ar-EG'));
             maybeAutoVersionSnapshot();
@@ -6719,10 +6842,331 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
       if (cloudPushPending) setTimeout(runCloudPush, 1000);
     }
 
+    // ============================================================
+    //  مزامنة الدرجات خانة بخانة (جدول grade_cells)
+    //  ------------------------------------------------------------
+    //  بدل رفع/تنزيل صف المرحلة كاملاً (طلاب + معلمون + كل الدرجات) عند كل حفظ — وهو ما يُضيّع درجات
+    //  المعلمين عند تزامن عدد كبير منهم — تُخزَّن كل درجة كصف مستقل في Supabase، ويُرفع فقط ما تغيّر،
+    //  ويُسحب فقط ما تغيّر منذ آخر سحب. الكتابة عبر دالة SQL ذرّية (upsert_grade_cells) لا تستبدل
+    //  الخانة إلا إذا كان وقت التعديل الجديد ≥ الموجود، فلا تضيع تعديلات معلم بسبب معلم آخر.
+    //  يعمل تلقائياً فور إنشاء الجدول (انظر supabase/grade_cells.sql)، وقبل ذلك يستمر النظام بالصيغة
+    //  القديمة دون أي تغيير.
+    // ============================================================
+    // ============================================================
+    //  توقيت موحّد من الخادم (حماية من خطأ ساعة الجهاز)
+    //  ------------------------------------------------------------
+    //  كل درجة تُختم بوقت التعديل، والأحدث يفوز عند التعارض. لو كانت ساعة جهاز معلم متقدمة لفازت درجاته
+    //  القديمة دائماً، ولو متأخرة لضاعت تعديلاته دائماً. لذلك يقيس النظام فرق ساعة الجهاز عن ساعة الخادم
+    //  (دالة get_server_time) ويصحّح كل ختم زمني بهذا الفرق، ويحتفظ بالفرق المقاس على الجهاز لحالة انقطاع
+    //  الإنترنت. والخادم نفسه يمنع أي ختم «من المستقبل» (يقصّه إلى وقت وصوله).
+    // ============================================================
+    var gcClockOffsetMs = 0;
+    var gcClockSyncedAt = 0;
+    var GC_CLOCK_LS_KEY = 'gradeSystemPro_clockOffsetMs';
+    try { const v = parseInt(localStorage.getItem(GC_CLOCK_LS_KEY), 10); if (!isNaN(v)) gcClockOffsetMs = v; } catch (e) {}
+
+    function gcNowIso() { return new Date(Date.now() + gcClockOffsetMs).toISOString(); }
+    window.gcNowIso = gcNowIso;
+
+    function gcShowClockWarning(offsetMs) {
+      try {
+        let el = document.getElementById('clockSkewBanner');
+        const mins = Math.round(Math.abs(offsetMs) / 60000);
+        if (mins < 5) { if (el) el.remove(); return; }
+        if (!el) {
+          el = document.createElement('div');
+          el.id = 'clockSkewBanner';
+          el.style.cssText = 'position:fixed;bottom:12px;right:12px;left:12px;max-width:560px;margin:auto;z-index:9998;background:#92400e;color:#fff;padding:10px 14px;border-radius:10px;font-size:13px;font-weight:600;text-align:center;box-shadow:0 4px 14px rgba(0,0,0,.25);cursor:pointer';
+          el.title = 'اضغط للإخفاء';
+          el.onclick = function () { el.remove(); };
+          document.body.appendChild(el);
+        }
+        el.textContent = '⚠️ ساعة جهازك ' + (offsetMs > 0 ? 'متأخرة' : 'متقدمة') + ' نحو ' + mins +
+          ' دقيقة عن الخادم. النظام يصحّح توقيت درجاتك تلقائياً، لكن يُفضَّل ضبط ساعة الجهاز.';
+      } catch (e) {}
+    }
+
+    async function gcSyncClock(force) {
+      if (!cloudAvailable || !isOnline) return;
+      if (!force && Date.now() - gcClockSyncedAt < 300000) return;
+      try {
+        const t0 = Date.now();
+        const r = await supabaseClient.rpc('get_server_time');
+        const t1 = Date.now();
+        if (r.error || !r.data) return;
+        const srv = new Date(r.data).getTime();
+        if (isNaN(srv)) return;
+        gcClockOffsetMs = Math.round(srv - (t0 + t1) / 2);
+        gcClockSyncedAt = Date.now();
+        try { localStorage.setItem(GC_CLOCK_LS_KEY, String(gcClockOffsetMs)); } catch (e) {}
+        gcShowClockWarning(gcClockOffsetMs);
+      } catch (e) {}
+    }
+    window.gcSyncClock = gcSyncClock;
+    setInterval(function () { gcSyncClock(false); }, 600000);
+    if (gcClockOffsetMs) setTimeout(function () { gcShowClockWarning(gcClockOffsetMs); }, 2500);
+
+    var gradeCellsMode = null;
+    var gradeCellsProbeAt = 0;
+    const GC_EPOCH = '2000-01-01T00:00:00.000Z';
+    const GC_CHUNK = 400;
+    const GC_SEP = '\u0001';
+
+    async function gradeCellsEnabled() {
+      if (!cloudAvailable || !isOnline) return false;
+      if (gradeCellsMode === true) return true;
+      if (gradeCellsMode === false && Date.now() - gradeCellsProbeAt < 120000) return false;
+      gradeCellsProbeAt = Date.now();
+      try {
+        const q = await supabaseClient.from('grade_cells').select('stage_id').limit(1);
+        if (q.error) { gradeCellsMode = false; return false; }
+        const r = await supabaseClient.rpc('upsert_grade_cells', { p_rows: [] });
+        gradeCellsMode = !r.error;
+        if (gradeCellsMode) gcSyncClock(true);
+      } catch (e) { gradeCellsMode = false; }
+      return gradeCellsMode === true;
+    }
+    window.gradeCellsEnabled = gradeCellsEnabled;
+
+    function gcMonth(v) { const n = parseInt(v, 10); return isNaN(n) ? 0 : n; }
+    function gcKey(g) {
+      return [g.studentId, g.subjectName, g.term, gcMonth(g.month), gcMonth(g.componentIndex)].join(GC_SEP);
+    }
+    function gcSig(g) { return String(g.score) + '|' + (g.updatedAt || ''); }
+    function gcTs(v) { if (!v) return 0; const t = new Date(v).getTime(); return isNaN(t) ? 0 : t; }
+    function gcDecodeScore(s) {
+      if (s === null || s === undefined) return '';
+      const t = String(s).trim();
+      return /^-?\d+(\.\d+)?$/.test(t) ? Number(t) : String(s);
+    }
+    function gcRowKey(r) {
+      return [r.student_id, r.subject_name, r.term, gcMonth(r.month), gcMonth(r.comp_index)].join(GC_SEP);
+    }
+    function gcToRow(stageId, g) {
+      return {
+        stage_id: stageId, student_id: g.studentId, subject_name: g.subjectName, term: g.term,
+        month: gcMonth(g.month), comp_index: gcMonth(g.componentIndex),
+        score: String(g.score), deleted: false,
+        updated_at: g.updatedAt || GC_EPOCH, updated_by: g.updatedBy || null,
+        edit_count: Number(g.editCount) || 0
+      };
+    }
+    // بصمة بيانات المرحلة بدون الدرجات (لمعرفة هل تغيّر غير الدرجات فيلزم رفع صف المرحلة)
+    function gcRowHash(data) {
+      const str = JSON.stringify(Object.assign({}, data, { grades: [], _gradesIndex: null }));
+      let h1 = 5381, h2 = 52711;
+      for (let i = 0; i < str.length; i++) { const c = str.charCodeAt(i); h1 = ((h1 << 5) + h1 + c) | 0; h2 = ((h2 * 33) ^ c) | 0; }
+      return str.length + ':' + (h1 >>> 0) + ':' + (h2 >>> 0);
+    }
+    function gcStageState(st) {
+      if (!st.gradeSync || typeof st.gradeSync !== 'object') st.gradeSync = { lastPull: null, cells: {} };
+      if (!st.gradeSync.cells) st.gradeSync.cells = {};
+      return st.gradeSync;
+    }
+
+    // يرفع الخانات التي تغيّرت محلياً منذ آخر مزامنة (إضافة/تعديل/حذف). يُرجع true عند النجاح الكامل.
+    async function pushGradeCells(st) {
+      if (!st || !st.data) return true;
+      const gs = gcStageState(st);
+      const cur = new Map();
+      (st.data.grades || []).forEach(g => { if (g && g.studentId != null && g.subjectName != null) cur.set(gcKey(g), g); });
+
+      // خانات بلا ختم زمني (مثل درجات رُفعت من ملف Excel أو رصد جماعي قديم): إن كان الجهاز قد زامن هذه المرحلة
+      // سابقاً فهي تعديل محلي جديد فتُختم بوقت الخادم الآن؛ وإن كانت أول مزامنة (ترحيل بيانات قديمة) تبقى
+      // بلا ختم فلا تتغلّب على أي درجة أحدث في السحابة.
+      const _hadSync = Object.keys(gs.cells).length > 0;
+      const upserts = [];
+      cur.forEach((g, k) => {
+        if (gs.cells[k] !== gcSig(g)) {
+          if (!g.updatedAt && _hadSync) g.updatedAt = gcNowIso();
+          if (gs.cells[k] !== gcSig(g)) upserts.push([k, g]);
+        }
+      });
+      let dels = Object.keys(gs.cells).filter(k => !cur.has(k));
+
+      // حاجز أمان: لا تُرفع حذوفات جماعية ناتجة عن استبدال بيانات المرحلة بالخطأ (مثلاً مرحلة فرغت فجأة)
+      const total = Object.keys(gs.cells).length;
+      const isAdmin = currentAccountType === 'superadmin' || currentAccountType === 'stageadmin';
+      if (dels.length && (cur.size === 0 || (!isAdmin && dels.length > 50) || (dels.length > 500 && dels.length > total * 0.5))) {
+        console.warn('grade cells: تم تجاهل حذف جماعي مشبوه (' + dels.length + ') وإعادة سحب كامل للمرحلة', st.id);
+        dels = [];
+        gs.lastPull = null; // يعيد سحب الخانات المفقودة من السحابة
+        gs.cells = {};      // وتُعتبر كل الخانات المحلية الحالية «غير مرفوعة» (آمن: الرفع newer-wins)
+      }
+      if (!upserts.length && !dels.length) return true;
+
+      const nowIso = gcNowIso();
+      const rows = [];
+      const sigsAfter = [];
+      upserts.forEach(([k, g]) => { rows.push(gcToRow(st.id, g)); sigsAfter.push([k, gcSig(g), false]); });
+      dels.forEach(k => {
+        const p = k.split(GC_SEP);
+        rows.push({ stage_id: st.id, student_id: p[0], subject_name: p[1], term: p[2], month: gcMonth(p[3]), comp_index: gcMonth(p[4]),
+          score: null, deleted: true, updated_at: nowIso, updated_by: (typeof currentUserLabel === 'function' ? currentUserLabel() : null), edit_count: 0 });
+        sigsAfter.push([k, null, true]);
+      });
+
+      for (let i = 0; i < rows.length; i += GC_CHUNK) {
+        const chunk = rows.slice(i, i + GC_CHUNK);
+        const res = await supabaseClient.rpc('upsert_grade_cells', { p_rows: chunk });
+        if (res.error) { console.error('upsert_grade_cells error:', res.error); return false; }
+        sigsAfter.slice(i, i + GC_CHUNK).forEach(([k, sig, isDel]) => { if (isDel) delete gs.cells[k]; else gs.cells[k] = sig; });
+      }
+      return true;
+    }
+
+    // يطبّق صفوف السحابة على درجات المرحلة محلياً (الأحدث وقت تعديل يفوز). يُرجع عدد ما تغيّر.
+    function applyGradeCellRows(st, rows, force) {
+      if (!rows || !rows.length) return 0;
+      if (!st.data) st.data = emptyStageData();
+      const gs = gcStageState(st);
+      const byKey = new Map();
+      (st.data.grades || []).forEach(g => { if (g) byKey.set(gcKey(g), g); });
+      let applied = 0;
+      rows.forEach(r => {
+        const k = gcRowKey(r);
+        const local = byKey.get(k);
+        const rts = gcTs(r.updated_at);
+        const lts = local ? gcTs(local.updatedAt) : -1;
+        if (!force && local && lts >= rts) {
+          // المحلية أحدث أو مساوية: احتفظ بها (وإن كانت مختلفة سترفع عند أول مزامنة)
+          if (lts === rts && String(local.score) === String(gcDecodeScore(r.score))) gs.cells[k] = gcSig(local);
+          return;
+        }
+        if (r.deleted) {
+          if (local) { byKey.delete(k); applied++; }
+          delete gs.cells[k];
+          return;
+        }
+        const g = {
+          studentId: r.student_id, subjectName: r.subject_name, term: r.term,
+          month: gcMonth(r.month), componentIndex: gcMonth(r.comp_index),
+          score: gcDecodeScore(r.score), updatedAt: r.updated_at, updatedBy: r.updated_by || '',
+          editCount: Number(r.edit_count) || 0
+        };
+        if (local && local.createdAt) g.createdAt = local.createdAt;
+        byKey.set(k, g);
+        gs.cells[k] = gcSig(g);
+        applied++;
+      });
+      if (applied) {
+        st.data.grades = Array.from(byKey.values());
+        st.data._gradesIndex = null;
+        try { if (typeof window.invalidateCompletionCache === 'function') window.invalidateCompletionCache(); } catch (e) {}
+      }
+      return applied;
+    }
+
+    // يسحب الخانات التي تغيّرت في السحابة منذ آخر سحب (أو الكل في أول مرة). يُرجع عدد ما طُبّق، أو -1 عند الفشل.
+    async function pullGradeCells(st) {
+      if (!st) return 0;
+      const gs = gcStageState(st);
+      let cursor = gs.lastPull || null;
+      let maxSeen = cursor;
+      let total = 0;
+      try {
+        for (let guard = 0; guard < 500; guard++) {
+          let q = supabaseClient.from('grade_cells').select('*').eq('stage_id', st.id)
+            .order('synced_at', { ascending: true }).limit(1000);
+          if (cursor) q = q.gt('synced_at', cursor);
+          const { data, error } = await q;
+          if (error) { console.error('pull grade_cells error:', error); return -1; }
+          if (!data || !data.length) break;
+          total += applyGradeCellRows(st, data);
+          cursor = data[data.length - 1].synced_at;
+          maxSeen = cursor;
+          if (data.length < 1000) break;
+        }
+      } catch (e) { console.error('pull grade_cells exception:', e); return -1; }
+      if (maxSeen) {
+        // تراجع 10 ثوانٍ كهامش أمان لصفوف تأكّد إتمامها (commit) بعد آخر قراءة؛ إعادة تطبيقها آمنة
+        gs.lastPull = new Date(new Date(maxSeen).getTime() - 10000).toISOString();
+      } else if (!gs.lastPull) {
+        gs.lastPull = new Date(Date.now() - 10000).toISOString();
+      }
+      return total;
+    }
+
+    // كشف تعارض الخانات قبل الحفظ: يجلب فقط خانات الطلاب المعنيين (طلب صغير) بدل صف المرحلة كاملاً
+    async function detectGradeConflictsCells(db, subjectName, term, month, pendingCells) {
+      let rows;
+      try {
+        const ids = Array.from(new Set(pendingCells.map(c => c.studentId)));
+        const res = await supabaseClient.from('grade_cells').select('*').eq('stage_id', currentStageId)
+          .eq('subject_name', subjectName).eq('term', term).eq('month', month).in('student_id', ids);
+        if (res.error) return true;
+        rows = res.data || [];
+      } catch (e) { return true; }
+      const remoteMap = new Map();
+      rows.forEach(r => { if (!r.deleted) remoteMap.set(r.student_id + GC_SEP + gcMonth(r.comp_index), gcDecodeScore(r.score)); });
+
+      const conflicts = [];
+      pendingCells.forEach(cell => {
+        const rk = cell.studentId + GC_SEP + cell.componentIndex;
+        const remoteScore = remoteMap.has(rk) ? remoteMap.get(rk) : null;
+        const lb = (db.grades.find(g => g.studentId === cell.studentId && g.subjectName === subjectName &&
+          g.term === term && g.month === month && g.componentIndex === cell.componentIndex) || {}).score;
+        const localBaseline = lb === undefined ? null : lb;
+        if (remoteScore !== localBaseline && remoteScore !== cell.newScore) {
+          conflicts.push(Object.assign({ remoteScore, localBaseline }, cell));
+        }
+      });
+      if (!conflicts.length) return true;
+      const proceed = await showGradeConflictModal(conflicts, subjectName);
+      conflicts.forEach(c => recordConflict({
+        studentName: c.studentName, subjectName, componentName: c.componentName,
+        remoteScore: c.remoteScore, newScore: c.newScore, resolution: proceed ? 'kept-mine' : 'took-remote'
+      }));
+      renderConflictLog();
+      if (!proceed) {
+        const root = getRootDB();
+        const st = root.stages.find(s => s.id === currentStageId);
+        if (st) { applyGradeCellRows(st, rows, true); persistRootDB(root); }
+        if (typeof loadGradesUI === 'function') loadGradesUI();
+        return false;
+      }
+      return true;
+    }
+
     // فحص دوري — لا يسحب أثناء رفع معلّق
     setInterval(function () {
       if (isOnline && !cloudPushInFlight && !cloudPushPending) pullFromCloud(true);
     }, 25000);
+
+    // بعد الدخول أو تبديل المرحلة: اسحب درجات المرحلة فوراً (دون انتظار الفحص الدوري)،
+    // ولمدير النظام/المرحلة اسحب أيضاً درجات كل مراحله مرة واحدة ليظهر الإنجاز في لوحة التحكم.
+    var _gcWatchKey = null, _gcAdminPulledFor = null;
+    setInterval(async function () {
+      try {
+        if (!currentAccountType || !currentStageId || !isOnline || cloudPushInFlight || cloudPushPending) return;
+        const key = currentAccountType + '|' + currentStageId;
+        if (key !== _gcWatchKey) {
+          _gcWatchKey = key;
+          await pullFromCloud(true);
+          // أول مزامنة لهذه المرحلة على هذا الجهاز: ارفع درجاتها المحلية الموجودة إلى grade_cells (ترحيل تلقائي)
+          if (await gradeCellsEnabled()) {
+            const stm = getStageRecord(currentStageId);
+            if (stm && stm.data && (stm.data.grades || []).length && !Object.keys(gcStageState(stm).cells).length) {
+              markStageCloudDirty(currentStageId); scheduleCloudPush();
+            }
+          }
+        }
+        const admKey = currentAccountType + '|' + (currentStageAdmin ? currentStageAdmin.id : '');
+        if ((currentAccountType === 'superadmin' || currentAccountType === 'stageadmin') && _gcAdminPulledFor !== admKey && await gradeCellsEnabled()) {
+          _gcAdminPulledFor = admKey;
+          const root = getRootDB();
+          const ids = currentAccountType === 'superadmin' ? (root.stages || []).map(s => s.id)
+            : ((currentStageAdmin && currentStageAdmin.stageIds) || []);
+          let any = false;
+          for (const sid of ids) {
+            if (sid === currentStageId) continue;
+            const st = (root.stages || []).find(s => s.id === sid);
+            if (st && (await pullGradeCells(st)) > 0) any = true;
+          }
+          if (any) { persistRootDB(root); try { softRefreshAfterCloudPull(); } catch (e) {} }
+        }
+      } catch (e) { console.warn('gc watch', e); }
+    }, 3000);
 
     // ============================================================
     //  رفع/تنزيل/حذف نسخ ملفات Excel الأصلية من Supabase Storage
@@ -9268,9 +9712,13 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
       if (currentAccountType !== 'stageadmin' || !currentStageAdmin) {
         const curSec = sectionSel.value;
         const curStage = stageTypeSel.value;
-        sectionSel.innerHTML = '<option value="">-- اختر القسم --</option>' +
-          SECTION_OPTS.map(o => `<option value="${o.value}">${o.label}</option>`).join('');
-        if (curSec) sectionSel.value = curSec;
+        const _curStageRec = typeof getStageRecord === 'function' ? getStageRecord(currentStageId) : null;
+        const _fixedSec = _curStageRec ? stageSectionOf(_curStageRec) : null;
+        sectionSel.innerHTML = (_fixedSec ? '' : '<option value="">-- اختر القسم --</option>') +
+          SECTION_OPTS.filter(o => !_fixedSec || o.value === _fixedSec)
+            .map(o => `<option value="${o.value}">${o.label}</option>`).join('');
+        if (_fixedSec) sectionSel.value = _fixedSec;
+        else if (curSec) sectionSel.value = curSec;
         stageTypeSel.innerHTML = '<option value="">-- اختر المرحلة --</option>' +
           STAGE_OPTS.map(o => `<option value="${o.value}">${o.label}</option>`).join('');
         if (curStage) { stageTypeSel.value = curStage; if (typeof onImportStageChange === 'function') onImportStageChange(); }
@@ -11804,6 +12252,25 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
         const assigned = currentStageAdmin.stageIds || [];
         if (currentStageId && assigned.length && !assigned.includes(currentStageId)) {
           status.textContent = '⚠️ غير مصرح لك بالرفع في هذه المرحلة التنظيمية.';
+          status.style.color = '#b91c1c';
+          return;
+        }
+      }
+
+      // حاجز لكل الحسابات (ومنها رئيس الكنترول): قسم الملف ونوع المرحلة لازم يطابقا المرحلة الحالية،
+      // حتى لا تختلط بيانات «عربي» داخل مرحلة «لغات» أو العكس.
+      {
+        const curStage = typeof getStageRecord === 'function' ? getStageRecord(currentStageId) : null;
+        const curSec = curStage ? stageSectionOf(curStage) : null;
+        if (curSec && importSection !== curSec) {
+          status.textContent = '⚠️ المرحلة الحالية («' + (curStage.name || '') + '») قسمها ' + (curSec === 'arabic' ? 'عربي' : 'لغات') +
+            '، ولا يمكن رفع ملف قسم ' + (importSection === 'arabic' ? 'عربي' : 'لغات') + ' داخلها. بدّل إلى المرحلة الصحيحة أولاً.';
+          status.style.color = '#b91c1c';
+          return;
+        }
+        const curType = curStage ? (curStage.stageType || inferEducationalStageTypeFromName(curStage.name)) : null;
+        if (curType && importStage !== curType) {
+          status.textContent = '⚠️ نوع المرحلة المختار لا يطابق المرحلة الحالية («' + (curStage.name || '') + '»). بدّل إلى المرحلة الصحيحة أولاً.';
           status.style.color = '#b91c1c';
           return;
         }
@@ -17994,7 +18461,7 @@ function renderMonthlyExportButtons() {
 
       let filled = 0,
         skippedExisting = 0;
-      const nowIso = new Date().toISOString();
+      const nowIso = gcNowIso();
       const actorName = (typeof currentUserLabel === 'function') ? currentUserLabel() : '';
       students.forEach(s => {
         fillComponents.forEach(({ c, ci }) => {
@@ -18055,7 +18522,7 @@ function renderMonthlyExportButtons() {
       if (!(await showConfirm(`سيتم رصد الدرجة النهائية (الدرجة العظمى) في مكوّن الاختبار/التقييم الشهري التالي لكل طلاب فصل "${classSectionLabel(cls)}" في مادة "${subjectName}" لهذا الشهر:\n${compNames}\n\nلن يتم لمس أي درجة مُدخَلة بالفعل. عدد الطلاب: ${students.length}. متابعة؟`))) return;
 
       let filled = 0, skippedExisting = 0;
-      const nowIso = new Date().toISOString();
+      const nowIso = gcNowIso();
       const actorName = (typeof currentUserLabel === 'function') ? currentUserLabel() : '';
       students.forEach(s => {
         fillComponents.forEach(({ c, ci }) => {
@@ -18147,7 +18614,7 @@ function renderMonthlyExportButtons() {
 
       let filled = 0,
         skippedExisting = 0;
-      const nowIso = new Date().toISOString();
+      const nowIso = gcNowIso();
       const actorName = (typeof currentUserLabel === 'function') ? currentUserLabel() : '';
       students.forEach(s => {
         const existing = db.grades.find(g => g.studentId === s.id && g.subjectName === subjectName && g.term === term && g.month === month && g.componentIndex === ci);
@@ -18298,13 +18765,20 @@ function renderMonthlyExportButtons() {
       });
 
       if (!(await warnIfAllComponentsAbsent(subject, pendingCells))) return;
-      const proceed = await detectAndResolveGradeConflicts(db, subjectName, term, month, pendingCells);
+      // الخانات التي تغيّرت قيمتها فقط: لا نُعيد ختم/كتابة خانة لم يُغيّرها المعلم (حتى لا تُمحى تصحيحات المدير
+      // لخانات أخرى لنفس الطالب بنسخة قديمة معروضة على شاشة المعلم، ولا يضيع اسم من عدّلها فعلاً)
+      const changedCells = pendingCells.filter(cell => {
+        const ex = db.grades.find(g => g.studentId === cell.studentId && g.subjectName === subjectName && g.term === term &&
+          g.month === month && g.componentIndex === cell.componentIndex);
+        return !ex || String(ex.score) !== String(cell.newScore);
+      });
+      const proceed = await detectAndResolveGradeConflicts(db, subjectName, term, month, changedCells);
       if (!proceed) return;
 
       let saved = 0;
-      const nowIso = new Date().toISOString();
+      const nowIso = gcNowIso();
       const actorName = (typeof currentUserLabel === 'function') ? currentUserLabel() : '';
-      pendingCells.forEach(cell => {
+      changedCells.forEach(cell => {
         let existing = db.grades.find(g => g.studentId === cell.studentId && g.subjectName === subjectName && g.term ===
           term && g.month === month && g.componentIndex === cell.componentIndex);
         if (existing) {
@@ -18328,7 +18802,7 @@ function renderMonthlyExportButtons() {
       const status = document.getElementById('gradesStatus');
       status.textContent = skipped ?
         `✅ تم حفظ ${saved} درجة، وتم تجاهل ${skipped} قيمة غير صحيحة (تحقق من الحد الأقصى أو القيم السالبة)` :
-        `✅ تم حفظ ${saved} درجة`;
+        (saved ? `✅ تم حفظ ${saved} درجة` : 'ℹ️ لا توجد تغييرات للحفظ');
       status.style.color = skipped ? '#b45309' : '#0b5e42';
       if (skipped) alert(`⚠️ لم يتم حفظ ${skipped} درجة لأنها تتجاوز الحد الأقصى المسموح به أو سالبة:\n${skippedDetails.join('\n')}`);
     
@@ -18397,13 +18871,20 @@ function renderMonthlyExportButtons() {
       });
 
       if (!(await warnIfAllComponentsAbsent(subject, pendingCells))) return;
-      const proceed = await detectAndResolveGradeConflicts(db, subjectName, term, month, pendingCells);
+      // الخانات التي تغيّرت قيمتها فقط: لا نُعيد ختم/كتابة خانة لم يُغيّرها المعلم (حتى لا تُمحى تصحيحات المدير
+      // لخانات أخرى لنفس الطالب بنسخة قديمة معروضة على شاشة المعلم، ولا يضيع اسم من عدّلها فعلاً)
+      const changedCells = pendingCells.filter(cell => {
+        const ex = db.grades.find(g => g.studentId === cell.studentId && g.subjectName === subjectName && g.term === term &&
+          g.month === month && g.componentIndex === cell.componentIndex);
+        return !ex || String(ex.score) !== String(cell.newScore);
+      });
+      const proceed = await detectAndResolveGradeConflicts(db, subjectName, term, month, changedCells);
       if (!proceed) return;
 
       let saved = 0;
-      const nowIso2 = new Date().toISOString();
+      const nowIso2 = gcNowIso();
       const actorName2 = (typeof currentUserLabel === 'function') ? currentUserLabel() : '';
-      pendingCells.forEach(cell => {
+      changedCells.forEach(cell => {
         let existing = db.grades.find(g => g.studentId === cell.studentId && g.subjectName === subjectName && g.term ===
           term && g.month === month && g.componentIndex === cell.componentIndex);
         if (existing) {
@@ -18432,7 +18913,7 @@ function renderMonthlyExportButtons() {
       const status = document.getElementById('gradesStatus');
       status.textContent = skipped ?
         `✅ تم حفظ ${saved} درجة، وتم تجاهل ${skipped} قيمة غير صحيحة` :
-        `✅ تم حفظ ${saved} درجة (الفصل ${term === 'first' ? 'الأول' : 'الثاني'})`;
+        (saved ? `✅ تم حفظ ${saved} درجة (الفصل ${term === 'first' ? 'الأول' : 'الثاني'})` : 'ℹ️ لا توجد تغييرات للحفظ');
       status.style.color = skipped ? '#b45309' : '#0b5e42';
       if (skipped) {
         const maxToShow = 15;
@@ -19337,7 +19818,7 @@ function renderMonthlyExportButtons() {
           msg.style.color = '#b91c1c'; cancelTeacherEdit(); loadTeachersUI(); return; }
         t.name = name;
         t.assignments = assignments;
-        t.updatedAt = new Date().toISOString();
+        t.updatedAt = gcNowIso();
         {
           const periodsRaw = document.getElementById('newTeacherPeriods');
           const periods = periodsRaw ? Math.max(0, parseInt(periodsRaw.value, 10) || 0) : (t.assignedPeriods || 0);
@@ -19375,7 +19856,7 @@ function renderMonthlyExportButtons() {
       const periods = periodsRaw ? Math.max(0, parseInt(periodsRaw.value, 10) || 0) : 0;
       db.teachers.push({
         id: newTeacherId, name, assignments, section: defaultSection, pin, pinHash, assignedPeriods: periods,
-        createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
+        createdAt: gcNowIso(), updatedAt: gcNowIso()
       });
       if (!db.teacherFeedback || typeof db.teacherFeedback !== 'object') db.teacherFeedback = { points: {}, log: [], basePoints: {} };
       if (!db.teacherFeedback.basePoints) db.teacherFeedback.basePoints = {};
