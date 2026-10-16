@@ -1,0 +1,81 @@
+-- رصد متزامن: دمج درجات المرحلة داخل PostgreSQL في عملية ذرية واحدة.
+-- طبّق هذا الملف في Supabase SQL Editor قبل نشر إصدار الواجهة المعدل.
+-- لا يحذف درجات غير موجودة في الطلب؛ يدمج حسب مفتاح الدرجة ويختار الأحدث updatedAt.
+
+create or replace function public.merge_grade_system_state(
+  p_id text,
+  p_data jsonb,
+  p_updated_at timestamptz default now()
+)
+returns void
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  v_current jsonb;
+  v_incoming_grades jsonb;
+  v_current_grades jsonb;
+  v_merged_grades jsonb;
+  v_merged_data jsonb;
+begin
+  if p_id is null or p_id not like 'stage\_%' escape '\' then
+    raise exception 'merge_grade_system_state only accepts stage rows';
+  end if;
+  if jsonb_typeof(p_data) is distinct from 'object' then
+    raise exception 'p_data must be a JSON object';
+  end if;
+
+  -- إنشاء الصف عند الحاجة ثم قفله؛ أي طلب متزامن آخر ينتظر هذا الصف.
+  insert into public.grade_system_state(id, data, updated_at)
+  values (p_id, jsonb_build_object('grades', '[]'::jsonb), p_updated_at)
+  on conflict (id) do nothing;
+
+  select coalesce(data, '{}'::jsonb)
+    into v_current
+    from public.grade_system_state
+   where id = p_id
+   for update;
+
+  v_current_grades := case when jsonb_typeof(v_current->'grades') = 'array'
+    then v_current->'grades' else '[]'::jsonb end;
+  v_incoming_grades := case when jsonb_typeof(p_data->'grades') = 'array'
+    then p_data->'grades' else '[]'::jsonb end;
+
+  -- Unnest both arrays and group by the same logical key used by the client:
+  -- studentId + subjectName + term + month + componentIndex.
+  -- On equal timestamps, incoming wins deterministically.
+  with all_grades as (
+    select g, 0 as source_order,
+      concat_ws('|', g->>'studentId', g->>'subjectName', g->>'term',
+        coalesce((g->>'month')::text, ''), coalesce((g->>'componentIndex')::text, '')) as grade_key,
+      case when nullif(g->>'updatedAt','') is not null
+        then (g->>'updatedAt')::timestamptz else '-infinity'::timestamptz end as grade_ts
+    from jsonb_array_elements(v_current_grades) as x(g)
+    union all
+    select g, 1 as source_order,
+      concat_ws('|', g->>'studentId', g->>'subjectName', g->>'term',
+        coalesce((g->>'month')::text, ''), coalesce((g->>'componentIndex')::text, '')) as grade_key,
+      case when nullif(g->>'updatedAt','') is not null
+        then (g->>'updatedAt')::timestamptz else '-infinity'::timestamptz end as grade_ts
+    from jsonb_array_elements(v_incoming_grades) as x(g)
+  ), ranked as (
+    select g, row_number() over (partition by grade_key order by grade_ts desc, source_order desc) as rn
+    from all_grades
+  )
+  select coalesce(jsonb_agg(g), '[]'::jsonb) into v_merged_grades
+    from ranked where rn = 1;
+
+  -- Preserve the rest of the stage payload and merge its latest incoming fields.
+  -- The grades key is replaced with the atomic union computed above.
+  v_merged_data := v_current || p_data || jsonb_build_object('grades', v_merged_grades);
+
+  update public.grade_system_state
+     set data = v_merged_data,
+         updated_at = greatest(coalesce(updated_at, '-infinity'::timestamptz), coalesce(p_updated_at, now()))
+   where id = p_id;
+end;
+$$;
+
+revoke all on function public.merge_grade_system_state(text, jsonb, timestamptz) from public;
+grant execute on function public.merge_grade_system_state(text, jsonb, timestamptz) to anon, authenticated;
