@@ -3643,6 +3643,9 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
               <p class="stages-hint">ثماني كيانات أساسية ثابتة: رياض أطفال / ابتدائي / إعدادى / ثانوي × (عربي + لغات). لا يمكن إضافة مراحل جديدة.</p>
             </div>
             <button type="button" class="btn btn-outline btn-sm" onclick="cleanupDuplicateStages()" title="دمج بيانات المراحل القديمة داخل الثمانية ثم حذف المكررات">🧹 تنظيف المكررات</button>
+            <button type="button" class="btn btn-outline btn-sm" id="bulkCloudBtn" onclick="bulkProvisionCloudAccounts()" title="إنشاء/تحديث الحساب السحابي لكل معلم لديه رقم سري، حتى تعمل المزامنة بصلاحيات مقيّدة">☁️ تفعيل الحسابات السحابية للمعلمين</button>
+            <button type="button" class="btn btn-outline btn-sm" onclick="printAllStagesTeacherCards()" title="طباعة بطاقات كل المعلمين في كل المراحل (4 بطاقات بالصفحة)">🖨️ بطاقات معلمي كل المراحل</button>
+            <span id="bulkCloudMsg" style="font-size:12.5px;color:#475569"></span>
           </div>
 
           <details class="stages-form-details" id="stageFormDetails" style="display:none">
@@ -5449,6 +5452,103 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
       });
       return changed;
     }
+
+    // تفعيل الحسابات السحابية (Supabase Auth) لكل المعلمين دفعة واحدة. يتطلب أن يكون رئيس الكنترول داخلاً
+    // بحسابه السحابي (البريد). آمن للتكرار: الدالة السحابية تُنشئ أو تُحدّث (upsert). يمكن إيقافه بإعادة
+    // تحميل الصفحة ثم استئنافه لاحقاً.
+    async function bulkProvisionCloudAccounts() {
+      const msg = document.getElementById('bulkCloudMsg');
+      const btn = document.getElementById('bulkCloudBtn');
+      const say = (t, c) => { if (msg) { msg.textContent = t; msg.style.color = c || '#475569'; } };
+      if (currentAccountType !== 'superadmin') { say('🔒 متاح لرئيس الكنترول فقط.', '#b91c1c'); return; }
+      if (!cloudAvailable || !isOnline) { say('⚠️ يلزم اتصال بالإنترنت وتهيئة Supabase.', '#b91c1c'); return; }
+      const sess = await supabaseClient.auth.getSession();
+      if (!(sess && sess.data && sess.data.session)) {
+        say('⚠️ سجّل دخول رئيس الكنترول بالبريد السحابي أولاً (ليس الرقم السري المحلي)، ثم أعد المحاولة.', '#b91c1c');
+        return;
+      }
+      const root = getRootDB();
+      // 1) توليد رقم سري لمن ليس لديه (لا يمكن إنشاء حساب بدونه)
+      const missing = [];
+      (root.stages || []).forEach(st => ((st.data && st.data.teachers) || []).forEach(t => { if (t && t.id && !t.pin) missing.push(t); }));
+      if (missing.length && await showConfirm('يوجد ' + missing.length + ' معلم بلا رقم سري محفوظ. هل تريد توليد رقم سري جديد لهم الآن؟ (من لديه رقم لن يتغير رقمه)')) {
+        for (const t of missing) {
+          const pin = generateRandomPin(DEFAULT_PIN_LENGTH);
+          t.pin = pin; t.pinHash = await sha256Hex(pin); t.updatedAt = gcNowIso();
+        }
+        saveRootDB(root);
+        if (typeof scheduleCloudPush === 'function') scheduleCloudPush();
+      }
+      const jobs = [];
+      let noPin = 0;
+      (root.stages || []).forEach(st => {
+        ((st.data && st.data.teachers) || []).forEach(t => {
+          if (!t || !t.id) return;
+          if (!t.pin) { noPin++; return; }
+          jobs.push({ stageId: st.id, stageName: st.name || st.id, t });
+        });
+      });
+      if (!jobs.length) { say('لا يوجد معلمون لديهم رقم سري محفوظ.', '#92400e'); return; }
+      // 2) تخطّي من لديه حساب سحابي بالفعل (استئناف آمن)
+      let have = new Set();
+      try {
+        for (let from = 0; ; from += 1000) {
+          const r = await supabaseClient.from('profiles').select('teacher_id').eq('role', 'teacher').range(from, from + 999);
+          if (r.error) break;
+          (r.data || []).forEach(x => x.teacher_id && have.add(String(x.teacher_id)));
+          if (!r.data || r.data.length < 1000) break;
+        }
+      } catch (e) { have = new Set(); }
+      const todo = jobs.filter(j => !have.has(String(j.t.id)));
+      if (!todo.length) { say('✅ كل المعلمين (' + jobs.length + ') لديهم حسابات سحابية بالفعل.', '#166534'); return; }
+      if (!(await showConfirm('سيتم إنشاء حساب سحابي لـ ' + todo.length + ' معلم من ' + jobs.length +
+        (have.size ? ' (' + (jobs.length - todo.length) + ' لديهم حساب بالفعل وسيُتخطّون)' : '') +
+        (noPin ? ' — ' + noPin + ' بلا رقم سري' : '') + '.\nقد يستغرق عدة دقائق. هل تريد المتابعة؟'))) return;
+      if (btn) btn.disabled = true;
+      let done = 0, ok = 0; const fails = [];
+      const CONC = 3;
+      let next = 0;
+      const sleep = ms => new Promise(r => setTimeout(r, ms));
+      async function worker() {
+        while (next < todo.length) {
+          const j = todo[next++];
+          let res = null;
+          for (let attempt = 0; attempt < 4; attempt++) {
+            try {
+              res = await provisionCloudAccount({
+                role: 'teacher', localId: j.t.id, fullName: j.t.name || '', pin: j.t.pin,
+                stageIds: [j.stageId], teacherId: j.t.id
+              });
+            } catch (e) { res = { error: (e && e.message) || String(e) }; }
+            if (res && res.ok) break;
+            const st = res && res.status;
+            const transient = !st || st === 429 || st >= 500;
+            if (!transient) break;
+            await sleep(800 * Math.pow(2, attempt));
+          }
+          done++;
+          if (res && res.ok) ok++;
+          else fails.push({ name: j.t.name || j.t.id, stage: j.stageName, error: (res && (res.error || 'تخطّي')) || '' });
+          say('⏳ ' + done + ' / ' + todo.length + ' — نجح ' + ok + (fails.length ? ' — تعذّر ' + fails.length : ''));
+        }
+      }
+      await Promise.all(Array.from({ length: CONC }, worker));
+      if (btn) btn.disabled = false;
+      say((fails.length ? '⚠️ ' : '✅ ') + 'انتهى: نجح ' + ok + ' من ' + todo.length +
+        (fails.length ? ' — تعذّر ' + fails.length + '. أعد الضغط على الزر لإعادة محاولة الفاشلين فقط.' : ''),
+        fails.length ? '#92400e' : '#166534');
+      if (fails.length) {
+        try {
+          const csv = '﻿الاسم,المرحلة,الخطأ\n' + fails.map(f => [f.name, f.stage, f.error].map(v => '"' + String(v).replace(/"/g, '""') + '"').join(',')).join('\n');
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+          a.download = 'teachers_cloud_failures.csv';
+          document.body.appendChild(a); a.click(); a.remove();
+        } catch (e) {}
+      }
+      try { recordAudit('تفعيل حسابات سحابية', 'نجح ' + ok + ' من ' + todo.length); } catch (e) {}
+    }
+    window.bulkProvisionCloudAccounts = bulkProvisionCloudAccounts;
 
     // تنظيف يدوي فوري للمراحل المكررة (لرئيس الكنترول) — يدمج ثم يحذف غير الثابتة
     async function cleanupDuplicateStages() {
@@ -20281,6 +20381,25 @@ function renderMonthlyExportButtons() {
         </div>
       `;
     }
+
+    // طباعة بطاقات كل معلمي كل المراحل دفعة واحدة (رئيس الكنترول)
+    function printAllStagesTeacherCards() {
+      if (currentAccountType !== 'superadmin') { alert('🔒 متاحة لرئيس الكنترول فقط.'); return; }
+      const root = getRootDB();
+      const issueDateText = new Date().toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' });
+      let cards = [];
+      (root.stages || []).forEach(st => {
+        const d = st.data || {};
+        const school = (d.schoolInfo && d.schoolInfo.schoolName) || '';
+        ((d.teachers) || []).filter(t => t && t.pin).forEach(t => cards.push(buildTeacherCardHtml(t, school, st.name || '', issueDateText)));
+      });
+      if (!cards.length) { alert('لا يوجد معلمون لديهم رقم سري.'); return; }
+      let pagesHtml = '';
+      for (let i = 0; i < cards.length; i += 4) pagesHtml += '<div class="card-page"><div class="id-card-grid">' + cards.slice(i, i + 4).join('') + '</div></div>';
+      document.getElementById('printCardsArea').innerHTML = pagesHtml;
+      setTimeout(() => { window.print(); }, 50);
+    }
+    window.printAllStagesTeacherCards = printAllStagesTeacherCards;
 
     function renderAndPrintCards(teachers) {
       if (!teachers.length) { alert('لا يوجد معلمون لطباعة بطاقاتهم.'); return; }
