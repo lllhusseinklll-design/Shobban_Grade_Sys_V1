@@ -3643,6 +3643,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
               <p class="stages-hint">ثماني كيانات أساسية ثابتة: رياض أطفال / ابتدائي / إعدادى / ثانوي × (عربي + لغات). لا يمكن إضافة مراحل جديدة.</p>
             </div>
             <button type="button" class="btn btn-outline btn-sm" onclick="cleanupDuplicateStages()" title="دمج بيانات المراحل القديمة داخل الثمانية ثم حذف المكررات">🧹 تنظيف المكررات</button>
+            <select id="bulkCloudStage" style="font-size:12.5px;padding:5px 8px;border:1px solid #cbd5e1;border-radius:8px" title="اختر المرحلة التي تريد تفعيل حسابات معلميها"><option value="">كل المراحل</option></select>
             <button type="button" class="btn btn-outline btn-sm" id="bulkCloudBtn" onclick="bulkProvisionCloudAccounts()" title="إنشاء/تحديث الحساب السحابي لكل معلم لديه رقم سري، حتى تعمل المزامنة بصلاحيات مقيّدة">☁️ تفعيل الحسابات السحابية للمعلمين</button>
             <button type="button" class="btn btn-outline btn-sm" onclick="printAllStagesTeacherCards()" title="طباعة بطاقات كل المعلمين في كل المراحل (4 بطاقات بالصفحة)">🖨️ بطاقات معلمي كل المراحل</button>
             <span id="bulkCloudMsg" style="font-size:12.5px;color:#475569"></span>
@@ -5468,9 +5469,11 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
         return;
       }
       const root = getRootDB();
+      const onlyStage = (document.getElementById('bulkCloudStage') || {}).value || '';
+      const scopeStages = (root.stages || []).filter(st => !onlyStage || st.id === onlyStage);
       // 1) توليد رقم سري لمن ليس لديه (لا يمكن إنشاء حساب بدونه)
       const missing = [];
-      (root.stages || []).forEach(st => ((st.data && st.data.teachers) || []).forEach(t => { if (t && t.id && !t.pin) missing.push(t); }));
+      scopeStages.forEach(st => ((st.data && st.data.teachers) || []).forEach(t => { if (t && t.id && !t.pin) missing.push(t); }));
       if (missing.length && await showConfirm('يوجد ' + missing.length + ' معلم بلا رقم سري محفوظ. هل تريد توليد رقم سري جديد لهم الآن؟ (من لديه رقم لن يتغير رقمه)')) {
         for (const t of missing) {
           const pin = generateRandomPin(DEFAULT_PIN_LENGTH);
@@ -5481,7 +5484,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
       }
       const jobs = [];
       let noPin = 0;
-      (root.stages || []).forEach(st => {
+      scopeStages.forEach(st => {
         ((st.data && st.data.teachers) || []).forEach(t => {
           if (!t || !t.id) return;
           if (!t.pin) { noPin++; return; }
@@ -5501,7 +5504,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
       } catch (e) { have = new Set(); }
       const todo = jobs.filter(j => !have.has(String(j.t.id)));
       if (!todo.length) { say('✅ كل المعلمين (' + jobs.length + ') لديهم حسابات سحابية بالفعل.', '#166534'); return; }
-      if (!(await showConfirm('سيتم إنشاء حساب سحابي لـ ' + todo.length + ' معلم من ' + jobs.length +
+      if (!(await showConfirm((onlyStage ? 'المرحلة المختارة فقط.\n' : '') + 'سيتم إنشاء حساب سحابي لـ ' + todo.length + ' معلم من ' + jobs.length +
         (have.size ? ' (' + (jobs.length - todo.length) + ' لديهم حساب بالفعل وسيُتخطّون)' : '') +
         (noPin ? ' — ' + noPin + ' بلا رقم سري' : '') + '.\nقد يستغرق عدة دقائق. هل تريد المتابعة؟'))) return;
       if (btn) btn.disabled = true;
@@ -10806,6 +10809,15 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
       if (currentAccountType !== 'superadmin') return;
       const root = getRootDB();
       populateTeacherImportTargetSelectors();
+      try {
+        const sel = document.getElementById('bulkCloudStage');
+        if (sel) {
+          const keep = sel.value;
+          sel.innerHTML = '<option value="">كل المراحل</option>' + (root.stages || []).map(st =>
+            '<option value="' + st.id + '">' + escapeHtml(stageDisplayLabel(st)) + ' (' + (((st.data || {}).teachers) || []).length + ' معلم)</option>').join('');
+          if (keep) sel.value = keep;
+        }
+      } catch (eSel) {}
 
       // مؤشرات الملخص
       let totalStudents = 0;
