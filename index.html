@@ -6563,29 +6563,23 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
     }
 
     function mergeSubjectsCollaborative(localList, remoteList) {
+      // المادة بمكوّناتها وحدة واحدة: الأحدث تعديلاً (updatedAt) تفوز كاملةً، فلا يعود مكوّن محذوف ولا يتكرر مكوّن أُعيدت تسميته.
+      // إن لم يوجد ختم زمني لأي منهما (بيانات قديمة) تُفضَّل النسخة المحلية لأنها ما يراه المستخدم.
       const map = new Map();
       const keyOf = (s) => String((s && s.name) || '').trim();
+      const ts = (x) => { try { return x && x.updatedAt ? new Date(x.updatedAt).getTime() : 0; } catch (e) { return 0; } };
       (remoteList || []).forEach(s => { const k = keyOf(s); if (k) map.set(k, s); });
       (localList || []).forEach(s => {
         const k = keyOf(s);
         if (!k) return;
         const r = map.get(k);
         if (!r) { map.set(k, s); return; }
-        const comps = [];
-        const seen = new Set();
-        const add = (list) => {
-          (list || []).forEach(c => {
-            const ck = String((c && c.name) || '').trim();
-            if (!ck || seen.has(ck)) return;
-            seen.add(ck);
-            comps.push(c);
-          });
-        };
-        add(r.components);
-        add(s.components);
-        map.set(k, Object.assign({}, r, s, {
-          components: comps.length ? comps : (s.components || r.components || []),
-          exportName: s.exportName || r.exportName || s.name || r.name
+        const localWins = ts(s) >= ts(r);
+        const win = localWins ? s : r, lose = localWins ? r : s;
+        const comps = (win.components && win.components.length) ? win.components : (lose.components || []);
+        map.set(k, Object.assign({}, lose, win, {
+          components: comps,
+          exportName: win.exportName || lose.exportName || win.name || lose.name
         }));
       });
       return Array.from(map.values());
@@ -6617,7 +6611,17 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
         return tt > new Date(dt).getTime();
       });
       out.students = mergeStudentsCollaborative(local.students, remote.students);
-      out.subjects = mergeSubjectsCollaborative(local.subjects, remote.subjects);
+      const tombS = {};
+      [remote.deletedIds && remote.deletedIds.subjects, local.deletedIds && local.deletedIds.subjects].forEach(m => {
+        Object.keys(m || {}).forEach(k => { if (!tombS[k] || String(m[k]) > String(tombS[k])) tombS[k] = m[k]; });
+      });
+      out.deletedIds.subjects = tombS;
+      out.subjects = mergeSubjectsCollaborative(local.subjects, remote.subjects).filter(sb => {
+        const dt = sb && tombS[String(sb.name || '').trim()];
+        if (!dt) return true;
+        const tt = sb.updatedAt ? new Date(sb.updatedAt).getTime() : 0;
+        return tt > new Date(dt).getTime();
+      });
       out.classes = mergeClassesCollaborative(local.classes, remote.classes);
       out.classGrade = Object.assign({}, remote.classGrade || {}, local.classGrade || {});
       if (remote.monthLocks || local.monthLocks) {
@@ -11347,6 +11351,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
             subj = {
               name: catSubj.name,
               exportName: catSubj.name,
+              updatedAt: gcNowIso(),
               appliesTo: [],
               components: catSubj.components.map(c => ({
                 name: c.name,
@@ -12463,6 +12468,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
           if (!existing) {
             if (!s.appliesTo) s.appliesTo = [];
             if (!s.appliesTo.includes(scopeKey)) s.appliesTo.push(scopeKey);
+            s.updatedAt = gcNowIso();
             db.subjects.push(s);
             subjectsByName.set(s.name, s);
             return;
@@ -12472,7 +12478,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
           const existingCompNames = new Set(existing.components.map(c => c.name));
           s.components.forEach(c => { if (c.isNewComponent && !existingCompNames.has(c.name)) {
             const { isNewComponent, ...compToSave } = c;
-            existing.components.push(compToSave); } });
+            existing.components.push(compToSave); existing.updatedAt = gcNowIso(); } });
         });
         // تنظيف أي مواد زائفة سبق حفظها (مثل «المسار»)
         db.subjects = gradeSubjectsOnly(db.subjects);
@@ -14806,7 +14812,7 @@ function renderMonthlyExportButtons() {
       if ((db.subjects || []).some(s => s.name === name)) { alert('توجد مادة بهذا الاسم بالفعل.'); return; }
       const exportName = (prompt('اسم مختصر للتصدير لنظام الكنترول (اختياري، اتركه فارغاً لاستخدام نفس الاسم):') || '').trim();
       db.subjects = db.subjects || [];
-      db.subjects.push({ name, exportName: exportName || name, components: [] });
+      db.subjects.push({ name, exportName: exportName || name, components: [], updatedAt: gcNowIso() });
       saveDB(db);
       loadSubjectsUI();
     
@@ -14829,8 +14835,14 @@ function renderMonthlyExportButtons() {
         (db.grades || []).forEach(g => { if (g.subjectName === sub.name) g.subjectName = newName; });
         (db.teachers || []).forEach(t => (t.assignments || []).forEach(a => { if (a.subjectName === sub.name) a.subjectName = newName; }));
       }
+      if (newName !== sub.name) {
+        if (!db.deletedIds || typeof db.deletedIds !== 'object') db.deletedIds = {};
+        if (!db.deletedIds.subjects) db.deletedIds.subjects = {};
+        db.deletedIds.subjects[String(sub.name).trim()] = gcNowIso();
+      }
       sub.name = newName;
       sub.exportName = newExportName || newName;
+      sub.updatedAt = gcNowIso();
       saveDB(db);
       loadSubjectsUI();
     
@@ -14848,7 +14860,11 @@ function renderMonthlyExportButtons() {
       if (!(await showConfirm(`سيتم حذف مادة "${sub.name}" نهائياً مع كل الدرجات المسجلة لها. هل أنت متأكد؟`))) return;
       db.subjects.splice(subIdx, 1);
       db.grades = (db.grades || []).filter(g => g.subjectName !== sub.name);
+      if (!db.deletedIds || typeof db.deletedIds !== 'object') db.deletedIds = {};
+      if (!db.deletedIds.subjects) db.deletedIds.subjects = {};
+      db.deletedIds.subjects[String(sub.name).trim()] = gcNowIso();
       saveDB(db);
+      if (typeof scheduleCloudPush === 'function') scheduleCloudPush();
       loadSubjectsUI();
      } catch (e) {
        console.error('deleteSubject failed:', e);
@@ -14868,6 +14884,7 @@ function renderMonthlyExportButtons() {
       // ولا يحتاج درجة عظمى ولا سؤال عن "الدرجة الشهرية" - بصمت تماماً.
       if (isAttendanceComponent(name)) {
         sub.components.push({ name, maxScore: null, isMonthlyGrade: false, type: 'attendance' });
+        sub.updatedAt = gcNowIso();
         saveDB(db);
         loadSubjectsUI();
         return;
@@ -14877,6 +14894,7 @@ function renderMonthlyExportButtons() {
       if (isNaN(maxScore) || maxScore <= 0) { alert('يرجى إدخال درجة عظمى صحيحة.'); return; }
       const isMonthlyGrade = await showConfirm('هل هذا المكوّن هو "الدرجة الشهرية" التي تُصدَّر لنظام رفع النتائج؟ (موافق = نعم)');
       sub.components.push({ name, maxScore, isMonthlyGrade, type: isPassFail ? 'passfail' : 'score' });
+      sub.updatedAt = gcNowIso();
       saveDB(db);
       loadSubjectsUI();
     
@@ -14898,6 +14916,7 @@ function renderMonthlyExportButtons() {
         comp.maxScore = null;
         comp.isMonthlyGrade = false;
         comp.type = 'attendance';
+        db.subjects[subIdx].updatedAt = gcNowIso();
         saveDB(db);
         loadSubjectsUI();
         return;
@@ -14908,6 +14927,7 @@ function renderMonthlyExportButtons() {
       comp.name = newName;
       comp.maxScore = newMax;
       comp.type = isPassFail ? 'passfail' : 'score';
+      db.subjects[subIdx].updatedAt = gcNowIso();
       saveDB(db);
       loadSubjectsUI();
     
@@ -14924,6 +14944,7 @@ function renderMonthlyExportButtons() {
       // لا يصح أن يكون أكثر من مكوّن واحد "درجة شهرية" في نفس المادة، لأن التصدير الشهري يعرض رقماً واحداً فقط لكل مادة
       if (checked) sub.components.forEach((c, i) => { c.isMonthlyGrade = (i === compIdx); });
       else sub.components[compIdx].isMonthlyGrade = false;
+      sub.updatedAt = gcNowIso();
       saveDB(db);
       loadSubjectsUI();
     }
@@ -14936,6 +14957,7 @@ function renderMonthlyExportButtons() {
       const comp = sub.components[compIdx];
       if (!(await showConfirm(`سيتم حذف مكوّن "${comp.name}" نهائياً مع كل الدرجات المسجلة له. هل أنت متأكد؟`))) return;
       sub.components.splice(compIdx, 1);
+      sub.updatedAt = gcNowIso();
       db.grades = (db.grades || []).filter(g => !(g.subjectName === sub.name && g.componentIndex === compIdx));
       // إعادة ترقيم فهارس المكونات الأكبر من المكوّن المحذوف حتى تبقى متوافقة مع مصفوفة المكونات بعد الحذف
       (db.grades || []).forEach(g => { if (g.subjectName === sub.name && g.componentIndex > compIdx) g.componentIndex--; });
