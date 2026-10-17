@@ -6604,7 +6604,18 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
       const out = Object.assign({}, remote);
       const mg = mergeStageGradesPreferNewer(local, remote);
       out.grades = mg.grades;
-      out.teachers = mergeTeachersCollaborative(local.teachers, remote.teachers);
+      // شواهد الحذف: اتحاد من الجهتين بأحدث وقت لكل معرّف، ثم يُحذف أي معلم حُذف بعد آخر تعديل له
+      const tombT = {};
+      [remote.deletedIds && remote.deletedIds.teachers, local.deletedIds && local.deletedIds.teachers].forEach(m => {
+        Object.keys(m || {}).forEach(k => { if (!tombT[k] || String(m[k]) > String(tombT[k])) tombT[k] = m[k]; });
+      });
+      out.deletedIds = Object.assign({}, remote.deletedIds || {}, local.deletedIds || {}, { teachers: tombT });
+      out.teachers = mergeTeachersCollaborative(local.teachers, remote.teachers).filter(t => {
+        const dt = t && tombT[String(t.id)];
+        if (!dt) return true;
+        const tt = t.updatedAt ? new Date(t.updatedAt).getTime() : 0;
+        return tt > new Date(dt).getTime();
+      });
       out.students = mergeStudentsCollaborative(local.students, remote.students);
       out.subjects = mergeSubjectsCollaborative(local.subjects, remote.subjects);
       out.classes = mergeClassesCollaborative(local.classes, remote.classes);
@@ -20337,7 +20348,7 @@ function renderMonthlyExportButtons() {
             const pinHash = await sha256Hex(pin);
             db.teachers.push({
               id: 't_' + Date.now() + '_' + i, name: g.name, assignments: g.assignments, section: targetSection,
-              pin, pinHash,
+              pin, pinHash, createdAt: gcNowIso(), updatedAt: gcNowIso(),
             });
             added++;
           }
@@ -20458,7 +20469,12 @@ function renderMonthlyExportButtons() {
       if (!(await showConfirm('هل تريد حذف هذا المعلم؟'))) return;
       const db = loadDB();
       db.teachers = db.teachers.filter(t => t.id !== id);
+      // شاهد حذف (tombstone): يمنع عودة المعلم المحذوف عند دمج نسخة السحابة أو أجهزة أخرى
+      if (!db.deletedIds || typeof db.deletedIds !== 'object') db.deletedIds = {};
+      if (!db.deletedIds.teachers || typeof db.deletedIds.teachers !== 'object') db.deletedIds.teachers = {};
+      db.deletedIds.teachers[String(id)] = gcNowIso();
       saveDB(db);
+      if (typeof scheduleCloudPush === 'function') scheduleCloudPush();
       if (document.getElementById('editingTeacherId').value === id) cancelTeacherEdit();
       loadTeachersUI();
      } catch (e) {
