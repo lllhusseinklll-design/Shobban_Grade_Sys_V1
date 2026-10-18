@@ -5078,7 +5078,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
     // مصدر واحد لرقم الإصدار بدل تناثر أسماء V19/V20/V21/V22/V23/V24 في التعليقات، رسائل سجل
     // العمليات، وأسماء ملفات التصدير. الأرقام V19-V24 القديمة كانت تشير لمراحل تطوير داخلية للكود
     // (أسماء دوال ومعرّفات HTML/CSS) ولم تعد تُستخدم كإشارة إصدار فعلية للمستخدم بعد الآن.
-    const APP_VERSION = '25.6.3';
+    const APP_VERSION = '26.0.0';
 
     // ============================================================
     //  UI MODAL (يحل محل alert()/confirm() الافتراضيتين من المتصفح)
@@ -6848,6 +6848,8 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
       if (local.schoolInfo || remote.schoolInfo) {
         out.schoolInfo = Object.assign({}, remote.schoolInfo || {}, local.schoolInfo || {});
       }
+      // السجلات المستقلة (حضور/غياب/سجل تقييم): اتحاد من الجهتين بدل أن يفوز صف أحد الأجهزة
+      if (recordCellsMode === true) { try { rcMergeRecords(out, local, remote); } catch (eRc) { console.warn('rcMergeRecords', eRc); } }
       // لا تُعيد بيانات قسم آخر من السحابة (تمنع عودة طلاب «عربي» إلى مرحلة «لغات» بعد التنظيف)
       purgeForeignSectionData(out, stageSection, stageType, stageId);
       return { data: out, localGradeWins: mg.localWon };
@@ -6901,6 +6903,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
         changed = true;
       }
 
+      try { await recordCellsEnabled(); } catch (eRm) {}
       if (currentStageId) {
         // فحص خفيف أولاً: لا نحمّل صف المرحلة الكبير (طلاب/معلمون) كل 25 ثانية من مئات الأجهزة
         // إلا إذا تغيّر فعلاً في السحابة (يكفي استعلام صغير عن وقت آخر تحديث).
@@ -7001,6 +7004,14 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
         }
       } catch (e) { console.warn('pull grade cells', e); }
 
+      // سجلات الحضور والتقييم المستقلة للمرحلة الحالية
+      try {
+        if (currentStageId && await recordCellsEnabled()) {
+          const stR = root.stages.find(s => s.id === currentStageId);
+          if (stR) { const n = await pullRecordCells(stR); if (n >= 0) changed = true; }
+        }
+      } catch (e) { console.warn('pull record cells', e); }
+
       if (changed) {
         persistRootDB(root);
         setConnBadge('تم دمج أحدث التعديلات من السحابة (الدرجات الأحدث محفوظة)');
@@ -7022,6 +7033,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
       }
       const remoteMeta = metaRow.data;
       const root = getRootDB();
+      try { await recordCellsEnabled(); } catch (eRm) {}
       const stageIds = (remoteMeta.stages || []).map(s => s.id);
       // جلب كل المراحل بالتوازي (Promise.all)
       const stageRows = await Promise.all(stageIds.map(id => cloudFetchRow('stage_' + id)));
@@ -7081,6 +7093,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
           }
           const rows = _isAdminAcct ? [{ id: 'root_meta', data: buildRootMeta(root), updated_at: now }] : [];
           const _gcOn = await gradeCellsEnabled();
+          const _rcOn = await recordCellsEnabled();
           let _gcAllOk = true;
           let dirtyIds = (typeof consumeDirtyStageIds === 'function') ? consumeDirtyStageIds() : [];
           try {
@@ -7112,12 +7125,17 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
               try { cellsOk = await pushGradeCells(st); } catch (e) { console.error('pushGradeCells', e); }
               if (!cellsOk) _gcAllOk = false;
             }
+            let recOk = false;
+            if (_rcOn) {
+              try { recOk = await pushRecordCells(st); } catch (e) { console.error('pushRecordCells', e); }
+              if (!recOk) _gcAllOk = false;
+            }
             let needRow = true, hash = null;
             if (_gcOn && cellsOk) {
-              try { hash = gcRowHash(st.data); } catch (e) { hash = null; }
+              try { hash = gcRowHash(st.data, recOk); } catch (e) { hash = null; }
               if (hash !== null && gcStageState(st).rowHash === hash) needRow = false;
             }
-            if (needRow) rowPlan.push({ st, cellsOk });
+            if (needRow) rowPlan.push({ st, cellsOk, recOk });
           }
 
           // 2) المراحل التي تغيّرت بياناتها غير الدرجات: ادمج مع السحابة ثم ارفع
@@ -7140,12 +7158,12 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
               }
             }
             // الدرجات لا تُكتب إلى grade_system_state إطلاقاً: مصدرها الوحيد في السحابة هو جدول grade_cells
-            const rowData = Object.assign({}, st.data, { grades: [], _gradesIndex: null, _gradesInCells: true });
-            rows.push({ id: 'stage_' + st.id, data: rowData, updated_at: now, _hashFor: st });
+            const rowData = Object.assign({}, x.recOk ? rcStripForRow(st.data) : st.data, { grades: [], _gradesIndex: null, _gradesInCells: true });
+            rows.push({ id: 'stage_' + st.id, data: rowData, updated_at: now, _hashFor: st, _rec: !!x.recOk });
             st.updatedAt = now;
           });
           root.lastUpdated = now;
-          const hashTargets = rows.filter(function (r) { return r._hashFor; }).map(function (r) { return r._hashFor; });
+          const hashTargets = rows.filter(function (r) { return r._hashFor; }).map(function (r) { return { st: r._hashFor, rec: r._rec }; });
           const sendRows = rows.map(function (r) { return { id: r.id, data: r.data, updated_at: r.updated_at }; });
           const { error } = sendRows.length ? await supabaseClient.from('grade_system_state').upsert(sendRows) : { error: null };
           if (error) {
@@ -7165,7 +7183,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
             uniqueIds.forEach(function(sid) { markStageCloudDirty(sid); });
             cloudPushPending = true;
           } else {
-            if (_gcOn) hashTargets.forEach(function (st) { try { gcStageState(st).rowHash = gcRowHash(st.data); } catch (e) {} });
+            if (_gcOn) hashTargets.forEach(function (o) { try { gcStageState(o.st).rowHash = gcRowHash(o.st.data, o.rec); } catch (e) {} });
             await persistRootDB(root);
             setConnBadge('تمت المزامنة ' + new Date().toLocaleTimeString('ar-EG'));
             maybeAutoVersionSnapshot();
@@ -7286,8 +7304,8 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
       };
     }
     // بصمة بيانات المرحلة بدون الدرجات (لمعرفة هل تغيّر غير الدرجات فيلزم رفع صف المرحلة)
-    function gcRowHash(data) {
-      const str = JSON.stringify(Object.assign({}, data, { grades: [], _gradesIndex: null }));
+    function gcRowHash(data, stripRecords) {
+      const str = JSON.stringify(Object.assign({}, stripRecords ? rcStripForRow(data) : data, { grades: [], _gradesIndex: null }));
       let h1 = 5381, h2 = 52711;
       for (let i = 0; i < str.length; i++) { const c = str.charCodeAt(i); h1 = ((h1 << 5) + h1 + c) | 0; h2 = ((h2 * 33) ^ c) | 0; }
       return str.length + ':' + (h1 >>> 0) + ':' + (h2 >>> 0);
@@ -7421,6 +7439,224 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
       return total;
     }
 
+    // ============================================================
+    //  السجلات المستقلة (جدول record_cells): حضور وغياب الطلاب (att) + حضور المعلمين (pres) + سجل تقييم المعلمين (fbl)
+    //  كل سجل صف مستقل في السحابة بدل أن يُحفظ داخل صف المرحلة الكبير، فلا يمسح معلمٌ سجلَّ زميله.
+    //  يعمل تلقائياً بعد تشغيل supabase/record_cells.sql؛ وقبله يستمر النظام بالصيغة القديمة دون أي تغيير.
+    // ============================================================
+    var recordCellsMode = null, recordCellsProbeAt = 0;
+    var RC_CHUNK = 500;
+
+    async function recordCellsEnabled() {
+      if (!cloudAvailable || !isOnline) return false;
+      if (recordCellsMode === true) return true;
+      if (recordCellsMode === false && Date.now() - recordCellsProbeAt < 120000) return false;
+      recordCellsProbeAt = Date.now();
+      try {
+        const q = await supabaseClient.from('record_cells').select('stage_id').limit(1);
+        if (q.error) { recordCellsMode = false; return false; }
+        const r = await supabaseClient.rpc('upsert_record_cells', { p_rows: [] });
+        recordCellsMode = !r.error;
+      } catch (e) { recordCellsMode = false; }
+      return recordCellsMode === true;
+    }
+    window.recordCellsEnabled = recordCellsEnabled;
+
+    function rcStageState(st) {
+      if (!st.recSync || typeof st.recSync !== 'object') st.recSync = { lastPull: null, cells: {} };
+      if (!st.recSync.cells) st.recSync.cells = {};
+      ['att', 'pres', 'fbl'].forEach(k => { if (!st.recSync.cells[k]) st.recSync.cells[k] = {}; });
+      return st.recSync;
+    }
+    function rcFbId(e) { return [e.teacherId, e.type, e.at, e.dateISO || '', e.by || '', e.points].join('|'); }
+    function rcHas(o, k) { return Object.prototype.hasOwnProperty.call(o, k); }
+    function rcMapKind(getObj, ensureObj) {
+      return {
+        appendOnly: false,
+        cur: function (d) { const r = getObj(d) || {}; const m = new Map(); Object.keys(r).forEach(k => m.set(k, { v: r[k], sig: String(r[k]) })); return m; },
+        get: function (d, k) { const r = getObj(d) || {}; return rcHas(r, k) ? { exists: true, sig: String(r[k]) } : { exists: false, sig: null }; },
+        set: function (d, k, v) { ensureObj(d)[k] = v; },
+        del: function (d, k) { const r = getObj(d); if (r) delete r[k]; },
+        sigOf: function (v) { return String(v); }
+      };
+    }
+    var RC_KINDS = {
+      att: rcMapKind(
+        function (d) { return d.attendance && d.attendance.records; },
+        function (d) { if (!d.attendance || typeof d.attendance !== 'object') d.attendance = {}; if (!d.attendance.records) d.attendance.records = {}; return d.attendance.records; }
+      ),
+      pres: rcMapKind(
+        function (d) { return d.teacherPresence && d.teacherPresence.records; },
+        function (d) { if (!d.teacherPresence || typeof d.teacherPresence !== 'object') d.teacherPresence = {}; if (!d.teacherPresence.records) d.teacherPresence.records = {}; return d.teacherPresence.records; }
+      ),
+      fbl: {
+        appendOnly: true,
+        cur: function (d) { const m = new Map(); ((d.teacherFeedback && d.teacherFeedback.log) || []).forEach(e => { if (e && typeof e === 'object') m.set(rcFbId(e), { v: e, sig: '1' }); }); return m; },
+        get: function (d, k) { const f = ((d.teacherFeedback && d.teacherFeedback.log) || []).some(e => e && rcFbId(e) === k); return { exists: f, sig: f ? '1' : null }; },
+        set: function (d, k, v) {
+          if (!d.teacherFeedback || typeof d.teacherFeedback !== 'object') d.teacherFeedback = { points: {}, log: [], basePoints: {} };
+          if (!Array.isArray(d.teacherFeedback.log)) d.teacherFeedback.log = [];
+          d.teacherFeedback.log.push(v);
+        },
+        del: function () {},
+        sigOf: function () { return '1'; }
+      }
+    };
+
+    // النقاط = رصيد قديم (legacyExtra، يُحسب مرة واحدة) + مجموع بنود السجل. هكذا لا تضيع نقاط عند اتحاد سجلات الأجهزة.
+    function rcFbLegacyFrom(fb) {
+      const sum = {};
+      (fb.log || []).forEach(e => { if (e) sum[e.teacherId] = (sum[e.teacherId] || 0) + (Number(e.points) || 0); });
+      const leg = {};
+      Object.keys(fb.points || {}).forEach(t => { const v = (Number(fb.points[t]) || 0) - (sum[t] || 0); if (v) leg[t] = v; });
+      return leg;
+    }
+    function rcFbInit(d) {
+      const fb = d.teacherFeedback;
+      if (!fb || typeof fb !== 'object') return;
+      if (!fb.legacyExtra || typeof fb.legacyExtra !== 'object') fb.legacyExtra = rcFbLegacyFrom(fb);
+    }
+    function rcFbRecompute(d) {
+      const fb = d.teacherFeedback;
+      if (!fb || !fb.legacyExtra) return;
+      const sum = {};
+      (fb.log || []).forEach(e => { if (e) sum[e.teacherId] = (sum[e.teacherId] || 0) + (Number(e.points) || 0); });
+      if (!fb.points) fb.points = {};
+      const ids = new Set([...Object.keys(sum), ...Object.keys(fb.legacyExtra), ...Object.keys(fb.points)]);
+      ids.forEach(t => { fb.points[t] = (Number(fb.legacyExtra[t]) || 0) + (sum[t] || 0); });
+    }
+
+    // يدمج سجلات جهازين (اتحاد لا استبدال) عند دمج صف المرحلة، حتى لا يضيع سجل محلي لم يُرفع بعد.
+    function rcMergeRecords(out, local, remote) {
+      const la = (local.attendance && local.attendance.records) || {}, ra = (remote.attendance && remote.attendance.records) || {};
+      out.attendance = Object.assign({}, local.attendance || {}, remote.attendance || {}, { records: Object.assign({}, ra, la) });
+      const lp = (local.teacherPresence && local.teacherPresence.records) || {}, rp = (remote.teacherPresence && remote.teacherPresence.records) || {};
+      out.teacherPresence = Object.assign({}, local.teacherPresence || {}, remote.teacherPresence || {}, { records: Object.assign({}, rp, lp) });
+      const lf = local.teacherFeedback || {}, rf = remote.teacherFeedback || {};
+      const byId = new Map();
+      (rf.log || []).concat(lf.log || []).forEach(e => { if (e && typeof e === 'object') byId.set(rcFbId(e), e); });
+      const legacy = rf.legacyExtra || lf.legacyExtra || (lf.log ? rcFbLegacyFrom(lf) : null);
+      out.teacherFeedback = Object.assign({}, lf, rf, {
+        points: Object.assign({}, lf.points || {}, rf.points || {}),
+        basePoints: Object.assign({}, lf.basePoints || {}, rf.basePoints || {}),
+        log: Array.from(byId.values())
+      });
+      if (legacy) out.teacherFeedback.legacyExtra = legacy;
+      rcFbRecompute(out);
+    }
+
+    // نسخة من بيانات المرحلة بلا السجلات المستقلة (هي في record_cells)
+    function rcStripForRow(data) {
+      const o = Object.assign({}, data);
+      if (o.attendance && typeof o.attendance === 'object') o.attendance = Object.assign({}, o.attendance, { records: {} });
+      if (o.teacherPresence && typeof o.teacherPresence === 'object') o.teacherPresence = Object.assign({}, o.teacherPresence, { records: {} });
+      if (o.teacherFeedback && typeof o.teacherFeedback === 'object') o.teacherFeedback = Object.assign({}, o.teacherFeedback, { log: [] });
+      o._recInCells = true;
+      return o;
+    }
+    function rcHasLocalRecords(d) {
+      return !!(d && ((d.attendance && Object.keys(d.attendance.records || {}).length) ||
+        (d.teacherPresence && Object.keys(d.teacherPresence.records || {}).length) ||
+        (d.teacherFeedback && (d.teacherFeedback.log || []).length)));
+    }
+    function rcSnapCount(st) {
+      const rs = rcStageState(st);
+      return Object.keys(rs.cells.att).length + Object.keys(rs.cells.pres).length + Object.keys(rs.cells.fbl).length;
+    }
+
+    // يرفع السجلات التي تغيّرت محلياً منذ آخر مزامنة. يُرجع true عند النجاح الكامل.
+    async function pushRecordCells(st) {
+      if (!st || !st.data) return true;
+      const rs = rcStageState(st);
+      const d = st.data;
+      // رصيد النقاط القديم يُحسب مرة واحدة، وبعد أن سحب هذا الجهاز السجلات من السحابة على الأقل مرة
+      if (rs.lastPull) { try { rcFbInit(d); } catch (e) {} }
+      const isAdmin = currentAccountType === 'superadmin' || currentAccountType === 'stageadmin';
+      const nowIso = gcNowIso();
+      const by = (typeof currentUserLabel === 'function' ? currentUserLabel() : null);
+      const rows = [], after = [];
+      let suspicious = false;
+      Object.keys(RC_KINDS).forEach(kind => {
+        const K = RC_KINDS[kind], cur = K.cur(d), snap = rs.cells[kind];
+        cur.forEach((o, k) => {
+          if (snap[k] !== o.sig) {
+            rows.push({ stage_id: st.id, kind, rkey: k, value: o.v, deleted: false, updated_at: nowIso, updated_by: by });
+            after.push([kind, k, o.sig, false]);
+          }
+        });
+        if (K.appendOnly) return;
+        let dels = Object.keys(snap).filter(k => !cur.has(k));
+        const total = Object.keys(snap).length;
+        // حاجز أمان: حذف جماعي مشبوه (مثلاً مرحلة فرغت فجأة) لا يُرفع، بل يُعاد سحب السجلات من السحابة
+        if (dels.length && (cur.size === 0 || (!isAdmin && dels.length > 50) || (dels.length > 500 && dels.length > total * 0.5))) {
+          suspicious = true;
+          dels.forEach(k => { delete snap[k]; });
+          dels = [];
+        }
+        dels.forEach(k => {
+          rows.push({ stage_id: st.id, kind, rkey: k, value: null, deleted: true, updated_at: nowIso, updated_by: by });
+          after.push([kind, k, null, true]);
+        });
+      });
+      if (suspicious) { console.warn('record cells: تم تجاهل حذف جماعي مشبوه وإعادة سحب السجلات', st.id); rs.lastPull = null; }
+      for (let i = 0; i < rows.length; i += RC_CHUNK) {
+        const res = await supabaseClient.rpc('upsert_record_cells', { p_rows: rows.slice(i, i + RC_CHUNK) });
+        if (res.error) { console.error('upsert_record_cells error:', res.error); return false; }
+        after.slice(i, i + RC_CHUNK).forEach(([kind, k, sig, isDel]) => { if (isDel) delete rs.cells[kind][k]; else rs.cells[kind][k] = sig; });
+      }
+      return true;
+    }
+
+    function applyRecordRows(st, rows) {
+      if (!rows || !rows.length) return 0;
+      if (!st.data) st.data = emptyStageData();
+      const rs = rcStageState(st), d = st.data;
+      let applied = 0, fblTouched = false;
+      rows.forEach(r => {
+        const K = RC_KINDS[r.kind];
+        if (!K) return;
+        const snap = rs.cells[r.kind], k = r.rkey;
+        const loc = K.get(d, k);
+        // تعديل محلي لم يُرفع بعد: لا يُستبدل (سيُرفع بختم أحدث)
+        const pending = !K.appendOnly && ((loc.exists && snap[k] !== loc.sig) || (!loc.exists && rcHas(snap, k)));
+        if (pending) return;
+        if (r.deleted) {
+          if (K.appendOnly) return;
+          if (loc.exists) { K.del(d, k); applied++; }
+          delete snap[k];
+          return;
+        }
+        const sig = K.sigOf(r.value);
+        if (!loc.exists || loc.sig !== sig) { K.set(d, k, r.value); applied++; if (r.kind === 'fbl') fblTouched = true; }
+        snap[k] = sig;
+      });
+      if (fblTouched) { try { rcFbRecompute(d); } catch (e) {} }
+      return applied;
+    }
+
+    async function pullRecordCells(st) {
+      if (!st) return 0;
+      const rs = rcStageState(st);
+      let cursor = rs.lastPull || null, maxSeen = cursor, total = 0;
+      try {
+        for (let guard = 0; guard < 500; guard++) {
+          let q = supabaseClient.from('record_cells').select('*').eq('stage_id', st.id)
+            .order('synced_at', { ascending: true }).limit(1000);
+          if (cursor) q = q.gt('synced_at', cursor);
+          const { data, error } = await q;
+          if (error) { console.error('pull record_cells error:', error); return -1; }
+          if (!data || !data.length) break;
+          total += applyRecordRows(st, data);
+          cursor = data[data.length - 1].synced_at;
+          maxSeen = cursor;
+          if (data.length < 1000) break;
+        }
+      } catch (e) { console.error('pull record_cells exception:', e); return -1; }
+      if (maxSeen) rs.lastPull = new Date(new Date(maxSeen).getTime() - 10000).toISOString();
+      else if (!rs.lastPull) rs.lastPull = new Date(Date.now() - 10000).toISOString();
+      return total;
+    }
+
     // كشف تعارض الخانات قبل الحفظ: يجلب فقط خانات الطلاب المعنيين (طلب صغير) بدل صف المرحلة كاملاً
     async function detectGradeConflictsCells(db, subjectName, term, month, pendingCells) {
       let rows;
@@ -7481,6 +7717,13 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
           if (await gradeCellsEnabled()) {
             const stm = getStageRecord(currentStageId);
             if (stm && stm.data && (stm.data.grades || []).length && !Object.keys(gcStageState(stm).cells).length) {
+              markStageCloudDirty(currentStageId); scheduleCloudPush();
+            }
+          }
+          // ترحيل تلقائي لسجلات الحضور/التقييم المحلية إلى record_cells عند أول مزامنة للمرحلة على هذا الجهاز
+          if (await recordCellsEnabled()) {
+            const stm2 = getStageRecord(currentStageId);
+            if (stm2 && stm2.data && rcHasLocalRecords(stm2.data) && !rcSnapCount(stm2)) {
               markStageCloudDirty(currentStageId); scheduleCloudPush();
             }
           }
@@ -26042,7 +26285,7 @@ function roundToHalf(n){ if (!Number.isFinite(n)) return 0; return Math.round(n 
       at: now.toISOString(),
       monthKey
     });
-    if (fb.log.length > 5000) fb.log = fb.log.slice(-4000);
+    if (window.recordCellsMode !== true && fb.log.length > 5000) fb.log = fb.log.slice(-4000); // مع record_cells لا اقتطاع (النقاط تُشتق من السجل)
     saveDB(db);
     if (typeof scheduleCloudPush === 'function') scheduleCloudPush();
     renderMonitorTeachersPanel();
