@@ -5078,7 +5078,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
     // مصدر واحد لرقم الإصدار بدل تناثر أسماء V19/V20/V21/V22/V23/V24 في التعليقات، رسائل سجل
     // العمليات، وأسماء ملفات التصدير. الأرقام V19-V24 القديمة كانت تشير لمراحل تطوير داخلية للكود
     // (أسماء دوال ومعرّفات HTML/CSS) ولم تعد تُستخدم كإشارة إصدار فعلية للمستخدم بعد الآن.
-    const APP_VERSION = '25.5.1';
+    const APP_VERSION = '25.6.3';
 
     // ============================================================
     //  UI MODAL (يحل محل alert()/confirm() الافتراضيتين من المتصفح)
@@ -5308,9 +5308,19 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
         });
       }
       ownClasses.forEach(k => foreignClasses.delete(k));
+      // اسم الفصل نفسه يحمل رقم الصف (G 1..6 ابتدائي، G 7..9 إعدادي، G 10..12 ثانوي) — مرجع قاطع
+      const levelOfClassName = key => {
+        const m = String(key).split('§')[0].match(/^\s*G\s*(\d{1,2})\b/i);
+        if (!m) return null;
+        const n = parseInt(m[1], 10);
+        if (stageType !== 'primary' && stageType !== 'prep') return null; // الثانوي/الروضة قد تُرقَّم بشكل مختلف
+        return n <= 6 ? 'primary' : n <= 9 ? 'prep' : null;
+      };
+      const allKeys = new Set([...(data.classes || []).map(String), ...students.filter(Boolean).map(x => classSectionKey(x.class, x.section)), ...Object.keys(data.classGrade || {})]);
+      allKeys.forEach(k => { if (foreign(levelOfClassName(k))) foreignClasses.add(k); });
       if (Array.isArray(data.students)) {
         const n = data.students.length;
-        data.students = data.students.filter(x => !(x && foreign(levelOfGradeText(x.grade))));
+        data.students = data.students.filter(x => !(x && (foreign(levelOfGradeText(x.grade)) || foreignClasses.has(classSectionKey(x.class, x.section)))));
         if (data.students.length !== n) changed = true;
       }
       const classOf = c => String(c);
@@ -5355,17 +5365,13 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
           return true;
         });
       }
-      // فصول يتيمة (بلا طلاب ولا مستوى معروف) تبقّت بعد التنظيف: تُزال، لأن أسماء الفصول (G 1 A) تتشابه بين المستويات
+      // فصول يتيمة: لا تُحذف إن كانت مرتبطة بمعلم (حتى لا تضيع التخصيصات عند إعادة رفع الطلاب)
       if (changed && Array.isArray(data.classes)) {
         const used = new Set();
         (data.students || []).forEach(x => { if (x) used.add(classSectionKey(x.class, x.section)); });
         Object.keys(data.classGrade || {}).forEach(k => used.add(k));
-        const n = data.classes.length;
+        (data.teachers || []).forEach(t => (t.assignments || []).forEach(a => (a.classes || []).forEach(c => used.add(String(c)))));
         data.classes = data.classes.filter(c => used.has(String(c)));
-        if (data.classes.length !== n) {
-          const keep = new Set(data.classes.map(String));
-          (data.teachers || []).forEach(t => (t.assignments || []).forEach(a => { if (Array.isArray(a.classes)) a.classes = a.classes.filter(c => keep.has(String(c))); }));
-        }
       }
       if (changed && Array.isArray(data.grades) && Array.isArray(data.students)) {
         const ids = new Set(data.students.map(x => x.id));
@@ -5377,8 +5383,22 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
 
     // حاجز سلامة: يزيل من بيانات المرحلة أي طالب/معلم/فصل/مادة ينتمي لقسم مختلف عن قسم المرحلة
     // (مثلاً طلاب «عربي» داخل «ثانوي لغات»). يعدّل الكائن في مكانه ويُرجع true إن حذف شيئاً.
-    function purgeForeignSectionData(data, section, stageType) {
-      const lvChanged = stageType ? purgeForeignLevelData(data, stageType) : false;
+    function purgeForeignSectionData(data, section, stageType, stageId) {
+      let ownChanged = false;
+      if (data && stageId) {
+        ['students', 'teachers', 'subjects'].forEach(k => {
+          if (!Array.isArray(data[k])) return;
+          const n = data[k].length;
+          data[k] = data[k].filter(x => !(x && x._stg && x._stg !== stageId));
+          if (data[k].length !== n) ownChanged = true;
+        });
+        if (ownChanged && Array.isArray(data.grades) && Array.isArray(data.students)) {
+          const ids = new Set(data.students.map(x => x.id));
+          data.grades = data.grades.filter(g => ids.has(g.studentId));
+          data._gradesIndex = null;
+        }
+      }
+      const lvChanged = (stageType ? purgeForeignLevelData(data, stageType) : false) || ownChanged;
       if (!data || (section !== 'arabic' && section !== 'languages')) return lvChanged;
       const other = section === 'arabic' ? 'languages' : 'arabic';
       const suffix = '§' + other;
@@ -5437,7 +5457,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
       if (sw <= 0) return false;
       if (tw === 0 || sw > tw) {
         target.data = source.data;
-        purgeForeignSectionData(target.data, stageSectionOf(target), stageTypeOf(target));
+        purgeForeignSectionData(target.data, stageSectionOf(target), stageTypeOf(target), target.id);
         if (source.updatedAt) target.updatedAt = source.updatedAt;
         return true;
       }
@@ -5548,7 +5568,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
 
       // شفاء ذاتي: لا يجوز أن تحتوي مرحلة «عربي» على بيانات «لغات» أو العكس
       root.stages.forEach(st => {
-        if (st && st.data && purgeForeignSectionData(st.data, stageSectionOf(st), stageTypeOf(st))) changed = true;
+        if (st && st.data && purgeForeignSectionData(st.data, stageSectionOf(st), stageTypeOf(st), st.id)) changed = true;
       });
 
       const order = FIXED_STAGES.map(s => s.id);
@@ -5987,12 +6007,15 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
         });
       }
       try { if (data && Array.isArray(data.teachers)) acctStamp(data.teachers); } catch (eSt) {}
+      // ختم الملكية: كل طالب/معلم/مادة يحمل معرّف مرحلته (_stg) فلا يمكن أن يعيش في مرحلة أخرى
+      try { ['students', 'teachers', 'subjects'].forEach(k => { if (data && Array.isArray(data[k])) data[k].forEach(x => { if (x && typeof x === 'object' && !x._stg) x._stg = currentStageId; }); }); } catch (eOw) {}
       st.data = data;
       st.updatedAt = gcNowIso();
       markStageCloudDirty(currentStageId);
       return saveRootDB(root, protectKeys);
     }
 
+    const _stageGuardSeen = new WeakSet();
     function loadDB() {
       const db = getDB();
       if (!db.students) db.students = [];
@@ -6002,6 +6025,17 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
       if (!db.teachers) db.teachers = [];
       if (!db.classGrade) db.classGrade = {};
       if (!db.metaByGrade) db.metaByGrade = {};
+      // حاجز الفصل بين المراحل على البيانات الحية: يُنفَّذ مرة لكل كائن بيانات (وبعد كل دمج يُنشئ كائناً جديداً)
+      try {
+        if (currentStageId && !_stageGuardSeen.has(db)) {
+          _stageGuardSeen.add(db);
+          if (purgeForeignSectionData(db, stageSectionOf(currentStageId), stageTypeOf(currentStageId), currentStageId)) {
+            db._gradesIndex = null;
+            const sid = currentStageId;
+            setTimeout(() => { try { if (currentStageId === sid) saveDB(db); } catch (e) {} }, 300);
+          }
+        }
+      } catch (eGuard) {}
       // كل خطوة ترقية بيانات قديمة أدناه مُغلَّفة بمحاولة/التقاط: لو كان سجل قديم واحد بصيغة غير
       // متوقعة تسبب توقفاً هنا، فإن ذلك كان يمنع loadDB() بالكامل من إرجاع أي بيانات، وهو ما يكسر كل
       // شاشة تعتمد عليها (الإحصائيات، المعلمين، بيانات المدرسة...) بصمت تام دون أي أثر ظاهر للمستخدم.
@@ -6627,7 +6661,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
     function acctStamp(list) {
       (list || []).forEach(a => {
         if (!a || typeof a !== 'object') return;
-        const sig = JSON.stringify(a, (k, v) => (k === 'updatedAt' || k === '_sig') ? undefined : v);
+        const sig = JSON.stringify(a, (k, v) => (k === 'updatedAt' || k === '_sig' || k === '_stg') ? undefined : v);
         if (a._sig === undefined) { a._sig = sig; return; }
         if (a._sig !== sig) { a._sig = sig; a.updatedAt = gcNowIso(); }
       });
@@ -6765,7 +6799,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
       return Array.from(set);
     }
 
-    function mergeStageDataCollaborative(localData, remoteData, stageSection, stageType) {
+    function mergeStageDataCollaborative(localData, remoteData, stageSection, stageType, stageId) {
       const local = localData || {};
       const remote = remoteData || {};
       const out = Object.assign({}, remote);
@@ -6815,7 +6849,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
         out.schoolInfo = Object.assign({}, remote.schoolInfo || {}, local.schoolInfo || {});
       }
       // لا تُعيد بيانات قسم آخر من السحابة (تمنع عودة طلاب «عربي» إلى مرحلة «لغات» بعد التنظيف)
-      purgeForeignSectionData(out, stageSection, stageType);
+      purgeForeignSectionData(out, stageSection, stageType, stageId);
       return { data: out, localGradeWins: mg.localWon };
     }
     window.mergeStageDataCollaborative = mergeStageDataCollaborative;
@@ -6894,7 +6928,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
               const localCopy = st.data || emptyStageData();
               const remoteCopy = stageRow.data;
               try {
-                const mg = mergeStageDataCollaborative(localCopy, remoteCopy, stageSectionOf(currentStageId), stageTypeOf(currentStageId));
+                const mg = mergeStageDataCollaborative(localCopy, remoteCopy, stageSectionOf(currentStageId), stageTypeOf(currentStageId), currentStageId);
                 st.data = mg.data;
                 if (mg.localGradeWins > 0) {
                   // درجات محلية أحدث: لا تعتمد updatedAt السحابة حتى لا تُعتبر نسختنا قديمة
@@ -6917,7 +6951,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
             try {
               const beforeT = (st.data.teachers || []).length;
               const beforeG = (st.data.grades || []).length;
-              const mg = mergeStageDataCollaborative(st.data, remote, stageSectionOf(st), stageTypeOf(st));
+              const mg = mergeStageDataCollaborative(st.data, remote, stageSectionOf(st), stageTypeOf(st), st.id);
               st.data = mg.data;
               if ((st.data.teachers || []).length !== beforeT || (st.data.grades || []).length !== beforeG || mg.localGradeWins >= 0) {
                 merged = true;
@@ -7003,7 +7037,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
           local.name = name;
           if (row && row.data) {
             try {
-              const mg = mergeStageDataCollaborative(local.data || emptyStageData(), row.data, stageSectionOf(local), stageTypeOf(local));
+              const mg = mergeStageDataCollaborative(local.data || emptyStageData(), row.data, stageSectionOf(local), stageTypeOf(local), local.id);
               local.data = mg.data;
             } catch (e) {
               local.data = row.data;
@@ -7095,7 +7129,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
             const stageRow = remoteRows[i];
             if (stageRow && stageRow.data) {
               try {
-                const mg = mergeStageDataCollaborative(st.data, stageRow.data, stageSectionOf(st), stageTypeOf(st));
+                const mg = mergeStageDataCollaborative(st.data, stageRow.data, stageSectionOf(st), stageTypeOf(st), st.id);
                 st.data = mg.data;
               } catch (e) {
                 console.warn('merge before push failed', st.id, e);
