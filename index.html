@@ -5807,6 +5807,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
     function saveRootDB(root, protectKeys) {
      try {
       if (currentAccountType === 'monitor') return Promise.resolve();
+      try { acctStamp(root.stageAdmins); acctStamp(root.stageMonitors); } catch (eSt) {}
       root.lastUpdated = new Date().toISOString();
       if (currentStageId) markStageCloudDirty(currentStageId);
       const p = persistRootDB(root, protectKeys);
@@ -5877,6 +5878,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
           if (g.componentIndex != null && g.componentIndex !== '') g.componentIndex = parseInt(g.componentIndex, 10);
         });
       }
+      try { if (data && Array.isArray(data.teachers)) acctStamp(data.teachers); } catch (eSt) {}
       st.data = data;
       st.updatedAt = gcNowIso();
       markStageCloudDirty(currentStageId);
@@ -6240,6 +6242,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
         stages: (root.stages || []).map(({ id, name, section }) => ({ id, name, section })),
         stageAdmins: root.stageAdmins || [],
         stageMonitors: root.stageMonitors || [],
+        deletedIds: root.deletedIds || {},
         superAdminPasswordHash: root.superAdminPasswordHash || null,
         systemClosure: root.systemClosure || { enabled: false, message: '', updatedAt: null },
         lastUpdated: root.lastUpdated || null
@@ -6511,6 +6514,66 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
     }
 
     // دمج المعلمين بالـ id + اتحاد التعيينات — حتى لا يُمسح تسجيل مسؤول الحاسب عند رصد معلم
+    // ===== دمج حسابات الإدارة (مسؤولو الحاسب / مديرو المراحل) بدل الاستبدال الكامل =====
+    // ختم تلقائي: أي تغيير في محتوى الحساب يرفع updatedAt؛ الحسابات القديمة بلا _sig تُسجَّل بصمتها دون تغيير الوقت.
+    function acctStamp(list) {
+      (list || []).forEach(a => {
+        if (!a || typeof a !== 'object') return;
+        const sig = JSON.stringify(a, (k, v) => (k === 'updatedAt' || k === '_sig') ? undefined : v);
+        if (a._sig === undefined) { a._sig = sig; return; }
+        if (a._sig !== sig) { a._sig = sig; a.updatedAt = gcNowIso(); }
+      });
+    }
+    function acctMergeTombs(a, b) {
+      const out = {};
+      [a, b].forEach(m => Object.keys(m || {}).forEach(k => { if (!out[k] || String(m[k]) > String(out[k])) out[k] = m[k]; }));
+      return out;
+    }
+    function acctMergeLists(localList, remoteList, tombs) {
+      const ts = (x) => { try { return x && x.updatedAt ? new Date(x.updatedAt).getTime() : 0; } catch (e) { return 0; } };
+      const map = new Map();
+      (remoteList || []).forEach(a => { if (a && a.id != null) map.set(String(a.id), a); });
+      (localList || []).forEach(a => {
+        if (!a || a.id == null) return;
+        const k = String(a.id), r = map.get(k);
+        if (!r || ts(a) >= ts(r)) map.set(k, a);
+      });
+      return Array.from(map.values()).filter(a => {
+        const dt = tombs && tombs[String(a.id)];
+        return !dt || ts(a) > new Date(dt).getTime();
+      });
+    }
+    function mergeRootAccounts(root, remoteMeta) {
+      if (!root || !remoteMeta) return;
+      const rd = remoteMeta.deletedIds || {}, ld = root.deletedIds || {};
+      root.deletedIds = {
+        stageAdmins: acctMergeTombs(ld.stageAdmins, rd.stageAdmins),
+        stageMonitors: acctMergeTombs(ld.stageMonitors, rd.stageMonitors)
+      };
+      root.stageAdmins = acctMergeLists(root.stageAdmins, remoteMeta.stageAdmins, root.deletedIds.stageAdmins);
+      root.stageMonitors = acctMergeLists(root.stageMonitors, remoteMeta.stageMonitors, root.deletedIds.stageMonitors);
+    }
+    // شواهد حذف الطلاب (على مستوى بيانات المرحلة): تمنع عودة طالب حُذف بالاستيراد من نسخة السحابة أو جهاز آخر
+    function stuTomb(data, students) {
+      if (!data || !students) return;
+      if (!data.deletedIds || typeof data.deletedIds !== 'object') data.deletedIds = {};
+      if (!data.deletedIds.students || typeof data.deletedIds.students !== 'object') data.deletedIds.students = {};
+      const now = gcNowIso();
+      (Array.isArray(students) ? students : Array.from(students)).forEach(s => {
+        const id = (s && typeof s === 'object') ? s.id : s;
+        if (id != null && id !== '') data.deletedIds.students[String(id)] = now;
+      });
+    }
+    function stuStamp(students) {
+      const now = gcNowIso();
+      (students || []).forEach(s => { if (s && typeof s === 'object') s.updatedAt = now; });
+    }
+    function acctTomb(root, kind, id) {
+      if (!root.deletedIds || typeof root.deletedIds !== 'object') root.deletedIds = {};
+      if (!root.deletedIds[kind] || typeof root.deletedIds[kind] !== 'object') root.deletedIds[kind] = {};
+      root.deletedIds[kind][String(id)] = gcNowIso();
+    }
+
     function mergeTeachersCollaborative(localList, remoteList) {
       const map = new Map();
       const ts = (x) => { try { return x && x.updatedAt ? new Date(x.updatedAt).getTime() : 0; } catch (e) { return 0; } };
@@ -6535,8 +6598,10 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
         addAsg(t.assignments);
         const prefer = ts(t) >= ts(prev) ? t : prev;
         const other = prefer === t ? prev : t;
+        // أحدث نسخة (ختم زمني مختلف) تحسم التخصيصات كاملة فلا يعود تخصيص حُذف؛ عند تساوي الختم أو غيابه (بيانات قديمة) يُجمع الاثنان
+        const decided = ts(t) !== ts(prev);
         map.set(id, Object.assign({}, other, prefer, {
-          assignments: asg.length ? asg : (prefer.assignments || other.assignments || [])
+          assignments: decided ? (prefer.assignments || []) : (asg.length ? asg : (prefer.assignments || other.assignments || []))
         }));
       };
       (remoteList || []).forEach(put);
@@ -6610,7 +6675,14 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
         const tt = t.updatedAt ? new Date(t.updatedAt).getTime() : 0;
         return tt > new Date(dt).getTime();
       });
-      out.students = mergeStudentsCollaborative(local.students, remote.students);
+      const tombSt = acctMergeTombs(local.deletedIds && local.deletedIds.students, remote.deletedIds && remote.deletedIds.students);
+      out.deletedIds.students = tombSt;
+      out.students = mergeStudentsCollaborative(local.students, remote.students).filter(st => {
+        const dt = st && tombSt[String(st.id)];
+        if (!dt) return true;
+        const tt = st.updatedAt ? new Date(st.updatedAt).getTime() : 0;
+        return tt > new Date(dt).getTime();
+      });
       const tombS = {};
       [remote.deletedIds && remote.deletedIds.subjects, local.deletedIds && local.deletedIds.subjects].forEach(m => {
         Object.keys(m || {}).forEach(k => { if (!tombS[k] || String(m[k]) > String(tombS[k])) tombS[k] = m[k]; });
@@ -6675,8 +6747,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
       const remoteMetaIsNewer = !localMetaUpdated ||
         (metaRow.updated_at && new Date(metaRow.updated_at) > new Date(localMetaUpdated));
       if (remoteMetaIsNewer) {
-        root.stageAdmins = remoteMeta.stageAdmins || root.stageAdmins;
-        if (remoteMeta.stageMonitors) root.stageMonitors = remoteMeta.stageMonitors;
+        mergeRootAccounts(root, remoteMeta);
         root.superAdminPasswordHash = remoteMeta.superAdminPasswordHash || root.superAdminPasswordHash;
         if (remoteMeta.systemClosure) root.systemClosure = remoteMeta.systemClosure;
         root.lastUpdated = remoteMeta.lastUpdated;
@@ -6812,8 +6883,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
       const stageIds = (remoteMeta.stages || []).map(s => s.id);
       // جلب كل المراحل بالتوازي (Promise.all)
       const stageRows = await Promise.all(stageIds.map(id => cloudFetchRow('stage_' + id)));
-      root.stageAdmins = remoteMeta.stageAdmins || root.stageAdmins;
-        if (remoteMeta.stageMonitors) root.stageMonitors = remoteMeta.stageMonitors;
+      mergeRootAccounts(root, remoteMeta);
       root.superAdminPasswordHash = remoteMeta.superAdminPasswordHash || root.superAdminPasswordHash;
       if (remoteMeta.systemClosure) root.systemClosure = remoteMeta.systemClosure;
       root.lastUpdated = remoteMeta.lastUpdated;
@@ -6863,6 +6933,10 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
           const now = gcNowIso();
           // root_meta (حسابات المديرين وكلمة السر...) لا يرفعه إلا المديرون، حتى لا تكتب نسخة معلم قديمة فوقه
           const _isAdminAcct = currentAccountType === 'superadmin' || currentAccountType === 'stageadmin';
+          if (_isAdminAcct) {
+            // ادمج حسابات الإدارة مع السحابة قبل الرفع حتى لا تمسح نسخة قديمة تعديلات جهاز آخر
+            try { const _mr = await cloudFetchRow('root_meta'); if (_mr && _mr.data) mergeRootAccounts(root, _mr.data); } catch (eMr) {}
+          }
           const rows = _isAdminAcct ? [{ id: 'root_meta', data: buildRootMeta(root), updated_at: now }] : [];
           const _gcOn = await gradeCellsEnabled();
           let _gcAllOk = true;
@@ -10058,7 +10132,8 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
           s.name = c.newName; s.grade = c.newGrade;
           const newId = (s.section || '') + '::' + (s.grade || '') + '::' + s.nationalId;
           if (newId !== oldId) {
-            s.id = newId;
+            stuTomb(stage.data, [oldId]);
+            s.id = newId; s.updatedAt = gcNowIso();
             stage.data.grades.forEach(g => { if (g.studentId === oldId) g.studentId = newId; });
           }
         });
@@ -10070,12 +10145,14 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
           stage.data.students.push({
             id: studentId, nationalId: ns.nationalId, seat: ns.seat, name: ns.name, gender: ns.gender,
             class: 'عام', grade: ns.grade || '', section: ns.section || '', secondLanguage: ns.secondLanguage || '',
+            updatedAt: gcNowIso(),
           });
         });
 
         const removedIds = new Set(sp.removed.map(s => s.nationalId));
         if (removedIds.size) {
           const removedStudentIds = new Set(stage.data.students.filter(s => removedIds.has(s.nationalId)).map(s => s.id));
+          stuTomb(stage.data, Array.from(removedStudentIds));
           stage.data.students = stage.data.students.filter(s => !removedIds.has(s.nationalId));
           stage.data.grades = stage.data.grades.filter(g => !removedStudentIds.has(g.studentId));
         }
@@ -10083,7 +10160,10 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
         // نقل خارج المرحلة: يُحذف من هنا فقط دون مسّ درجاته (تبقى محفوظة تاريخياً في حال احتيج
         // الرجوع إليها)، وسجله الجديد أُضيف بالفعل في المرحلة الهدف عبر transfersIn أعلاه.
         const transferOutIds = new Set(sp.transfers.map(t => t.nationalId));
-        if (transferOutIds.size) stage.data.students = stage.data.students.filter(s => !transferOutIds.has(s.nationalId));
+        if (transferOutIds.size) {
+          stuTomb(stage.data, stage.data.students.filter(s => transferOutIds.has(s.nationalId)));
+          stage.data.students = stage.data.students.filter(s => !transferOutIds.has(s.nationalId));
+        }
 
         // القائمة الرسمية المعتمدة لهذه المرحلة بعد التحديث — تُستخدم لاحقاً لفحص أي طالب يُضاف عبر
         // رفع ملف درجات برقم قومي غير معروف بها (زر "فحص تعارضات الرقم القومي" بالأسفل).
@@ -10647,6 +10727,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
       if (!a) return;
       if (!confirm('حذف مدير المرحلة «' + a.name + '»؟')) return;
       root.stageMonitors = (root.stageMonitors || []).filter(x => x.id !== id);
+      acctTomb(root, 'stageMonitors', id);
       saveRootDB(root);
       loadStagesMgmtUI();
      } catch (e) {
@@ -11138,6 +11219,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
       const root = getRootDB();
       const a = root.stageAdmins.find(x => x.id === id);
       root.stageAdmins = root.stageAdmins.filter(x => x.id !== id);
+      acctTomb(root, 'stageAdmins', id);
       saveRootDB(root);
       if (a) {
         await provisionCloudAccount({
@@ -12451,6 +12533,10 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
           db.grades = (db.grades || []).filter(g => !removedIds.has(g.studentId));
         }
 
+        // شواهد حذف: الطلاب غير الموجودين في الملف الجديد + المعرّفات القديمة التي استُبدلت، حتى لا تعيدهم المزامنة
+        stuTomb(db, rosterDiff.removed);
+        stuTomb(db, (rosterDiff.idRemaps || []).map(r => r.oldId));
+        stuStamp(result.students);
         db.students = (db.students || []).filter(s => !(s.grade === importGrade && s.section === importSection)).concat(result.students);
 
         // المواد مشتركة عادة بين صفوف نفس المرحلة. المادة الجديدة كلياً تُضاف كتعريف رسمي أول مرة،
@@ -14488,6 +14574,7 @@ function renderMonthlyExportButtons() {
       if (!(await showConfirm('تأكيد أخير: هذا الإجراء لا يمكن التراجع عنه. متابعة الحذف؟'))) return;
 
       const idPrefix = section + '::' + grade + '::';
+      stuTomb(db, studentsToDelete);
       db.students = db.students.filter(s => !(s.grade === grade && s.section === section));
       db.grades = (db.grades || []).filter(g => !(typeof g.studentId === 'string' && g.studentId.startsWith(idPrefix)));
 
@@ -14534,6 +14621,7 @@ function renderMonthlyExportButtons() {
           .filter(Boolean);
         if (st.data && st.data.meta && st.data.meta.workbookStoragePath) orphanedKeys.push(st.data.meta.workbookStoragePath);
         if (orphanedKeys.length) await deleteWorkbooksFromCloud([...new Set(orphanedKeys)]);
+        stuTomb(st.data, st.data.students || []);
         st.data.students = []; st.data.subjects = []; st.data.grades = []; st.data.classes = [];
         st.data.locks = {}; st.data.meta = null; st.data.metaByGrade = {}; st.data.classGrade = {};
         saveRootDB(root);
