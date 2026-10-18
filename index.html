@@ -5078,7 +5078,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
     // مصدر واحد لرقم الإصدار بدل تناثر أسماء V19/V20/V21/V22/V23/V24 في التعليقات، رسائل سجل
     // العمليات، وأسماء ملفات التصدير. الأرقام V19-V24 القديمة كانت تشير لمراحل تطوير داخلية للكود
     // (أسماء دوال ومعرّفات HTML/CSS) ولم تعد تُستخدم كإشارة إصدار فعلية للمستخدم بعد الآن.
-    const APP_VERSION = '25.5.0';
+    const APP_VERSION = '25.5.1';
 
     // ============================================================
     //  UI MODAL (يحل محل alert()/confirm() الافتراضيتين من المتصفح)
@@ -5354,6 +5354,18 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
           sub.appliesTo = kept;
           return true;
         });
+      }
+      // فصول يتيمة (بلا طلاب ولا مستوى معروف) تبقّت بعد التنظيف: تُزال، لأن أسماء الفصول (G 1 A) تتشابه بين المستويات
+      if (changed && Array.isArray(data.classes)) {
+        const used = new Set();
+        (data.students || []).forEach(x => { if (x) used.add(classSectionKey(x.class, x.section)); });
+        Object.keys(data.classGrade || {}).forEach(k => used.add(k));
+        const n = data.classes.length;
+        data.classes = data.classes.filter(c => used.has(String(c)));
+        if (data.classes.length !== n) {
+          const keep = new Set(data.classes.map(String));
+          (data.teachers || []).forEach(t => (t.assignments || []).forEach(a => { if (Array.isArray(a.classes)) a.classes = a.classes.filter(c => keep.has(String(c))); }));
+        }
       }
       if (changed && Array.isArray(data.grades) && Array.isArray(data.students)) {
         const ids = new Set(data.students.map(x => x.id));
