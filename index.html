@@ -5078,7 +5078,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
     // مصدر واحد لرقم الإصدار بدل تناثر أسماء V19/V20/V21/V22/V23/V24 في التعليقات، رسائل سجل
     // العمليات، وأسماء ملفات التصدير. الأرقام V19-V24 القديمة كانت تشير لمراحل تطوير داخلية للكود
     // (أسماء دوال ومعرّفات HTML/CSS) ولم تعد تُستخدم كإشارة إصدار فعلية للمستخدم بعد الآن.
-    const APP_VERSION = '26.0.0';
+    const APP_VERSION = '26.1.0';
 
     // ============================================================
     //  UI MODAL (يحل محل alert()/confirm() الافتراضيتين من المتصفح)
@@ -6856,6 +6856,20 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
     }
     window.mergeStageDataCollaborative = mergeStageDataCollaborative;
 
+    // root_meta (حسابات المديرين...) لا يتغيّر إلا نادراً: استعلام صغير عن وقت تعديله، ولا يُحمَّل كاملاً إلا إذا تغيّر
+    var _rootMetaCache = null;
+    async function cloudFetchRootMetaCached() {
+      try {
+        if (_rootMetaCache && _rootMetaCache.data) {
+          const s0 = await supabaseClient.from('grade_system_state').select('updated_at').eq('id', 'root_meta').maybeSingle();
+          if (!s0.error && s0.data && s0.data.updated_at === _rootMetaCache.updated_at) return _rootMetaCache;
+        }
+      } catch (e) {}
+      const row = await cloudFetchRow('root_meta');
+      if (row && row.data) _rootMetaCache = row;
+      return row;
+    }
+
     async function pullFromCloud(refreshUi) {
       if (!cloudAvailable || !isOnline) return;
       // لا تسحب أثناء رفع معلّق حتى لا تُستبدل التعديلات المحلية قبل وصولها للسحابة
@@ -6864,7 +6878,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
         return;
       }
 
-      const metaRow = await cloudFetchRow('root_meta');
+      const metaRow = await cloudFetchRootMetaCached();
 
       // ── الصيغة القديمة (صف 'main'): ترحيل تلقائي ──
       if (!metaRow || !metaRow.data) {
@@ -7699,9 +7713,33 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
     }
 
     // فحص دوري — لا يسحب أثناء رفع معلّق
-    setInterval(function () {
-      if (isOnline && !cloudPushInFlight && !cloudPushPending) pullFromCloud(true);
-    }, 25000);
+    // فحص دوري متكيّف لتخفيف الحمل عن Supabase (مئات الأجهزة): 30 ث والصفحة ظاهرة، 120 ث إن كانت مخفية،
+    // مع تفاوت عشوائي ±20% حتى لا تطلب كل الأجهزة في اللحظة نفسها، وتباطؤ تلقائي إن بطؤ الخادم، وسحب فوري عند العودة للصفحة.
+    (function () {
+      var slow = 0, lastPullAt = Date.now();
+      function nextDelay() {
+        var base = document.hidden ? 120000 : 30000;
+        return Math.min(base * (0.8 + Math.random() * 0.4) * Math.pow(2, slow), 300000);
+      }
+      async function tick() {
+        try {
+          if (isOnline && !cloudPushInFlight && !cloudPushPending) {
+            var t0 = Date.now();
+            await pullFromCloud(true);
+            lastPullAt = Date.now();
+            slow = (lastPullAt - t0 > 4000) ? Math.min(slow + 1, 3) : 0;
+          }
+        } catch (e) { slow = Math.min(slow + 1, 3); }
+        setTimeout(tick, nextDelay());
+      }
+      setTimeout(tick, nextDelay());
+      document.addEventListener('visibilitychange', function () {
+        if (!document.hidden && isOnline && Date.now() - lastPullAt > 20000 && !cloudPushInFlight && !cloudPushPending) {
+          lastPullAt = Date.now();
+          pullFromCloud(true);
+        }
+      });
+    })();
 
     // بعد الدخول أو تبديل المرحلة: اسحب درجات المرحلة فوراً (دون انتظار الفحص الدوري)،
     // ولمدير النظام/المرحلة اسحب أيضاً درجات كل مراحله مرة واحدة ليظهر الإنجاز في لوحة التحكم.
