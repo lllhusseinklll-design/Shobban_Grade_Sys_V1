@@ -5078,7 +5078,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
     // مصدر واحد لرقم الإصدار بدل تناثر أسماء V19/V20/V21/V22/V23/V24 في التعليقات، رسائل سجل
     // العمليات، وأسماء ملفات التصدير. الأرقام V19-V24 القديمة كانت تشير لمراحل تطوير داخلية للكود
     // (أسماء دوال ومعرّفات HTML/CSS) ولم تعد تُستخدم كإشارة إصدار فعلية للمستخدم بعد الآن.
-    const APP_VERSION = '26.1.0';
+    const APP_VERSION = '26.2.0';
 
     // ============================================================
     //  UI MODAL (يحل محل alert()/confirm() الافتراضيتين من المتصفح)
@@ -9561,6 +9561,51 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
       const el=document.getElementById('backupStatus'); if(el) { el.textContent='✅ تم إنشاء نسخة احتياطية كاملة من بيانات النظام.'; el.style.color='#0b5e42'; }
       recordAudit('إنشاء نسخة احتياطية','تم تنزيل نسخة كاملة من بيانات النظام'); renderAuditLog();
     }
+
+    // نسخة احتياطية كاملة من السحابة نفسها (كل المراحل: صفوف المراحل + الدرجات + الحضور) إلى ملف على الجهاز.
+    // قراءة فقط: لا تغيّر شيئاً في السحابة ولا في بيانات الجهاز.
+    async function downloadCloudBackup() {
+      const el = document.getElementById('cloudBackupStatus');
+      const say = (t, ok) => { if (el) { el.textContent = t; el.style.color = ok === false ? '#b91c1c' : (ok ? '#0b5e42' : '#334155'); } };
+      if (!cloudAvailable || !isOnline || typeof supabaseClient === 'undefined' || !supabaseClient) { say('⚠️ لا يوجد اتصال بالسحابة الآن.', false); return; }
+      const btn = document.getElementById('cloudBackupBtn'); if (btn) btn.disabled = true;
+      try {
+        const out = { format: 'GradeSystemPro-CloudBackup', appVersion: APP_VERSION, createdAt: new Date().toISOString(), tables: {} };
+        const spec = [
+          ['grade_system_state', null, 'صفوف المراحل والإعدادات'],
+          ['grade_cells', ['synced_at', 'student_id', 'subject_name', 'term', 'month', 'comp_index'], 'الدرجات'],
+          ['record_cells', ['synced_at', 'stage_id', 'kind', 'rkey'], 'الحضور والتقييم']
+        ];
+        const counts = {};
+        for (const [table, order, label] of spec) {
+          const rows = []; const PAGE = 1000;
+          for (let from = 0; ; from += PAGE) {
+            say('⏳ جارٍ قراءة ' + label + ' … ' + (rows.length));
+            let q = supabaseClient.from(table).select('*');
+            if (order) order.forEach(c => { q = q.order(c, { ascending: true }); }); else q = q.order('id', { ascending: true });
+            const { data, error } = await q.range(from, from + PAGE - 1);
+            if (error) {
+              if (table === 'record_cells' && /does not exist|relation|404/i.test(String(error.message || error))) break; // لم يُفعَّل بعد
+              throw new Error(label + ': ' + (error.message || error));
+            }
+            if (!data || !data.length) break;
+            data.forEach(r => rows.push(r));
+            if (data.length < PAGE) break;
+          }
+          out.tables[table] = rows; counts[table] = rows.length;
+        }
+        if (!counts.grade_system_state) throw new Error('لم تُقرأ أي بيانات من السحابة — لم تُحفظ النسخة.');
+        const stamp = new Date().toISOString().replace(/[:T]/g, '-').slice(0, 16);
+        downloadBlob('GradeSystemPro_CloudBackup_' + stamp + '.json', JSON.stringify(out), 'application/json;charset=utf-8');
+        say('✅ تم تنزيل النسخة: ' + counts.grade_system_state + ' صف مراحل، ' + (counts.grade_cells || 0) + ' درجة، ' + (counts.record_cells || 0) + ' سجل حضور/تقييم.', true);
+        try { recordAudit('نسخة احتياطية سحابية', 'مراحل ' + counts.grade_system_state + ' · درجات ' + (counts.grade_cells || 0) + ' · سجلات ' + (counts.record_cells || 0)); renderAuditLog(); } catch (e) {}
+      } catch (e) {
+        console.error('cloud backup', e);
+        say('❌ تعذّر إكمال النسخة: ' + ((e && e.message) || e) + ' — لم يُحفظ ملف ناقص.', false);
+      }
+      if (btn) btn.disabled = false;
+    }
+    window.downloadCloudBackup = downloadCloudBackup;
 
     async function restoreLocalBackup(file) {
       if (!file) return;
@@ -21393,6 +21438,11 @@ function renderMonthlyExportButtons() {
             <input id="backupRestoreInput" type="file" accept="application/json,.json" style="display:none" onchange="restoreLocalBackup(this.files[0])">
           </div>
           <div id="backupStatus" style="margin-top:12px;font-size:13px"></div>
+          <hr style="border:none;border-top:1px solid #e2e8f0;margin:14px 0">
+          <h3 style="margin:0 0 6px">☁️ نسخة كاملة من السحابة</h3>
+          <p style="margin:0 0 8px">تقرأ كل المراحل والدرجات وسجلات الحضور مباشرة من السحابة وتحفظها في ملف على جهازك. للقراءة فقط ولا تغيّر أي بيانات. خذها قبل بدء الرصد الفعلي وبعد أي عملية كبيرة.</p>
+          <button class="btn btn-primary" id="cloudBackupBtn" onclick="downloadCloudBackup()">☁️ تنزيل نسخة كاملة من السحابة</button>
+          <div id="cloudBackupStatus" style="margin-top:12px;font-size:13px"></div>
         </div>
         <div class="security-card">
           <h3>📋 سجل دخول المدراء والعمليات</h3>
