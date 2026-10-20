@@ -12188,10 +12188,11 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
     // فعلياً غياباً (لا يوجد رقم واحد بينها). القيم غير المُدخَلة أصلاً لا تدخل هذه المصفوفة من الأساس.
     function aggregateAbsentAwareValues(rawVals, mode) {
       if (!rawVals.length) return null;
-      const numeric = rawVals.filter(v => !isAbsentMark(v));
-      if (!numeric.length) return ABSENT_MARK;
-      const sum = numeric.reduce((a, b) => a + b, 0);
-      return mode === 'sum' ? sum : sum / numeric.length;
+      // تعديل: علامة الغياب "غ" تُحتسب صفراً داخل المتوسط/المجموع (بدلاً من تجاهلها).
+      // الشهور التي لم تُرصد أصلاً لا تدخل في rawVals فلا تُحتسب.
+      const nums = rawVals.map(v => isAbsentMark(v) ? 0 : v);
+      const sum = nums.reduce((a, b) => a + b, 0);
+      return mode === 'sum' ? sum : sum / nums.length;
     }
 
     // ============================================================
