@@ -2269,6 +2269,15 @@
       writing-mode: vertical-rl; transform: rotate(180deg);
       display: inline-block; max-height: 22mm;
     }
+    /* الطباعة الطولية: عنوان التقييم الشهري وعمود المجموع الكلي بعده رأسيان (مثل الطباعة العرضية) */
+    .ministry-portrait-page th.ml-exam-slot,
+    .ministry-portrait-page th.ml-grand-slot { vertical-align: middle; }
+    .ministry-portrait-page th.ml-exam-slot .exam-title,
+    .ministry-portrait-page th.ml-grand-slot .grand-title {
+      writing-mode: vertical-rl; transform: rotate(180deg);
+      display: inline-block; white-space: nowrap;
+      line-height: 1.2; font-weight: 800; max-height: 26mm;
+    }
     .ministry-landscape-page th.avg-col {
       background: #3f7a57 !important;
       color: #ffffff !important;
