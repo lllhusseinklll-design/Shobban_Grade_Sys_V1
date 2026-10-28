@@ -6793,10 +6793,14 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
         const localWins = ts(s) >= ts(r);
         const win = localWins ? s : r, lose = localWins ? r : s;
         const comps = (win.components && win.components.length) ? win.components : (lose.components || []);
-        map.set(k, Object.assign({}, lose, win, {
+        const mergedScopes = Object.assign({}, lose.componentsByScope || {}, win.componentsByScope || {});
+        const merged = Object.assign({}, lose, win, {
           components: comps,
           exportName: win.exportName || lose.exportName || win.name || lose.name
-        }));
+        });
+        if (Object.keys(mergedScopes).length) merged.componentsByScope = mergedScopes;
+        if (!merged.baseScope && (win.baseScope || lose.baseScope)) merged.baseScope = win.baseScope || lose.baseScope;
+        map.set(k, merged);
       });
       return Array.from(map.values());
     }
@@ -11988,7 +11992,14 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
     // ترتيبه وخصائصه المحفوظة (الدرجة العظمى، وعلامة "الدرجة الشهرية")، فقط رقم العمود (colIndex) يُؤخذ
     // من الملف الحالي. أي مكوّن جديد فعلاً (اسم لم يُشاهَد من قبل لهذه المادة) يُضاف في نهاية القائمة
     // ويُعلَّم بـ isNewComponent حتى يعرضه الاستيراد كتنبيه بدلاً من إضافته صامتاً.
-    function reconcileWithCatalog(freshSubjects, existingSubjects) {
+    // هل مكونات الملف الحالي (fresh) تطابق تعريفاً محفوظاً (بالاسم بعد التطبيع + الدرجة العظمى)؟
+    // الملف الجزئي (أقل مكونات) يُعتبر مطابقاً؛ أي مكوّن جديد أو بدرجة عظمى مختلفة = تركيب مختلف.
+    function sameComponentStructure(existingComps, freshComps) {
+      return (freshComps || []).every(fc => (existingComps || []).some(ec =>
+        normalizeArabic(ec.name).replace(/\s+/g, '') === normalizeArabic(fc.name).replace(/\s+/g, '') &&
+        (Number(ec.maxScore) || 0) === (Number(fc.maxScore) || 0)));
+    }
+    function reconcileWithCatalog(freshSubjects, existingSubjects, scopeKey) {
       const warnings = [];
       const catalogByName = new Map((existingSubjects || []).map(s => [s.name, s]));
       const reconciled = freshSubjects.map(freshSubj => {
@@ -11997,7 +12008,21 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
           // مادة جديدة كلياً: هذا أول رفع لها، فتصبح هي نفسها التعريف الرسمي
           return freshSubj;
         }
-        const existingComps = existing.components || [];
+        let existingComps = existing.components || [];
+        let isVariant = false;
+        const savedVariant = scopeKey && existing.componentsByScope && existing.componentsByScope[scopeKey];
+        if (Array.isArray(savedVariant) && savedVariant.length) {
+          // هذا الصف له تعريف مكونات خاص محفوظ سابقاً: نطابق الملف عليه
+          existingComps = savedVariant;
+          isVariant = true;
+        } else {
+          const baseScope = existing.baseScope || ((existing.appliesTo || [])[0]) || '';
+          if (scopeKey && baseScope && scopeKey !== baseScope && !sameComponentStructure(existingComps, freshSubj.components)) {
+            // أول رفع لهذا الصف وتركيب مكوناته يختلف عن الصف الأساسي: نعتمد مكونات ملفه كما هي
+            return { name: existing.name, exportName: existing.exportName,
+              components: freshSubj.components.map(c => ({ ...c })), isVariant: true };
+          }
+        }
         const matchedNames = new Set();
         const newComponents = [];
         const orderedComponents = existingComps.map(ec => {
@@ -12014,7 +12039,9 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
         if (newComponents.length) {
           warnings.push({ subjectName: freshSubj.name, newComponents: newComponents.map(c => c.name) });
         }
-        return { name: existing.name, exportName: existing.exportName, components: orderedComponents.concat(newComponents) };
+        const out = { name: existing.name, exportName: existing.exportName, components: orderedComponents.concat(newComponents) };
+        if (isVariant) out.isVariant = true;
+        return out;
       });
       return { subjects: reconciled, warnings };
     }
@@ -12110,6 +12137,40 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
     window.componentAppliesToClass = componentAppliesToClass;
     window.resolveGradeNumberForClass = resolveGradeNumberForClass;
     window.shouldShowProjectColumn = shouldShowProjectColumn;
+
+    // ============================================================
+    //  مكونات المادة حسب الصف/القسم
+    //  المادة المشتركة بين صفوف (مثل العربي والتاريخ) قد تختلف مكوّناتها ودرجاتها العظمى من صف لآخر
+    //  (الأول الثانوي: 15/15/10/30 — الثاني الثانوي: 15/20/10/40). التعريف الأساسي يبقى في
+    //  subject.components (للصف الأول الذي رُفع ملفه)، وأي صف مختلف التركيب يُخزَّن تعريفه في
+    //  subject.componentsByScope["اسم الصف|القسم"].
+    // ============================================================
+    function subjectScopeKeyForStudent(st) {
+      return String((st && st.grade) || '') + '|' + String((st && st.section) || '');
+    }
+    function resolveSubjectForScope(subj, scopeKey) {
+      if (!subj || !scopeKey || !subj.componentsByScope) return subj;
+      if (subj.__scopeResolved === scopeKey) return subj;
+      const v = subj.componentsByScope[scopeKey];
+      if (!Array.isArray(v) || !v.length) return subj;
+      return Object.assign({}, subj, { components: v, __scopeResolved: scopeKey });
+    }
+    // cls = مفتاح الفصل (اسم الفصل§القسم) كما في قوائم تبويب الرصد
+    function findSubjectForClass(db, subjectName, cls) {
+      const subj = (db.subjects || []).find(s => s.name === subjectName);
+      if (!subj || !subj.componentsByScope) return subj;
+      const grade = (db.classGrade || {})[cls] || '';
+      const section = String(cls || '').split('§')[1] || '';
+      return resolveSubjectForScope(subj, grade + '|' + section);
+    }
+    function resolveSubjectForStudentId(db, subject, studentId) {
+      if (!subject || !subject.componentsByScope) return subject;
+      const st = (db.students || []).find(x => x.id === studentId);
+      return st ? resolveSubjectForScope(subject, subjectScopeKeyForStudent(st)) : subject;
+    }
+    window.findSubjectForClass = findSubjectForClass;
+    window.resolveSubjectForScope = resolveSubjectForScope;
+    window.resolveSubjectForStudentId = resolveSubjectForStudentId;
 
     // أسماء المعلمين على الكشوف: إزالة التكرار (نفس الاسم مرتين بسبب سجل مزدوج أو تعيين مكرر)
     function formatAssignedTeachersForPrint(teachers, subjectName, cls) {
@@ -12589,7 +12650,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
 
       const skipCols = new Set(Object.values(colMap).filter(v => v !== undefined));
       const subjects = buildSubjects(headerRow, componentRow, maxRowIdx !== -1 ? rows[maxRowIdx] : null, skipCols);
-      const { subjects: reconciledSubjects, warnings: catalogWarnings } = reconcileWithCatalog(subjects, existingSubjects);
+      const { subjects: reconciledSubjects, warnings: catalogWarnings } = reconcileWithCatalog(subjects, existingSubjects, String(grade || '') + '|' + String(section || ''));
       const dataStartIdx = maxRowIdx !== -1 ? maxRowIdx + 1 : headerIdx + 1;
 
       const students = [];
@@ -13032,13 +13093,22 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
           if (!existing) {
             if (!s.appliesTo) s.appliesTo = [];
             if (!s.appliesTo.includes(scopeKey)) s.appliesTo.push(scopeKey);
+            s.baseScope = scopeKey;
             s.updatedAt = gcNowIso();
             db.subjects.push(s);
             subjectsByName.set(s.name, s);
             return;
           }
           if (!existing.appliesTo) existing.appliesTo = [];
+          if (!existing.baseScope && existing.appliesTo.length) existing.baseScope = existing.appliesTo[0];
           if (!existing.appliesTo.includes(scopeKey)) existing.appliesTo.push(scopeKey);
+          if (s.isVariant) {
+            // مكونات هذا الصف تختلف عن الصف الأساسي: تُحفظ كتعريف خاص بهذا الصف/القسم فقط
+            existing.componentsByScope = existing.componentsByScope || {};
+            existing.componentsByScope[scopeKey] = s.components.map(c => { const { isNewComponent, ...rest } = c; return rest; });
+            existing.updatedAt = gcNowIso();
+            return;
+          }
           const existingCompNames = new Set(existing.components.map(c => c.name));
           s.components.forEach(c => { if (c.isNewComponent && !existingCompNames.has(c.name)) {
             const { isNewComponent, ...compToSave } = c;
@@ -13355,7 +13425,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
       // الملف الأصلي وتعديلها وإعادة كتابته - بدون أي عملية XLSX ثقيلة هنا على الخيط الرئيسي.
       const writes = [];
       db.students.filter(s => s.grade === grade && s.section === section).forEach(s => {
-        db.subjects.forEach(subj => {
+        db.subjects.map(sv => resolveSubjectForScope(sv, grade + '|' + section)).forEach(subj => {
           subj.components.forEach((comp, ci) => {
             if (comp.colIndex === undefined || comp.colIndex < 0) return;
             const finalScore = computeFinalComponentScore(db, s.id, subj.name, ci, term, comp.name, comp.maxScore);
@@ -13478,7 +13548,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
       const header = ['الرقم القومي', 'نتيجة', 'الصف', 'اسم الطالب', 'رقم الجلوس', 'حالة النتيجة', 'المسار', 'مادة التخصص'];
       let secondLangMarkerAdded = false;
       const subjectCols = []; // { type: 'secondLangText' } أو { type: 'subject', subject, comps }
-      (db.subjects || []).forEach(subj => {
+      (db.subjects || []).map(sv => resolveSubjectForScope(sv, grade + '|' + section)).forEach(subj => {
         if ((subj.name || '').trim() === 'نوع') return; // استبعاد عمود "نوع" من كشف الرصد الشهري بناءً على طلب المستخدم
         if (!subjectAppliesToGradeSection(subj, grade, section)) return;
         if (!secondLangMarkerAdded && subjectIsSecondLang(subj.name)) {
@@ -13562,7 +13632,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
           const monthlySection = gk.section || '';
           const monthlyStudents = db.students.filter(s => !gradeKey || (s.grade === monthlyGrade && s.section === monthlySection));
           const monthlyCells = [];
-          (db.subjects || []).forEach(subj => {
+          (db.subjects || []).map(sv => resolveSubjectForScope(sv, monthlyGrade + '|' + monthlySection)).forEach(subj => {
             if ((subj.name || '').trim() === 'نوع') return;
             if (!subjectAppliesToGradeSection(subj, monthlyGrade, monthlySection)) return;
             const monthlyIdx = (subj.components || []).findIndex(c => c.isMonthlyGrade);
@@ -13622,7 +13692,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
       let secondLangMarkerAdded = false;
       const subjectCols = []; // { type: 'secondLangText' } أو { type: 'subject', subject }
       // مواد هذا الصف/القسم فقط (حسب appliesTo المسجّل عند رفع الملف الأصلي) حتى لا تظهر مواد صفوف أخرى
-      (db.subjects || []).forEach(subj => {
+      (db.subjects || []).map(sv => resolveSubjectForScope(sv, grade + '|' + section)).forEach(subj => {
         if ((subj.name || '').trim() === 'نوع') return;
         if (!subjectAppliesToGradeSection(subj, grade, section)) return;
         if (!secondLangMarkerAdded && subjectIsSecondLang(subj.name)) {
@@ -13679,7 +13749,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
           const controlStudents = db.students.filter(s => !gradeKey || (s.grade === controlGrade && s.section === controlSection));
           const controlMonths = getMonthLabels(term).map((_, i) => i + 1);
           const controlCells = [];
-          (db.subjects || []).forEach(subj => {
+          (db.subjects || []).map(sv => resolveSubjectForScope(sv, controlGrade + '|' + controlSection)).forEach(subj => {
             if ((subj.name || '').trim() === 'نوع') return;
             if (!subjectAppliesToGradeSection(subj, controlGrade, controlSection)) return;
             const comps = (subj.components || []).map((c, ci) => ({ index: ci, name: c.name, type: c.type }))
@@ -14172,7 +14242,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
       const printOrder = (document.getElementById('pcBlankPrintOrder') || {}).value || 'class-first';
       const jobs = [];
       function pushGradeJob(cls, sn) {
-        const subj = (db.subjects || []).find(s => s.name === sn);
+        const subj = findSubjectForClass(db, sn, cls);
         if (!subj) return;
         if (typeof subjectAppliesToClass === 'function' && !subjectAppliesToClass(subj, cls, db)) return;
         jobs.push({ cls, subj });
@@ -14532,7 +14602,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
         const subjects = (db.subjects || []).filter(subj => {
           if ((subj.name || '').trim() === 'نوع') return false;
           return subjectAppliesToGradeSection(subj, grade, section);
-        });
+        }).map(sv => resolveSubjectForScope(sv, grade + '|' + section));
         if (!subjects.length) {
           alert('لا توجد مواد مسجّلة لهذا الصف/القسم.');
           return;
@@ -14792,6 +14862,7 @@ function renderMonthlyExportButtons() {
     }
 
     function subjectTermTotal(db, studentId, subjectName, term, subject) {
+      subject = resolveSubjectForStudentId(db, subject, studentId);
       let total = 0,
         any = false,
         hasNumeric = false,
@@ -14874,6 +14945,7 @@ function renderMonthlyExportButtons() {
     // النسبة المئوية لمجموع مادة معينة لطالب عبر فصل دراسي كامل - تُبنى فوق subjectTermTotal
     // الموجودة بالفعل، فتحترم تلقائياً نفس منطق "غير مكتمل"/"غ" المتّبع في باقي النظام.
     function computeSubjectTermPercentage(db, studentId, subjectName, term, subject) {
+      subject = resolveSubjectForStudentId(db, subject, studentId);
       const total = subjectTermTotal(db, studentId, subjectName, term, subject);
       if (total === null || total === INCOMPLETE_MARK || total === ABSENT_MARK) return null;
       const maxTotal = subjectAcademicMaxTotal(subject);
@@ -15865,7 +15937,7 @@ function renderMonthlyExportButtons() {
         document.getElementById('gradesStatus').textContent = '⚠️ يرجى اختيار المادة والفصل';
         return;
       }
-      const subject = db.subjects.find(s => s.name === subjectName);
+      const subject = findSubjectForClass(db, subjectName, cls);
       if (!subject) {
         document.getElementById('gradeEntryArea').style.display = 'none';
         document.getElementById('gradesStatus').textContent = '❌ المادة غير موجودة';
@@ -16075,7 +16147,7 @@ function renderMonthlyExportButtons() {
       const cls = document.getElementById('gradeClassSelect').value;
       const term = document.getElementById('gradeTermSelect').value;
       if (!subjectName || !cls) { area.innerHTML = ''; return; }
-      const subject = db.subjects.find(s => s.name === subjectName);
+      const subject = findSubjectForClass(db, subjectName, cls);
       if (!subject) { area.innerHTML = ''; return; }
 
       let students = db.students.filter(s => classSectionKey(s.class, s.section) === cls);
@@ -16124,7 +16196,7 @@ function renderMonthlyExportButtons() {
       const cls = document.getElementById('gradeClassSelect').value;
       const term = document.getElementById('gradeTermSelect').value;
       if (!subjectName || !cls) { area.innerHTML = ''; return; }
-      const subject = db.subjects.find(s => s.name === subjectName);
+      const subject = findSubjectForClass(db, subjectName, cls);
       if (!subject) { area.innerHTML = ''; return; }
       const stageType = (db.schoolInfo && db.schoolInfo.stageType) || '';
 
@@ -16503,7 +16575,7 @@ function renderMonthlyExportButtons() {
       const month = parseInt(document.getElementById('gradeMonthSelect').value, 10);
 
       if (!subjectName || !cls) { alert('يرجى اختيار المادة والفصل أولاً من قائمة الفلاتر.'); return; }
-      const subject = db.subjects.find(s => s.name === subjectName);
+      const subject = findSubjectForClass(db, subjectName, cls);
       if (!subject) { alert('المادة غير موجودة.'); return; }
       if (!canAccessGrade(subjectName, cls)) { alert('غير مصرح لك بطباعة كشف درجات هذه المادة/الفصل.'); return; }
 
@@ -16869,7 +16941,7 @@ function renderMonthlyExportButtons() {
       const month = parseInt(document.getElementById('gradeMonthSelect').value, 10);
 
       if (!subjectName || !cls) { alert('يرجى اختيار المادة والفصل أولاً من قائمة الفلاتر.'); return; }
-      const subject = db.subjects.find(s => s.name === subjectName);
+      const subject = findSubjectForClass(db, subjectName, cls);
       if (!subject) { alert('المادة غير موجودة.'); return; }
       if (!canAccessGrade(subjectName, cls)) { alert('غير مصرح لك بطباعة كشف درجات هذه المادة/الفصل.'); return; }
 
@@ -17334,7 +17406,7 @@ function renderMonthlyExportButtons() {
       const examColMode = opts.examColMode || mlGetExamColMode();
 
       if (!subjectName || !cls) { alert('يرجى اختيار المادة والفصل أولاً من قائمة الفلاتر.'); return; }
-      const subject = db.subjects.find(s => s.name === subjectName);
+      const subject = findSubjectForClass(db, subjectName, cls);
       if (!subject) { alert('المادة غير موجودة.'); return; }
       if (!canAccessGrade(subjectName, cls)) { alert('غير مصرح لك بطباعة كشف درجات هذه المادة/الفصل.'); return; }
 
@@ -18343,7 +18415,7 @@ function renderMonthlyExportButtons() {
       const examColMode = opts.examColMode || mlGetExamColMode();
 
       if (!subjectName || !cls) { alert('يرجى اختيار المادة والفصل أولاً من قائمة الفلاتر.'); return; }
-      const subject = db.subjects.find(s => s.name === subjectName);
+      const subject = findSubjectForClass(db, subjectName, cls);
       if (!subject) { alert('المادة غير موجودة.'); return; }
       if (!canAccessGrade(subjectName, cls)) { alert('غير مصرح لك بطباعة كشف درجات هذه المادة/الفصل.'); return; }
 
@@ -18444,7 +18516,7 @@ function renderMonthlyExportButtons() {
 
       const jobs = [];
       function pushJob(cls, sn) {
-        const subj = (db.subjects || []).find(s => s.name === sn);
+        const subj = findSubjectForClass(db, sn, cls);
         if (!subj) return;
         if (typeof subjectAppliesToClass === 'function' && !subjectAppliesToClass(subj, cls, db)) return;
         jobs.push({ cls, subj, subjectName: sn });
@@ -18534,7 +18606,7 @@ function renderMonthlyExportButtons() {
       const examColMode = mlGetExamColMode();
       const jobs = [];
       function pushJob(cls, sn) {
-        const subj = (db.subjects || []).find(s => s.name === sn);
+        const subj = findSubjectForClass(db, sn, cls);
         if (!subj) return;
         if (typeof subjectAppliesToClass === 'function' && !subjectAppliesToClass(subj, cls, db)) return;
         jobs.push({ cls, subj, subjectName: sn });
@@ -18935,7 +19007,7 @@ function renderMonthlyExportButtons() {
       const usedMonthLabels = twoMonthsOnly ? fullMonthLabels.slice(0, 2) : fullMonthLabels;
 
       if (!subjectName || !cls) { alert('يرجى اختيار المادة والفصل أولاً من قائمة الفلاتر.'); return; }
-      const subject = db.subjects.find(s => s.name === subjectName);
+      const subject = findSubjectForClass(db, subjectName, cls);
       if (!subject) { alert('المادة غير موجودة.'); return; }
       if (!canAccessGrade(subjectName, cls)) { alert('غير مصرح لك بطباعة كشف درجات هذه المادة/الفصل.'); return; }
 
@@ -19147,7 +19219,7 @@ function renderMonthlyExportButtons() {
       const term = document.getElementById('gradeTermSelect').value;
       const month = parseInt(document.getElementById('gradeMonthSelect').value, 10);
       if (!subjectName || !cls) { alert('يرجى اختيار المادة والفصل أولاً.'); return; }
-      const subject = db.subjects.find(s => s.name === subjectName);
+      const subject = findSubjectForClass(db, subjectName, cls);
       if (!subject) return;
       if (!canAccessGrade(subjectName, cls)) { alert('🚫 غير مصرح لك بالوصول لهذه المادة أو الفصل.'); return; }
       if (isGradeEntryLocked(db, cls, subjectName, term, month)) { alert('🔒 إدخال الدرجات مقفول حالياً لهذا الفصل/المادة/الشهر، لا يمكن الرصد الجماعي.'); return; }
@@ -19209,7 +19281,7 @@ function renderMonthlyExportButtons() {
       const term = document.getElementById('gradeTermSelect').value;
       const month = parseInt(document.getElementById('gradeMonthSelect').value, 10);
       if (!subjectName || !cls) { alert('يرجى اختيار المادة والفصل أولاً.'); return; }
-      const subject = db.subjects.find(s => s.name === subjectName);
+      const subject = findSubjectForClass(db, subjectName, cls);
       if (!subject) return;
       if (!canAccessGrade(subjectName, cls)) { alert('🚫 غير مصرح لك بالوصول لهذه المادة أو الفصل.'); return; }
       if (isGradeEntryLocked(db, cls, subjectName, term, month)) { alert('🔒 إدخال الدرجات مقفول حالياً لهذا الفصل/المادة/الشهر، لا يمكن الرصد الجماعي.'); return; }
@@ -19305,7 +19377,7 @@ function renderMonthlyExportButtons() {
       const term = document.getElementById('gradeTermSelect').value;
       const month = parseInt(document.getElementById('gradeMonthSelect').value, 10);
       if (!subjectName || !cls) return;
-      const subject = db.subjects.find(s => s.name === subjectName);
+      const subject = findSubjectForClass(db, subjectName, cls);
       const comp = subject && subject.components[ci];
       if (!comp) return;
       if (!canAccessGrade(subjectName, cls)) { alert('🚫 غير مصرح لك بالوصول لهذه المادة أو الفصل.'); return; }
@@ -19360,7 +19432,7 @@ function renderMonthlyExportButtons() {
       const term = document.getElementById('gradeTermSelect').value;
       const month = parseInt(document.getElementById('gradeMonthSelect').value, 10);
       if (!subjectName || !cls) return;
-      const subject = db.subjects.find(s => s.name === subjectName);
+      const subject = findSubjectForClass(db, subjectName, cls);
       const comp = subject && subject.components[ci];
       if (!comp) return;
       if (!canAccessGrade(subjectName, cls)) { alert('🚫 غير مصرح لك بالوصول لهذه المادة أو الفصل.'); return; }
@@ -19446,8 +19518,9 @@ function renderMonthlyExportButtons() {
       const subjectName = document.getElementById('gradeSubjectSelect').value;
       const term = document.getElementById('gradeTermSelect').value;
       const month = parseInt(document.getElementById('gradeMonthSelect').value, 10);
-      const subject = db.subjects.find(s => s.name === subjectName);
+      let subject = db.subjects.find(s => s.name === subjectName);
       if (!subject) return;
+      subject = resolveSubjectForStudentId(db, subject, studentId);
       const student = db.students.find(s => s.id === studentId);
       if (!student || !canAccessStudentGrade(subjectName, student)) {
         document.getElementById('gradesStatus').textContent = '🚫 غير مصرح لك بتعديل درجات هذا الطالب';
@@ -19531,7 +19604,7 @@ function renderMonthlyExportButtons() {
       const cls = document.getElementById('gradeClassSelect').value;
       const term = document.getElementById('gradeTermSelect').value;
       const month = parseInt(document.getElementById('gradeMonthSelect').value, 10);
-      const subject = db.subjects.find(s => s.name === subjectName);
+      const subject = findSubjectForClass(db, subjectName, cls);
       if (!subject) return;
       if (!canAccessGrade(subjectName, cls)) {
         document.getElementById('gradesStatus').textContent = '🚫 غير مصرح لك بتعديل درجات هذا الفصل';
@@ -19646,7 +19719,7 @@ function renderMonthlyExportButtons() {
       const term = document.getElementById('gradeTermSelect').value;
 
       if (!subjectName || !cls) { alert('يرجى اختيار المادة والفصل أولاً'); return; }
-      const subject = db.subjects.find(s => s.name === subjectName);
+      const subject = findSubjectForClass(db, subjectName, cls);
       if (!subject) return;
       if (!canAccessGrade(subjectName, cls)) { alert('🚫 غير مصرح لك بالوصول لهذه المادة أو الفصل'); return; }
 
@@ -19888,7 +19961,7 @@ function renderMonthlyExportButtons() {
       const cls = document.getElementById('statsClassSelect').value;
       const subjectName = document.getElementById('statsSubjectSelect').value;
       if (!cls || !subjectName) { area.innerHTML = '<div style="color:#94a3b8; font-size:13px;">اختر فصلاً ومادة أعلاه لعرض مخططات الأداء.</div>'; return; }
-      const subject = db.subjects.find(s => s.name === subjectName);
+      const subject = findSubjectForClass(db, subjectName, cls);
       if (!subject) { area.innerHTML = ''; return; }
       const stageType = (db.schoolInfo && db.schoolInfo.stageType) || '';
 
