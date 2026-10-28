@@ -4208,6 +4208,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
                   <option value="current">الفترة الحالية فقط (4 أسابيع)</option>
                   <option value="from2">من الأسبوع 5 حتى نهاية الفصل (بدون 1–4)</option>
                   <option value="full">الفصل كاملاً (كل الكتل + ملخص)</option>
+                  <option value="avg">كشف المتوسطات فقط (متوسطات الفصل + الاختبارات)</option>
                   <option value="1">كتلة 1: الأسابيع 1–4</option>
                   <option value="2">كتلة 2: الأسابيع 5–8</option>
                   <option value="3">كتلة 3: الأسابيع 9–12</option>
@@ -4708,6 +4709,8 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
           <button type="button" class="btn btn-primary" onclick="printBlankGradeSheetsBatch()">🖨️ طباعة كشوف الرصد المحددة (طولي)</button>
           <button type="button" class="btn btn-success" onclick="printMinistryLandscapeBatch({blank:true})" title="كشف وزارة عرضي فارغ — لكل توليفة فصل×مادة حسب النطاق المحدد أعلاه">🖨️ كشوف وزارة عرضي فارغة (دفعة)</button>
           <button type="button" class="btn btn-success" onclick="printMinistryLandscapeBatch({blank:false})" title="كشف وزارة عرضي بالدرجات المرصودة — لكل توليفة فصل×مادة حسب النطاق">🖨️ كشوف وزارة عرضي ببيانات (دفعة)</button>
+          <button type="button" class="btn btn-success" onclick="printMinistryAveragesBatch({blank:false})" title="كشف المتوسطات عرضي — يُلحق بآخر فترة إن كانت أسبوعين فقط، وإلا في ورقة مستقلة بعرض كامل">🖨️ كشوف المتوسطات (عرضي) ببيانات (دفعة)</button>
+          <button type="button" class="btn btn-outline" onclick="printMinistryAveragesBatch({blank:true})" title="كشف المتوسطات عرضي فارغ">🖨️ كشوف المتوسطات (عرضي) فارغة (دفعة)</button>
           <button type="button" class="btn btn-success" onclick="printMinistryPortraitBatch({blank:true})" title="كشف وزارة طولي فارغ — فصل كامل في كل ورقة A4 طولية">🖨️ كشوف وزارة طولي فارغة (دفعة)</button>
           <button type="button" class="btn btn-success" onclick="printMinistryPortraitBatch({blank:false})" title="كشف وزارة طولي ببيانات — فصل كامل في كل ورقة A4 طولية">🖨️ كشوف وزارة طولي ببيانات (دفعة)</button>
           <button type="button" class="btn btn-outline" onclick="printMinistryAbsenceBatch({blank:true})" title="كشف غياب عرضي فارغ — 4 أسابيع × أيام مع التواريخ — بدون غلاف">🖨️ كشوف غياب عرضي فارغة (دفعة)</button>
@@ -17437,6 +17440,8 @@ function renderMonthlyExportButtons() {
           if (m <= monthCount || blank) monthsToPrint.push(m);
         }
         if (!monthsToPrint.length) monthsToPrint = [2];
+      } else if (weekScope === 'avg') {
+        monthsToPrint = []; // كشف المتوسطات فقط
       } else if (weekScope === 'current') {
         monthsToPrint = [monthFromFilter || 1];
       } else {
@@ -17454,7 +17459,7 @@ function renderMonthlyExportButtons() {
       }
 
       if (!blank) {
-        const checkMonths = monthsToPrint.filter(m => m >= 1 && m <= monthCount);
+        const checkMonths = (weekScope === 'avg' ? Array.from({ length: monthCount }, (_, i) => i + 1) : monthsToPrint).filter(m => m >= 1 && m <= monthCount);
         if (checkMonths.length) {
           const printGradeCells = buildCellsForCheck(students, subjectName,
             subject.components.map((c, ci) => ({ index: ci, name: c.name })), term, checkMonths);
@@ -17467,25 +17472,12 @@ function renderMonthlyExportButtons() {
       if (mlShouldPrintCoverForMonths(monthsToPrint)) {
         allHtml += buildMinistryCoverAndProtocolHtml({ db, subjectName, cls, term, blank });
       }
-      monthsToPrint.forEach((m, idx) => {
-        const pages = buildMinistryLandscapePagesHtml({
-          db, subject, subjectName, cls, term, month: m, students, blank,
-          examColMode,
-          blockIndex: idx,
-          totalBlocks: monthsToPrint.length + (weekScope === 'full' ? 1 : 0)
-        });
-        if (pages) allHtml += pages;
+      allHtml += mlAssembleLandscapeHtml({
+        db, subject, subjectName, cls, term, students, blank, examColMode,
+        monthsToPrint,
+        withSummary: (weekScope === 'full' || weekScope === 'from2' || weekScope === 'avg'),
+        onlySummary: weekScope === 'avg'
       });
-
-      // ورقة الملخص (المتوسطات + المجاميع) في نهاية السجل:
-      // - الفصل كاملاً، أو
-      // - من الأسبوع 5 حتى النهاية (تكملة سجل طُبعت فيه 1–4 مسبقاً)
-      if (weekScope === 'full' || weekScope === 'from2') {
-        const summary = buildMinistrySummaryPagesHtml({
-          db, subject, subjectName, cls, term, students, blank, monthCount
-        });
-        if (summary) allHtml += summary;
-      }
 
       if (!allHtml) { alert('تعذّر بناء الكشف.'); return; }
       printMinistryLandscapeHtml(allHtml);
@@ -17499,7 +17491,7 @@ function renderMonthlyExportButtons() {
     function buildMinistryLandscapePagesHtml(cfg) {
       const { db, subject, subjectName, cls, term, month, blank, examColMode } = cfg;
       let students = (cfg.students || []).slice();
-      const weekCount = 4;
+      let weekCount = 4;
       const globalWeeks = mlGlobalWeekNumbers(month);
       // أسابيع الفترة الفعلية من الروزنامة المركزية
       let periodStartW = globalWeeks[0], periodEndW = globalWeeks[3];
@@ -17522,6 +17514,8 @@ function renderMonthlyExportButtons() {
       const scopeWeeks = (typeof getPeriodWeekCount === 'function') ? getPeriodWeekCount(term, month - 1) : 4;
       const weekOutCls = (wi) => (typeof isWeekExcluded === 'function' ? isWeekExcluded(term, month - 1, wi) : (wi >= scopeWeeks)) ? ' week-out-of-scope' : '';
       const isWeekOut = (wi) => (typeof isWeekExcluded === 'function' ? isWeekExcluded(term, month - 1, wi) : (wi >= scopeWeeks));
+      // دمج ورقة المتوسطات مع آخر فترة (أسبوعان فقط): نعرض أسابيع الفترة الفعلية فقط ونوفّر العرض للمتوسطات
+      if (cfg.embedAverages) weekCount = Math.max(1, Math.min(4, scopeWeeks));
       const showExam = mlShouldShowExamCol(term, month, examColMode || 'auto');
       let examAfterGlobal = 0;
       if (showExam && typeof periodExamAfterWeek === 'function') {
@@ -17568,8 +17562,11 @@ function renderMonthlyExportButtons() {
         }
       }
 
+      const avgCols = cfg.embedAverages
+        ? buildMinistryAverageColumns({ db, subject, subjectName, cls, term, blank, monthCount: cfg.embedAverages.monthCount })
+        : null;
       const colsPerWeek = underWeekComps.length + 1; // مكوّنات + مجموع الأسبوع
-      const extraCols = (examComp ? 1 : 0) + (projectComp ? 1 : 0) + 1; // اختبار؟ + مشروع؟ + المجموع الكلي
+      const extraCols = (examComp ? 1 : 0) + (projectComp ? 1 : 0) + 1 + (avgCols ? avgCols.count : 0); // اختبار؟ + مشروع؟ + المجموع الكلي
       const totalDataCols = (weekCount * colsPerWeek) + extraCols;
       // عمود الاسم أضيق لاستغلال المساحة في خانات الدرجات — مع الإبقاء على حجم خط الاسم
       const isPortraitPage = !!cfg.portrait;
@@ -17613,6 +17610,7 @@ function renderMonthlyExportButtons() {
         const projMax = projectComp ? (Number(projectComp.comp.maxScore) || 0) : 0;
         const grandMax = underWeekMaxSum + monMax + projMax;
         weekHeaderRow += `<th rowspan="3" class="grand-total-col ml-grand-slot"><div class="grand-title">المجموع الكلي</div><div class="exam-max">/${toHindiDigits(grandMax)}</div></th>`;
+        if (avgCols) weekHeaderRow += avgCols.row1;
       }
 
       // --- صف 2: مكوّنات + «م» (مجموع الأسبوع المختصر لتفادي التداخل) ---
@@ -17627,6 +17625,8 @@ function renderMonthlyExportButtons() {
         // مجموع الأسبوع رأسياً مثل باقي رؤوس الأعمدة
         compHeaderRow += `<th class="avg-col ml-week-sum-head${out}" title="مجموع درجات هذا الأسبوع"><span class="c-vert week-sum-label">مجموع الأسبوع</span></th>`;
       }
+
+      if (avgCols) compHeaderRow += avgCols.row2;
 
       // --- صف 3: الدرجات القصوى (بدون خلايا للامتحان/الكلي لأن rowspan=3) ---
       let maxRow = '';
@@ -17643,6 +17643,7 @@ function renderMonthlyExportButtons() {
         maxRow += `<th class="avg-col${out}">${excluded ? '—' : toHindiDigits(underWeekMaxSum)}</th>`;
       }
 
+      if (avgCols) maxRow += avgCols.row3;
       const theadHtml = `<tr class="week-row">${weekHeaderRow}</tr><tr class="comp-row">${compHeaderRow}</tr><tr class="max-row">${maxRow}</tr>`;
 
       const formatScoreExact = (v) => {
@@ -17736,6 +17737,7 @@ function renderMonthlyExportButtons() {
             row += blank ? emptyCell('month-eval-col') : cell(projScore, 'month-eval-col');
           }
           row += blank ? emptyCell('grand-total-col') : cell(grand, 'grand-total-col');
+          if (avgCols) row += avgCols.cells(s);
           bodyHtml += `<tr>${row}</tr>`;
         });
         return bodyHtml;
@@ -17781,25 +17783,25 @@ function renderMonthlyExportButtons() {
 
       const isPortrait = !!cfg.portrait;
       // طولي: فصل كامل في صفحة واحدة مهما كان العدد (يُضغط تلقائياً عند الطباعة)
-      // عرضي: تقريباً 16 طالباً/ورقة كما كان
+      // عرضي: حتى 20 طالباً/ورقة كما كان
       let perPage;
       if (isPortrait) {
         perPage = Math.max(students.length, 1);
       } else {
-        perPage = students.length <= 16 ? Math.max(students.length, 1) : Math.ceil(students.length / Math.ceil(students.length / 16));
+        perPage = students.length <= 20 ? Math.max(students.length, 1) : Math.ceil(students.length / Math.ceil(students.length / 20));
       }
       const chunks = [];
       for (let i = 0; i < students.length; i += perPage) chunks.push(students.slice(i, i + perPage));
       if (!chunks.length) chunks.push([]);
       const totalPages = chunks.length;
-      const pageClass = isPortrait ? 'ministry-portrait-page detailed-sheet-page ds-scope' : 'ministry-landscape-page detailed-sheet-page ds-scope';
+      const pageClass = (isPortrait ? 'ministry-portrait-page detailed-sheet-page ds-scope' : 'ministry-landscape-page detailed-sheet-page ds-scope') + (avgCols ? ' ml-avg-embedded' : '');
 
       let pagesHtml = '';
       chunks.forEach((chunk, pageIdx) => {
         const bodyHtml = buildBodyHtml(chunk, pageIdx * perPage);
         const pageLabel = `<div class="ml-page-label">ورقة ${toHindiDigits(pageIdx + 1)} من ${toHindiDigits(totalPages)} · ${escapeHtml(weekRangeLbl)} · ${escapeHtml(monthLabel)}</div>`;
         const lhHtml = (typeof buildUnifiedLetterhead === 'function') ? buildUnifiedLetterhead({
-            title: (blank ? 'سجل رصد درجات (نموذج) — ' : 'سجل رصد درجات — ') + subjectName,
+            title: (blank ? 'سجل رصد درجات (نموذج) — ' : 'سجل رصد درجات — ') + subjectName + (avgCols ? ' + متوسطات الفصل' : ''),
             subtitleRight: weekRangeLbl,
             subtitleLeft: termLabel,
             printedBy,
@@ -17826,209 +17828,237 @@ function renderMonthlyExportButtons() {
       return pagesHtml;
     }
 
+    // ============================================================
+    //  أعمدة متوسطات الفصل (على شكل نموذج الوزارة): متوسط كل مكوّن + المجموع | الاختبارات (كل شهر + المتوسط)
+    //  | الإجمالي | عدد أيام الغياب. تُستعمل إمّا ملحقة بآخر فترة (إن كانت أسبوعين فقط) أو في ورقة مستقلة.
+    //  قاعدة الاختبارات: المتوسط (30+30=30 للأول الثانوي، 40+40=40 للثاني الثانوي) وليس المجموع.
+    // ============================================================
+    function buildMinistryAverageColumns(cfg) {
+      const { db, subject, subjectName, cls, term, blank } = cfg;
+      const monthCount = cfg.monthCount || mlMonthCount(term);
+      const comps = [];
+      let examComp = null;
+      (subject.components || []).forEach((c, ci) => {
+        if (typeof componentAppliesToClass === 'function' && !componentAppliesToClass(c, cls, db)) return;
+        if (c.type === 'attendance') return;
+        if (typeof isProjectLikeComponent === 'function' && isProjectLikeComponent(c)) return;
+        if (c.isMonthlyGrade || (typeof isExamLikeComponent === 'function' && isExamLikeComponent(c))) {
+          if (!examComp) examComp = { comp: c, ci };
+        } else comps.push({ comp: c, ci });
+      });
+      if (!comps.length && !examComp) return null;
+
+      const termShort = term === 'first' ? 'الأول' : 'الثاني';
+      const monthLabels = (typeof getMonthLabels === 'function') ? getMonthLabels(term) : [];
+      const sittings = [];
+      if (examComp) {
+        const n = Math.max(1, Math.min(EXAM_TERM_SITTINGS, monthCount));
+        for (let m = 1; m <= n; m++) sittings.push(m);
+      }
+      const ABS = (typeof ABSENT_MARK !== 'undefined') ? ABSENT_MARK : 'غ';
+      const fmt = (v) => {
+        if (v === '' || v === undefined || v === null) return '';
+        if (typeof isAbsentMark === 'function' && isAbsentMark(v)) return ABS;
+        const n = Number(v);
+        if (Number.isFinite(n)) return toHindiDigits(String(parseFloat(n.toPrecision(12))));
+        return toHindiDigits(v);
+      };
+      const compMax = comps.reduce((t, x) => t + (Number(x.comp.maxScore) || 0), 0);
+      const examMax = examComp ? (Number(examComp.comp.maxScore) || 0) : 0;
+      const mx = (v) => toHindiDigits(String(parseFloat(Number(v).toPrecision(12))));
+
+      let row1 = '', row2 = '', row3 = '';
+      if (comps.length) {
+        row1 += `<th colspan="${comps.length + 1}" class="ml-week-head week-sep-left">متوسط الفصل الدراسي ${termShort}</th>`;
+        comps.forEach((x, i) => {
+          row2 += `<th class="${i === 0 ? 'week-sep-left' : ''}"><span class="c-vert">${escapeHtml(x.comp.name || '')}</span></th>`;
+          row3 += `<th class="${i === 0 ? 'week-sep-left' : ''}">${x.comp.maxScore == null ? '—' : mx(x.comp.maxScore)}</th>`;
+        });
+        row2 += `<th class="avg-col"><span class="c-vert">المجموع</span></th>`;
+        row3 += `<th class="avg-col">${mx(compMax)}</th>`;
+      }
+      if (examComp) {
+        row1 += `<th colspan="${sittings.length + 1}" class="ml-week-head week-sep-left">الاختبارات</th>`;
+        sittings.forEach((m, i) => {
+          row2 += `<th class="${i === 0 ? 'week-sep-left' : ''}"><span class="c-vert">${escapeHtml(monthLabels[m - 1] || ('الشهر ' + m))}</span></th>`;
+          row3 += `<th class="${i === 0 ? 'week-sep-left' : ''}">${mx(examMax)}</th>`;
+        });
+        row2 += `<th class="month-eval-col"><span class="c-vert">المتوسط</span></th>`;
+        row3 += `<th class="month-eval-col">${mx(examMax)}</th>`;
+      }
+      row1 += `<th rowspan="3" class="grand-total-col week-sep-left"><div class="grand-title">الإجمالي</div><div class="exam-max">/${mx(compMax + examMax)}</div></th>`;
+      row1 += `<th rowspan="3"><span class="c-vert">عدد أيام الغياب</span></th>`;
+      const count = (comps.length ? comps.length + 1 : 0) + (examComp ? sittings.length + 1 : 0) + 2;
+
+      const gradesIdx = (typeof buildGradesIndex === 'function') ? buildGradesIndex(db) : null;
+      const getScore = (sid, ci, month) => {
+        const g = gradesIdx ? gradesIdx.get(sid + '|' + subjectName + '|' + term + '|' + month + '|' + ci)
+          : (db.grades || []).find(x => x.studentId === sid && x.subjectName === subjectName && x.term === term && x.month === month && x.componentIndex === ci);
+        return g ? g.score : '';
+      };
+      const sumVals = (arr) => {
+        let any = false, sum = 0;
+        arr.forEach(v => {
+          if (v === '' || v === null || v === undefined) return;
+          any = true;
+          if (!(typeof isAbsentMark === 'function' && isAbsentMark(v))) sum += Number(v) || 0;
+        });
+        return any ? sum : '';
+      };
+      const cellOf = (v, c) => `<td class="${c ? c + ' ' : ''}gs-score">${fmt(v)}</td>`;
+      const blankCell = (c) => `<td class="${c ? c + ' ' : ''}blank-cell"></td>`;
+
+      function cells(s) {
+        let out = '';
+        if (blank || !s || !s.id) {
+          comps.forEach((_, i) => { out += blankCell(i === 0 ? 'week-sep-left' : ''); });
+          if (comps.length) out += blankCell('avg-col');
+          sittings.forEach((_, i) => { out += blankCell(i === 0 ? 'week-sep-left' : ''); });
+          if (examComp) out += blankCell('month-eval-col');
+          out += blankCell('grand-total-col week-sep-left') + blankCell('');
+          return out;
+        }
+        const avgs = comps.map(x => {
+          const v = computeFinalComponentScore(db, s.id, subjectName, x.ci, term, x.comp.name, x.comp.maxScore);
+          return v === null || v === undefined ? '' : v;
+        });
+        const compsSum = sumVals(avgs);
+        let examAvg = '';
+        const examVals = sittings.map(m => getScore(s.id, examComp.ci, m));
+        if (examComp) {
+          const v = computeFinalComponentScore(db, s.id, subjectName, examComp.ci, term, examComp.comp.name, examComp.comp.maxScore);
+          examAvg = v === null || v === undefined ? '' : v;
+        }
+        const grand = sumVals([compsSum, examAvg]);
+        let absentDays = '';
+        try { const n = mlCountAbsentDaysForTerm(db, s.id, subjectName, term); if (n !== '' && n != null) absentDays = n; } catch (e) {}
+        avgs.forEach((v, i) => { out += cellOf(v, i === 0 ? 'week-sep-left' : ''); });
+        if (comps.length) out += cellOf(compsSum, 'avg-col');
+        examVals.forEach((v, i) => { out += cellOf(v, i === 0 ? 'week-sep-left' : ''); });
+        if (examComp) out += cellOf(examAvg, 'month-eval-col');
+        out += cellOf(grand, 'grand-total-col week-sep-left');
+        out += `<td class="gs-score">${absentDays === '' ? '' : toHindiDigits(String(absentDays))}</td>`;
+        return out;
+      }
+      return { count, row1, row2, row3, cells };
+    }
+    window.buildMinistryAverageColumns = buildMinistryAverageColumns;
+
+    // ورقة المتوسطات المستقلة: الجدول يملأ عرض الورقة بالكامل (الأعمدة موزعة بالتساوي بعد عمود الاسم)
     function buildMinistrySummaryPagesHtml(cfg) {
-      const { db, subject, subjectName, cls, term, blank, monthCount } = cfg;
+      const { db, subject, subjectName, cls, term, blank } = cfg;
+      const monthCount = cfg.monthCount || mlMonthCount(term);
       let students = (cfg.students || []).slice();
       if (blank && students.length === 0) {
         students = Array.from({ length: 20 }, () => ({ id: '', name: '' }));
       }
       if (!students.length) return '';
+      const avgCols = buildMinistryAverageColumns({ db, subject, subjectName, cls, term, blank, monthCount });
+      if (!avgCols) return '';
 
-      const underWeekComps = [];
-      let monthlyComp = null;
-      (subject.components || []).forEach((c, ci) => {
-        if (typeof componentAppliesToClass === 'function' && !componentAppliesToClass(c, cls, db)) return;
-        if (c.isMonthlyGrade || (typeof isExamLikeComponent === 'function' && isExamLikeComponent(c))) {
-          if (!monthlyComp) monthlyComp = { comp: c, ci };
-        } else underWeekComps.push({ comp: c, ci });
-      });
-
-      const months = [];
-      for (let m = 1; m <= monthCount; m++) months.push(m);
-      const monthLabels = (typeof getMonthLabels === 'function') ? getMonthLabels(term) : months.map(m => 'ش' + m);
-
-      // أعمدة: م | اسم | متوسط كل مكوّن أسبوعي الشكل | امتحان كل شهر | مجموع المكوّنات | مجموع الامتحانات | المجموع الكلي | أيام الغياب
-      const fmt = (v) => {
-        if (v === '' || v === undefined || v === null) return '';
-        if (typeof isAbsentMark === 'function' && isAbsentMark(v)) return (typeof ABSENT_MARK !== 'undefined' ? ABSENT_MARK : 'غ');
-        if (typeof v === 'number' && Number.isFinite(v)) return toHindiDigits(String(parseFloat(v.toPrecision(12))));
-        const n = Number(v);
-        if (Number.isFinite(n) && String(v).trim() !== '') return toHindiDigits(String(parseFloat(n.toPrecision(12))));
-        return toHindiDigits(v);
-      };
-
-      const gradesIdxSum = (typeof buildGradesIndex === 'function') ? buildGradesIndex(db) : null;
-      function getScore(studentId, ci, month) {
-        if (!studentId || ci < 0) return '';
-        if (gradesIdxSum) {
-          const g = gradesIdxSum.get(studentId + '|' + subjectName + '|' + term + '|' + month + '|' + ci);
-          return g ? g.score : '';
-        }
-        const g = db.grades.find(x =>
-          x.studentId === studentId && x.subjectName === subjectName &&
-          x.term === term && x.month === month && x.componentIndex === ci);
-        return g ? g.score : '';
-      }
-
-      function avgNumeric(vals) {
-        let sum = 0, n = 0, anyAbsent = false, any = false;
-        vals.forEach(v => {
-          if (v === '' || v === undefined || v === null) return;
-          any = true;
-          if (typeof isAbsentMark === 'function' && isAbsentMark(v)) { anyAbsent = true; return; }
-          sum += Number(v) || 0; n++;
-        });
-        if (!any) return '';
-        if (n === 0) return (typeof ABSENT_MARK !== 'undefined' ? ABSENT_MARK : 'غ');
-        return parseFloat((sum / n).toPrecision(12));
-      }
-
-      function sumNumeric(vals) {
-        let sum = 0, n = 0, any = false;
-        vals.forEach(v => {
-          if (v === '' || v === undefined || v === null) return;
-          any = true;
-          if (typeof isAbsentMark === 'function' && isAbsentMark(v)) return;
-          sum += Number(v) || 0; n++;
-        });
-        if (!any) return '';
-        if (n === 0) return (typeof ABSENT_MARK !== 'undefined' ? ABSENT_MARK : 'غ');
-        return sum;
-      }
-
-      // ترويسة
-      let groupRow = `<th rowspan="2" class="serial-col">م</th><th rowspan="2">اسم الطالب</th>`;
-      underWeekComps.forEach(x => {
-        groupRow += `<th rowspan="2">${escapeHtml(x.comp.name || '')}<div style="font-weight:600;font-size:8px">متوسط</div></th>`;
-      });
-      if (monthlyComp) {
-        groupRow += `<th colspan="${months.length}">${escapeHtml(monthlyComp.comp.name || 'اختبار الشهر')}</th>`;
-      }
-      groupRow += `<th rowspan="2">مجموع المكوّنات</th>`;
-      if (monthlyComp) groupRow += `<th rowspan="2">مجموع الاختبارات</th>`;
-      groupRow += `<th rowspan="2" class="grand-total-col">المجموع الكلي</th>`;
-      groupRow += `<th rowspan="2">أيام الغياب</th>`;
-
-      let subRow = '';
-      if (monthlyComp) {
-        months.forEach((m, i) => {
-          subRow += `<th>${escapeHtml(monthLabels[i] || ('ش' + m))}</th>`;
-        });
-      }
-
-      const theadHtml = subRow
-        ? `<tr>${groupRow}</tr><tr>${subRow}</tr>`
-        : `<tr>${groupRow}</tr>`;
-
-      function buildBody(slice, startIdx) {
-        let html = '';
-        const list = slice.length ? slice : [{ id: '', name: '' }];
-        list.forEach((s, li) => {
-          const idx = startIdx + li;
-          if (blank) {
-            let row = `<td class="serial-col">${toHindiDigits(idx + 1)}</td><td class="gs-name">${escapeHtml(s.name || '')}</td>`;
-            underWeekComps.forEach(() => { row += `<td class="blank-cell"></td>`; });
-            if (monthlyComp) months.forEach(() => { row += `<td class="blank-cell"></td>`; });
-            row += `<td class="blank-cell"></td>`;
-            if (monthlyComp) row += `<td class="blank-cell"></td>`;
-            row += `<td class="blank-cell grand-total-col"></td><td class="blank-cell"></td>`;
-            html += `<tr>${row}</tr>`;
-            return;
-          }
-          const compAvgs = underWeekComps.map(x => {
-            const vals = months.map(m => getScore(s.id, x.ci, m));
-            return avgNumeric(vals);
-          });
-          const examScores = monthlyComp ? months.map(m => getScore(s.id, monthlyComp.ci, m)) : [];
-          const compsSum = sumNumeric(compAvgs);
-          const examsSum = monthlyComp ? sumNumeric(examScores) : '';
-          let grand = '';
-          {
-            const parts = compAvgs.concat(examScores);
-            grand = sumNumeric(parts);
-          }
-          // أيام الغياب من سجل المواظبة لنفس المادة والفصل الدراسي
-          let absentDays = '';
-          try {
-            const n = mlCountAbsentDaysForTerm(db, s.id, subjectName, term);
-            if (n !== '' && n != null) absentDays = n;
-          } catch (e) {}
-
-          let row = `<td class="serial-col">${toHindiDigits(idx + 1)}</td><td class="gs-name">${escapeHtml(s.name || '')}</td>`;
-          compAvgs.forEach(v => { row += `<td class="gs-score">${fmt(v)}</td>`; });
-          if (monthlyComp) examScores.forEach(v => { row += `<td class="gs-score">${fmt(v)}</td>`; });
-          row += `<td class="gs-score">${fmt(compsSum)}</td>`;
-          if (monthlyComp) row += `<td class="gs-score">${fmt(examsSum)}</td>`;
-          row += `<td class="gs-score grand-total-col">${fmt(grand)}</td>`;
-          row += `<td class="gs-score">${absentDays === '' || absentDays == null ? '' : toHindiDigits(String(absentDays))}</td>`;
-          html += `<tr>${row}</tr>`;
-        });
-        return html;
-      }
+      const isPortrait = !!cfg.portrait;
+      const serialPct = isPortrait ? 3.2 : 2.4;
+      const namePct = isPortrait ? 20 : 22;
+      const colPct = (100 - serialPct - namePct) / avgCols.count;
+      let colgroupHtml = `<col style="width:${serialPct}%"><col style="width:${namePct}%">`;
+      for (let i = 0; i < avgCols.count; i++) colgroupHtml += `<col style="width:${colPct}%">`;
+      const theadHtml = `<tr class="week-row"><th rowspan="3" class="serial-col">م</th><th rowspan="3">اسم الطالب</th>${avgCols.row1}</tr>`
+        + `<tr class="comp-row">${avgCols.row2}</tr><tr class="max-row">${avgCols.row3}</tr>`;
 
       const { cls: clsPlain, section: clsSection } = splitClassSectionKey(cls);
       const info = db.schoolInfo || {};
       const termLabel = term === 'first' ? 'الفصل الدراسي الأول' : 'الفصل الدراسي الثاني';
       const assignedTeachers = (db.teachers || []).filter(t =>
         (t.assignments || []).some(a => a.subjectName === subjectName && (a.classes || []).includes(cls)));
-      const teacherName = (typeof formatAssignedTeachersForPrint === 'function') ? formatAssignedTeachersForPrint(assignedTeachers, subjectName, cls) : assignedTeachers.map(t=>escapeHtml(t.name||'')).join('، ');
+      const teacherName = (typeof formatAssignedTeachersForPrint === 'function')
+        ? formatAssignedTeachersForPrint(assignedTeachers, subjectName, cls)
+        : assignedTeachers.map(t => escapeHtml(t.name || '')).join('، ');
       const printedBy = (typeof resolvePrintedByName === 'function') ? resolvePrintedByName() : 'المستخدم';
       const printDate = new Date().toLocaleDateString('ar-EG');
       const classGradeLabelForPrint = (db.classGrade && db.classGrade[cls]) || info.grade || '';
       const metaBarHtmlDet = [
         `<span>${(typeof formatClassSectionForPrint === 'function') ? formatClassSectionForPrint(classGradeLabelForPrint, clsSection, clsPlain) : escapeHtml(cls)}</span>`,
         `<span><strong>المادة:</strong> ${escapeHtml(subjectName)}${teacherName ? ' — <strong>المعلم:</strong> ' + teacherName : ''}</span>`,
-        `<span><strong>ملخص أعمال السنة — ${termLabel}</strong></span>`,
+        `<span><strong>متوسطات ${termLabel}</strong></span>`,
         blank ? '<span style="color:#b45309;font-weight:700">نموذج فارغ</span>' : ''
       ].filter(Boolean).join('');
-
       const footer = (typeof buildUnifiedFooter === 'function')
-        ? buildUnifiedFooter({
-            captions: ['معلم المادة', 'مشرف المادة', 'وكيل المرحلة', 'موجه المادة', 'مدير المدرسة']
-          })
+        ? buildUnifiedFooter({ captions: ['معلم المادة', 'مشرف المادة', 'وكيل المرحلة', 'موجه المادة', 'مدير المدرسة'] })
         : '';
 
-      const isPortrait = !!cfg.portrait;
       let perPage;
-      if (isPortrait) {
-        perPage = Math.max(students.length, 1);
-      } else {
-        perPage = students.length <= 28 ? Math.max(students.length, 1) : Math.ceil(students.length / 2);
-      }
+      if (isPortrait) perPage = Math.max(students.length, 1);
+      else perPage = students.length <= 20 ? Math.max(students.length, 1) : Math.ceil(students.length / Math.ceil(students.length / 20));
       const chunks = [];
       for (let i = 0; i < students.length; i += perPage) chunks.push(students.slice(i, i + perPage));
-      if (!chunks.length) chunks.push([]);
       const pageClass = isPortrait
         ? 'ministry-portrait-page detailed-sheet-page ds-scope'
         : 'ministry-landscape-page detailed-sheet-page ds-scope';
 
       let pagesHtml = '';
       chunks.forEach((chunk, pageIdx) => {
-        const lhSum = (typeof buildUnifiedLetterhead === 'function') ? buildUnifiedLetterhead({
-            title: (blank ? 'ملخص أعمال السنة (نموذج) — ' : 'ملخص أعمال السنة — ') + subjectName,
-            subtitleRight: 'متوسطات + اختبارات الشهور',
-            subtitleLeft: termLabel,
-            printedBy,
-            printDate,
-            governorate: info.governorate || '',
-            educationAdmin: info.educationAdmin || '',
-            schoolName: info.schoolName || '',
-            academicYear: info.academicYear || '',
-            metaBarHtml: metaBarHtmlDet
-          }) : '';
-        const sumCols = 2 + underWeekComps.length + (monthlyComp ? months.length : 0) + 1 + (monthlyComp ? 1 : 0) + 1 + 1;
+        const lh = (typeof buildUnifiedLetterhead === 'function') ? buildUnifiedLetterhead({
+          title: (blank ? 'كشف المتوسطات (نموذج) — ' : 'كشف المتوسطات — ') + subjectName,
+          subtitleRight: 'متوسطات الفصل + الاختبارات',
+          subtitleLeft: termLabel,
+          printedBy, printDate,
+          governorate: info.governorate || '',
+          educationAdmin: info.educationAdmin || '',
+          schoolName: info.schoolName || '',
+          academicYear: info.academicYear || '',
+          metaBarHtml: metaBarHtmlDet
+        }) : '';
+        const body = chunk.map((st, li) => {
+          const idx = pageIdx * perPage + li;
+          return `<tr><td class="serial-col">${toHindiDigits(idx + 1)}</td><td class="gs-name">${escapeHtml(st.name || '')}</td>${avgCols.cells(st)}</tr>`;
+        }).join('');
         pagesHtml += `
-        <div class="${pageClass}">
-          <div class="ml-page-label">ورقة الملخص · ${toHindiDigits(pageIdx + 1)} / ${toHindiDigits(chunks.length)}</div>
-          <table class="detailed-weekly-table ml-week-first-table">
-            ${typeof theadWithFixedLetterhead === 'function' ? theadWithFixedLetterhead(lhSum, theadHtml, sumCols) : ('<thead>' + theadHtml + '</thead>')}
-            <tbody>${buildBody(chunk, pageIdx * perPage)}</tbody>
+        <div class="${pageClass} ml-avg-standalone">
+          <div class="ml-page-label">ورقة المتوسطات · ${toHindiDigits(pageIdx + 1)} / ${toHindiDigits(chunks.length)}</div>
+          <table class="detailed-weekly-table ml-week-first-table" style="width:100%;table-layout:fixed;">
+            <colgroup>${colgroupHtml}</colgroup>
+            ${typeof theadWithFixedLetterhead === 'function' ? theadWithFixedLetterhead(lh, theadHtml, avgCols.count + 2) : ('<thead>' + theadHtml + '</thead>')}
+            <tbody>${body}</tbody>
           </table>
           ${footer}
         </div>`;
       });
       return pagesHtml;
     }
+
+    // يجمّع صفحات كشف وزارة عرضي لفصل×مادة: الفترات المطلوبة ثم المتوسطات.
+    // المتوسطات تُلحق بآخر فترة إن كانت أسبوعين فقط، وإلا تُطبع في ورقة مستقلة بعرض كامل.
+    function mlAssembleLandscapeHtml(cfg) {
+      const { db, subject, subjectName, cls, term, students, blank, examColMode } = cfg;
+      const monthsToPrint = (cfg.monthsToPrint || []).slice();
+      const monthCount = mlMonthCount(term);
+      const withSummary = !!cfg.withSummary;
+      let embed = false;
+      if (withSummary) {
+        const lastWeeks = (typeof getPeriodWeekCount === 'function') ? getPeriodWeekCount(term, monthCount - 1) : 4;
+        embed = lastWeeks > 0 && lastWeeks <= 2;
+      }
+      if (embed && cfg.onlySummary && !monthsToPrint.includes(monthCount)) monthsToPrint.push(monthCount);
+      let html = '';
+      let summaryDone = false;
+      monthsToPrint.forEach((m, idx) => {
+        const doEmbed = embed && m === monthCount;
+        const pages = buildMinistryLandscapePagesHtml({
+          db, subject, subjectName, cls, term, month: m, students, blank, examColMode,
+          blockIndex: idx, totalBlocks: monthsToPrint.length,
+          embedAverages: doEmbed ? { monthCount } : null
+        });
+        if (pages) {
+          html += pages;
+          if (doEmbed && pages.indexOf('ml-avg-embedded') >= 0) summaryDone = true;
+        }
+      });
+      if (withSummary && !summaryDone) {
+        html += buildMinistrySummaryPagesHtml({ db, subject, subjectName, cls, term, students, blank, monthCount });
+      }
+      return html;
+    }
+    window.mlAssembleLandscapeHtml = mlAssembleLandscapeHtml;
 
     function printMinistryLandscapeHtml(pagesHtml) {
       const area = document.getElementById('printGradeSheetArea');
@@ -18646,6 +18676,8 @@ function renderMonthlyExportButtons() {
             if (m <= monthCount || blank) monthsToPrint.push(m);
           }
           if (!monthsToPrint.length) monthsToPrint = [2];
+        } else if (weekScope === 'avg') {
+          monthsToPrint = [];
         } else if (weekScope === 'current' || !weekScope) {
           monthsToPrint = [month];
         } else {
@@ -18659,26 +18691,59 @@ function renderMonthlyExportButtons() {
             db, subjectName: job.subjectName, cls: job.cls, term, blank
           });
         }
-        monthsToPrint.forEach(m => {
-          const pages = buildMinistryLandscapePagesHtml({
-            db, subject: job.subj, subjectName: job.subjectName, cls: job.cls,
-            term, month: m, students, blank, examColMode
-          });
-          if (pages) allHtml += pages;
+        allHtml += mlAssembleLandscapeHtml({
+          db, subject: job.subj, subjectName: job.subjectName, cls: job.cls, term, students, blank, examColMode,
+          monthsToPrint,
+          withSummary: (weekScope === 'full' || weekScope === 'from2' || weekScope === 'avg'),
+          onlySummary: weekScope === 'avg'
         });
-        if (weekScope === 'full' || weekScope === 'from2') {
-          const summary = buildMinistrySummaryPagesHtml({
-            db, subject: job.subj, subjectName: job.subjectName, cls: job.cls,
-            term, students, blank, monthCount
-          });
-          if (summary) allHtml += summary;
-        }
       }
       if (!allHtml) { alert('تعذّر بناء أي كشف.'); return; }
       printMinistryLandscapeHtml(allHtml);
     }
 
 
+
+    // دفعة مركز الطباعة: كشوف المتوسطات (عرضي) لكل فصل×مادة محددة — مثل كشوف الدرجات
+    async function printMinistryAveragesBatch(opts) {
+      opts = opts || {};
+      const blank = !!opts.blank;
+      if (!canAccessPrintCenter()) { alert('مركز الطباعة متاح للإدارة ومدير المرحلة فقط.'); return; }
+      if (currentAccountType === 'teacher') { alert('دفعة مركز الطباعة متاحة للإدارة ومدير المرحلة.'); return; }
+      const db = loadDB();
+      const classes = (typeof pcGetChecked === 'function') ? pcGetChecked('pcClassList', 'data-class') : [];
+      const subjectNames = (typeof pcGetChecked === 'function') ? pcGetChecked('pcSubjectList', 'data-subject') : [];
+      const term = (document.getElementById('pcBlankTerm') || {}).value || 'first';
+      if (!classes.length || !subjectNames.length) { alert('يرجى تحديد فصل واحد على الأقل ومادة واحدة على الأقل.'); return; }
+      const printOrder = (document.getElementById('pcBlankPrintOrder') || {}).value || 'class-first';
+      const examColMode = mlGetExamColMode();
+      const jobs = [];
+      function pushJob(cls, sn) {
+        const subj = findSubjectForClass(db, sn, cls);
+        if (!subj) return;
+        if (typeof subjectAppliesToClass === 'function' && !subjectAppliesToClass(subj, cls, db)) return;
+        jobs.push({ cls, subj, subjectName: sn });
+      }
+      if (printOrder === 'subject-first') subjectNames.forEach(sn => { classes.forEach(cls => pushJob(cls, sn)); });
+      else classes.forEach(cls => { subjectNames.forEach(sn => pushJob(cls, sn)); });
+      if (!jobs.length) { alert('لا توجد توليفات صالحة.'); return; }
+      if (jobs.length > 1 && !confirm('طباعة ' + jobs.length + ' كشف متوسطات (' + (blank ? 'فارغ' : 'ببيانات') + ')؟')) return;
+
+      let allHtml = '';
+      for (const job of jobs) {
+        let students = db.students.filter(s => classSectionKey(s.class, s.section) === job.cls);
+        students = (typeof filterStudentsForTeacherLanguage === 'function')
+          ? filterStudentsForTeacherLanguage(students, job.subjectName, job.cls) : students;
+        students.sort((a, b) => a.gender !== b.gender ? (a.gender === 'F' ? -1 : 1) : a.name.localeCompare(b.name));
+        allHtml += mlAssembleLandscapeHtml({
+          db, subject: job.subj, subjectName: job.subjectName, cls: job.cls, term, students, blank, examColMode,
+          monthsToPrint: [], withSummary: true, onlySummary: true
+        });
+      }
+      if (!allHtml) { alert('تعذّر بناء أي كشف.'); return; }
+      printMinistryLandscapeHtml(allHtml);
+    }
+    window.printMinistryAveragesBatch = printMinistryAveragesBatch;
 
     // ============================================================
     //  كشف غياب عرضي — 4 أسابيع × أيام + تواريخ (بدون غلاف)
@@ -18845,12 +18910,12 @@ function renderMonthlyExportButtons() {
         : '';
 
       const isPortrait = !!cfg.portrait;
-      // طولي: فصل كامل في ورقة واحدة — عرضي: تقريباً 16 طالب/ورقة
+      // طولي: فصل كامل في ورقة واحدة — عرضي: حتى 20 طالباً/ورقة
       let perPage;
       if (isPortrait) {
         perPage = Math.max(students.length, 1);
       } else {
-        perPage = students.length <= 16 ? Math.max(students.length, 1) : Math.ceil(students.length / Math.ceil(students.length / 16));
+        perPage = students.length <= 20 ? Math.max(students.length, 1) : Math.ceil(students.length / Math.ceil(students.length / 20));
       }
       const chunks = [];
       for (let i = 0; i < students.length; i += perPage) chunks.push(students.slice(i, i + perPage));
