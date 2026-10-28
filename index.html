@@ -18498,7 +18498,7 @@ function renderMonthlyExportButtons() {
         }
 
         // كشف الغياب الطولي: معالجة مخصصة (رؤوس رأسية + ملء الصفحة + أكبر خط للأسماء)
-        if (page.classList.contains('ml-absence-page') && fitPortraitAbsencePage(page, pageHmm)) return;
+        if (page.classList.contains('ml-absence-page') && fitPortraitAbsencePage(page, pageHmm - 9)) return; // هامش أمان ~9مم حتى لا ينزل التذييل لصفحة تالية
 
         // كشوف الرصد / الغياب / الملخص: ملء الورقة بالكامل مهما كان عدد الطلاب
         page.style.height = pageHmm + 'mm';
