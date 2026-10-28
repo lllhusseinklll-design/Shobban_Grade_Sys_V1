@@ -2227,6 +2227,48 @@
       padding: 1.2mm 3mm;
       page-break-inside: avoid;
     }
+    /* شريط متابعة بعرض الصفحة — ثقيل وواضح بدل الترويسة من الورقة الثانية فصاعداً */
+    .ministry-landscape-page .ml-page-cont-bar {
+      display: flex;
+      flex-wrap: nowrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 3mm;
+      width: 100%;
+      box-sizing: border-box;
+      margin: 0 0 2mm 0;
+      padding: 2.5mm 4mm;
+      background: linear-gradient(90deg, #14532d 0%, #166534 45%, #15803d 100%);
+      border: 2px solid #14532d;
+      border-radius: 0;
+      font-size: 12px;
+      font-weight: 800;
+      color: #fff;
+      line-height: 1.5;
+      letter-spacing: 0.01em;
+      page-break-inside: avoid;
+      box-shadow: 0 1px 0 rgba(0,0,0,.12);
+    }
+    .ministry-landscape-page .ml-page-cont-bar .ml-cont-main {
+      flex: 1 1 auto;
+      min-width: 0;
+      font-weight: 800;
+    }
+    .ministry-landscape-page .ml-page-cont-bar .ml-cont-main strong {
+      color: #bbf7d0;
+      font-weight: 900;
+    }
+    .ministry-landscape-page .ml-page-cont-bar .ml-cont-page {
+      flex: 0 0 auto;
+      font-weight: 900;
+      font-size: 12.5px;
+      color: #fff;
+      background: rgba(255,255,255,.18);
+      border: 1px solid rgba(255,255,255,.35);
+      border-radius: 4px;
+      padding: 1mm 3mm;
+      white-space: nowrap;
+    }
 
     .ministry-landscape-page .ml-week-head {
       background: #3f7a57;
@@ -17886,51 +17928,66 @@ function renderMonthlyExportButtons() {
 
       const isPortrait = !!cfg.portrait;
       // طولي: فصل كامل في صفحة واحدة
-      // عرضي: حتى 20 طالباً/ورقة (مع ضغط ترويسة المكوّنات) + توزيع متوازن + توقيعات في الأخيرة فقط
+      // عرضي: 20/ورقة · ترويسة كاملة في الأولى فقط · من الثانية شريط متابعة مختصر · التوقيعات في الأخيرة
       const ML_LANDSCAPE_MAX_ROWS = 20;
       let chunks;
-      let perPage;
       if (isPortrait) {
-        perPage = Math.max(students.length, 1);
         chunks = [students.slice()];
       } else {
         chunks = mlChunkStudentsBalanced(students, ML_LANDSCAPE_MAX_ROWS);
-        perPage = ML_LANDSCAPE_MAX_ROWS; // للترقيم التسلسلي نمرّر الإزاحة الفعلية أدناه
       }
       if (!chunks.length) chunks.push([]);
       const totalPages = chunks.length;
       const pageClass = (isPortrait ? 'ministry-portrait-page detailed-sheet-page ds-scope' : 'ministry-landscape-page detailed-sheet-page ds-scope') + (avgCols ? ' ml-avg-embedded' : '');
       const continueNote = '<div class="ml-continue-note">↓ تابع باقي الطلاب في الصفحة التالية ↓</div>';
+      const classLabelShort = (typeof formatClassSectionForPrint === 'function')
+        ? formatClassSectionForPrint(classGradeLabelForPrint, clsSection, clsPlain)
+        : escapeHtml(cls);
+      const contBarBase = `تابع رصد درجات — <strong>فصل:</strong> ${classLabelShort} · <strong>مادة:</strong> ${escapeHtml(subjectName)}${teacherName ? ' · <strong>معلم:</strong> ' + teacherName : ''} · <strong>${escapeHtml(monthLabel)}</strong> · ${escapeHtml(weekRangeLbl)}`;
 
       let pagesHtml = '';
       let rowOffset = 0;
       chunks.forEach((chunk, pageIdx) => {
+        const isFirstPage = pageIdx === 0;
         const isLastPage = pageIdx === totalPages - 1;
         const bodyHtml = buildBodyHtml(chunk, rowOffset);
         rowOffset += chunk.length;
-        const pageLabel = `<div class="ml-page-label">ورقة ${toHindiDigits(pageIdx + 1)} من ${toHindiDigits(totalPages)} · ${escapeHtml(weekRangeLbl)} · ${escapeHtml(monthLabel)}</div>`;
-        const lhHtml = (typeof buildUnifiedLetterhead === 'function') ? buildUnifiedLetterhead({
-            title: (blank ? 'سجل رصد درجات (نموذج) — ' : 'سجل رصد درجات — ') + subjectName + (avgCols ? ' + متوسطات الفصل' : ''),
-            subtitleRight: weekRangeLbl,
-            subtitleLeft: termLabel,
-            printedBy,
-            printDate,
-            governorate: info.governorate || '',
-            educationAdmin: info.educationAdmin || '',
-            schoolName: info.schoolName || '',
-            academicYear: info.academicYear || '',
-            metaBarHtml: metaBarHtmlDet
-          }) : '';
         const colSpanEst = (typeof colgroupHtml === 'string' ? (colgroupHtml.match(/<col/gi) || []).length : 0) || 40;
         const pageFoot = isPortrait
           ? ministryFooter
           : (isLastPage ? ministryFooter : (totalPages > 1 ? continueNote : ministryFooter));
+
+        let topBar = '';
+        let theadPart;
+        if (isPortrait || isFirstPage) {
+          topBar = `<div class="ml-page-label">ورقة ${toHindiDigits(pageIdx + 1)} من ${toHindiDigits(totalPages)} · ${escapeHtml(weekRangeLbl)} · ${escapeHtml(monthLabel)}</div>`;
+          const lhHtml = (typeof buildUnifiedLetterhead === 'function') ? buildUnifiedLetterhead({
+              title: (blank ? 'سجل رصد درجات (نموذج) — ' : 'سجل رصد درجات — ') + subjectName + (avgCols ? ' + متوسطات الفصل' : ''),
+              subtitleRight: weekRangeLbl,
+              subtitleLeft: termLabel,
+              printedBy,
+              printDate,
+              governorate: info.governorate || '',
+              educationAdmin: info.educationAdmin || '',
+              schoolName: info.schoolName || '',
+              academicYear: info.academicYear || '',
+              metaBarHtml: metaBarHtmlDet
+            }) : '';
+          theadPart = (typeof theadWithFixedLetterhead === 'function')
+            ? theadWithFixedLetterhead(lhHtml, theadHtml, colSpanEst)
+            : ('<thead>' + theadHtml + '</thead>');
+        } else {
+          // من الورقة الثانية: شريط متابعة مختصر بدل الترويسة الوزارية الكاملة
+          topBar = `<div class="ml-page-cont-bar"><span class="ml-cont-main">${contBarBase}</span><span class="ml-cont-page">ورقة ${toHindiDigits(pageIdx + 1)} من ${toHindiDigits(totalPages)}</span></div>`;
+          theadPart = '<thead>' + theadHtml + '</thead>';
+        }
+
         pagesHtml += `
         <div class="${pageClass}">
-          ${pageLabel}
+          ${topBar}
           <table class="detailed-weekly-table ml-week-first-table">
             <colgroup>${colgroupHtml}</colgroup>
-            ${typeof theadWithFixedLetterhead === 'function' ? theadWithFixedLetterhead(lhHtml, theadHtml, colSpanEst) : ('<thead>' + theadHtml + '</thead>')}
+            ${theadPart}
             <tbody>${bodyHtml}</tbody>
           </table>
           ${pageFoot}
@@ -18107,22 +18164,16 @@ function renderMonthlyExportButtons() {
         ? 'ministry-portrait-page detailed-sheet-page ds-scope'
         : 'ministry-landscape-page detailed-sheet-page ds-scope';
       const continueNote = '<div class="ml-continue-note">↓ تابع باقي الطلاب في الصفحة التالية ↓</div>';
+      const classLabelShort = (typeof formatClassSectionForPrint === 'function')
+        ? formatClassSectionForPrint(classGradeLabelForPrint, clsSection, clsPlain)
+        : escapeHtml(cls);
+      const contBarBase = `تابع كشف المتوسطات — <strong>فصل:</strong> ${classLabelShort} · <strong>مادة:</strong> ${escapeHtml(subjectName)}${teacherName ? ' · <strong>معلم:</strong> ' + teacherName : ''} · <strong>متوسطات ${termLabel}</strong>`;
 
       let pagesHtml = '';
       let rowOffset = 0;
       chunks.forEach((chunk, pageIdx) => {
+        const isFirstPage = pageIdx === 0;
         const isLastPage = pageIdx === totalPages - 1;
-        const lh = (typeof buildUnifiedLetterhead === 'function') ? buildUnifiedLetterhead({
-          title: (blank ? 'كشف المتوسطات (نموذج) — ' : 'كشف المتوسطات — ') + subjectName,
-          subtitleRight: 'متوسطات الفصل + الاختبارات',
-          subtitleLeft: termLabel,
-          printedBy, printDate,
-          governorate: info.governorate || '',
-          educationAdmin: info.educationAdmin || '',
-          schoolName: info.schoolName || '',
-          academicYear: info.academicYear || '',
-          metaBarHtml: metaBarHtmlDet
-        }) : '';
         const offsetNow = rowOffset;
         const body = chunk.map((st, li) => {
           const idx = offsetNow + li;
@@ -18132,12 +18183,36 @@ function renderMonthlyExportButtons() {
         const pageFoot = isPortrait
           ? footer
           : (isLastPage ? footer : (totalPages > 1 ? continueNote : footer));
+
+        let topBar = '';
+        let theadPart;
+        if (isPortrait || isFirstPage) {
+          topBar = `<div class="ml-page-label">ورقة المتوسطات · ${toHindiDigits(pageIdx + 1)} / ${toHindiDigits(totalPages)}</div>`;
+          const lh = (typeof buildUnifiedLetterhead === 'function') ? buildUnifiedLetterhead({
+            title: (blank ? 'كشف المتوسطات (نموذج) — ' : 'كشف المتوسطات — ') + subjectName,
+            subtitleRight: 'متوسطات الفصل + الاختبارات',
+            subtitleLeft: termLabel,
+            printedBy, printDate,
+            governorate: info.governorate || '',
+            educationAdmin: info.educationAdmin || '',
+            schoolName: info.schoolName || '',
+            academicYear: info.academicYear || '',
+            metaBarHtml: metaBarHtmlDet
+          }) : '';
+          theadPart = (typeof theadWithFixedLetterhead === 'function')
+            ? theadWithFixedLetterhead(lh, theadHtml, avgCols.count + 2)
+            : ('<thead>' + theadHtml + '</thead>');
+        } else {
+          topBar = `<div class="ml-page-cont-bar"><span class="ml-cont-main">${contBarBase}</span><span class="ml-cont-page">ورقة ${toHindiDigits(pageIdx + 1)} من ${toHindiDigits(totalPages)}</span></div>`;
+          theadPart = '<thead>' + theadHtml + '</thead>';
+        }
+
         pagesHtml += `
         <div class="${pageClass} ml-avg-standalone">
-          <div class="ml-page-label">ورقة المتوسطات · ${toHindiDigits(pageIdx + 1)} / ${toHindiDigits(totalPages)}</div>
+          ${topBar}
           <table class="detailed-weekly-table ml-week-first-table" style="width:100%;table-layout:fixed;">
             <colgroup>${colgroupHtml}</colgroup>
-            ${typeof theadWithFixedLetterhead === 'function' ? theadWithFixedLetterhead(lh, theadHtml, avgCols.count + 2) : ('<thead>' + theadHtml + '</thead>')}
+            ${theadPart}
             <tbody>${body}</tbody>
           </table>
           ${pageFoot}
@@ -19135,7 +19210,7 @@ function renderMonthlyExportButtons() {
         : '';
 
       const isPortrait = !!cfg.portrait;
-      // طولي: فصل كامل — عرضي: حتى 18 + توزيع متوازن + توقيعات في الأخيرة فقط
+      // طولي: فصل كامل — عرضي: 20/ورقة · ترويسة كاملة في الأولى · من الثانية شريط متابعة · توقيعات في الأخيرة
       const ML_LANDSCAPE_MAX_ROWS = 20;
       let chunks;
       if (isPortrait) chunks = [students.slice()];
@@ -19146,32 +19221,47 @@ function renderMonthlyExportButtons() {
         ? 'ministry-portrait-page detailed-sheet-page ds-scope ml-absence-page'
         : 'ministry-landscape-page detailed-sheet-page ds-scope ml-absence-page';
       const continueNote = '<div class="ml-continue-note">↓ تابع باقي الطلاب في الصفحة التالية ↓</div>';
+      const contBarBase = `تابع رصد غياب — <strong>فصل:</strong> ${classLabel} · <strong>مادة:</strong> ${escapeHtml(subjectName)}${teacherName ? ' · <strong>معلم:</strong> ' + teacherName : ''} · <strong>${escapeHtml(monthLabel)}</strong>`;
 
       let pagesHtml = '';
       let rowOffset = 0;
       chunks.forEach((chunk, pageIdx) => {
+        const isFirstPage = pageIdx === 0;
         const isLastPage = pageIdx === totalPages - 1;
-        const lhAbs = (typeof buildUnifiedLetterhead === 'function') ? buildUnifiedLetterhead({
-            title: (blank ? 'كشف رصد غياب (نموذج) — ' : 'كشف رصد غياب — ') + subjectName,
-            subtitleRight: monthLabel,
-            subtitleLeft: termLabel,
-            printedBy,
-            printDate,
-            governorate: info.governorate || '',
-            educationAdmin: info.educationAdmin || '',
-            schoolName: info.schoolName || '',
-            academicYear: info.academicYear || '',
-            metaBarHtml: metaBarHtmlDet
-          }) : '';
         const absCols = 2 + (weekCount * daysPerWeek) + 1;
         const pageFoot = isPortrait
           ? footer
           : (isLastPage ? footer : (totalPages > 1 ? continueNote : footer));
         const offsetNow = rowOffset;
         rowOffset += chunk.length;
+
+        let topBar = '';
+        let theadPart;
+        if (isPortrait || isFirstPage) {
+          topBar = `<div class="ml-page-label">ورقة ${toHindiDigits(pageIdx + 1)} من ${toHindiDigits(totalPages)} · كشف رصد غياب · ${escapeHtml(monthLabel)}</div>`;
+          const lhAbs = (typeof buildUnifiedLetterhead === 'function') ? buildUnifiedLetterhead({
+              title: (blank ? 'كشف رصد غياب (نموذج) — ' : 'كشف رصد غياب — ') + subjectName,
+              subtitleRight: monthLabel,
+              subtitleLeft: termLabel,
+              printedBy,
+              printDate,
+              governorate: info.governorate || '',
+              educationAdmin: info.educationAdmin || '',
+              schoolName: info.schoolName || '',
+              academicYear: info.academicYear || '',
+              metaBarHtml: metaBarHtmlDet
+            }) : '';
+          theadPart = (typeof theadWithFixedLetterhead === 'function')
+            ? theadWithFixedLetterhead(lhAbs, theadHtml, absCols)
+            : ('<thead>' + theadHtml + '</thead>');
+        } else {
+          topBar = `<div class="ml-page-cont-bar"><span class="ml-cont-main">${contBarBase}</span><span class="ml-cont-page">ورقة ${toHindiDigits(pageIdx + 1)} من ${toHindiDigits(totalPages)}</span></div>`;
+          theadPart = '<thead>' + theadHtml + '</thead>';
+        }
+
         pagesHtml += `
         <div class="${pageClass}">
-          <div class="ml-page-label">ورقة ${toHindiDigits(pageIdx + 1)} من ${toHindiDigits(totalPages)} · كشف رصد غياب · ${escapeHtml(monthLabel)}</div>
+          ${topBar}
           <table class="detailed-weekly-table ml-week-first-table ml-absence-table">
             <colgroup>
               <col class="col-serial">
@@ -19179,7 +19269,7 @@ function renderMonthlyExportButtons() {
               ${Array.from({length: weekCount * daysPerWeek}, () => '<col class="col-day">').join('')}
               <col class="col-sum">
             </colgroup>
-            ${typeof theadWithFixedLetterhead === 'function' ? theadWithFixedLetterhead(lhAbs, theadHtml, absCols) : ('<thead>' + theadHtml + '</thead>')}
+            ${theadPart}
             <tbody>${buildBody(chunk, offsetNow)}</tbody>
           </table>
           <div style="text-align:center;font-size:9px;color:#64748b;margin-top:2mm">✓ حضور · غ غياب · ع عذر · إج إجازة — التواريخ من الروزنامة المركزية</div>
