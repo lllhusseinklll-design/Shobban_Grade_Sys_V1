@@ -12019,8 +12019,16 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
           const baseScope = existing.baseScope || ((existing.appliesTo || [])[0]) || '';
           if (scopeKey && baseScope && scopeKey !== baseScope && !sameComponentStructure(existingComps, freshSubj.components)) {
             // أول رفع لهذا الصف وتركيب مكوناته يختلف عن الصف الأساسي: نعتمد مكونات ملفه كما هي
-            return { name: existing.name, exportName: existing.exportName,
-              components: freshSubj.components.map(c => ({ ...c })), isVariant: true };
+            // نُبقي ترتيب المكونات على مواضع المكونات القديمة (مطابقة بالاسم أولاً ثم بالترتيب) حتى
+            // تظل الدرجات المرصودة سابقاً لهذا الصف على فهارسها وتُقرأ تحت المكوّن المقابل لها.
+            const nk = n => normalizeArabic(n).replace(/\s+/g, '');
+            const pool = freshSubj.components.map(c => ({ ...c }));
+            const slots = existingComps.map(ec => {
+              const i = pool.findIndex(fc => nk(fc.name) === nk(ec.name));
+              return i >= 0 ? pool.splice(i, 1)[0] : null;
+            });
+            const ordered = slots.map(x => x || pool.shift() || null).filter(Boolean).concat(pool);
+            return { name: existing.name, exportName: existing.exportName, components: ordered, isVariant: true };
           }
         }
         const matchedNames = new Set();
