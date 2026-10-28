@@ -2216,15 +2216,15 @@
     }
     /* سطر متابعة بين صفحات الكشف العرضي — بدل التوقيعات في الصفحات غير الأخيرة */
     .ministry-landscape-page .ml-continue-note {
-      margin-top: 3mm;
+      margin-top: 1.5mm;
       text-align: center;
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 800;
       color: #1e3a5f;
       background: #eff6ff;
       border: 1px dashed #93c5fd;
-      border-radius: 6px;
-      padding: 2.5mm 4mm;
+      border-radius: 5px;
+      padding: 1.2mm 3mm;
       page-break-inside: avoid;
     }
 
@@ -2235,12 +2235,12 @@
     }
     .ministry-landscape-page .ml-week-head .w-name { font-size: 9px; }
     .ministry-landscape-page .ml-week-head .w-date { font-size: 7.5px; font-weight: 600; opacity: 0.95; }
-    /* ضغط صف المكوّنات الرأسي في العرضي: من 26مم → 18مم لتوفير ارتفاع يكفي 20 طالباً + التوقيعات */
+    /* ضغط صف المكوّنات الرأسي في العرضي: من 26مم → 16مم لتوفير ارتفاع يكفي 20 طالباً + التذييل */
     .ministry-landscape-page .detailed-weekly-table thead tr.comp-row th,
     .ministry-landscape-page .ml-week-first-table thead tr.comp-row th {
-      height: 18mm !important;
-      max-height: 18mm !important;
-      padding: 0.4mm 0.15mm !important;
+      height: 16mm !important;
+      max-height: 16mm !important;
+      padding: 0.25mm 0.1mm !important;
     }
     .ministry-landscape-page .detailed-weekly-table thead .c-vert,
     .ministry-landscape-page .ml-week-first-table .c-vert {
@@ -2249,13 +2249,24 @@
       transform: rotate(180deg);
       white-space: nowrap;
       max-width: 100%;
-      line-height: 1.08;
-      font-size: 7.5px;
+      line-height: 1.05;
+      font-size: 7px;
       font-weight: 800;
     }
     .ministry-landscape-page .detailed-weekly-table th,
     .ministry-landscape-page .detailed-weekly-table td {
-      padding: 0.45mm 0.3mm;
+      padding: 0.35mm 0.25mm;
+    }
+    .ministry-landscape-page .detailed-weekly-table td.gs-name {
+      font-size: 9px !important;
+    }
+    .ministry-landscape-page .detailed-weekly-table thead tr.week-row th {
+      padding: 0.8mm 0.3mm !important;
+      line-height: 1.25 !important;
+    }
+    .ministry-landscape-page .detailed-weekly-table thead tr.max-row th {
+      padding: 0.4mm 0.2mm !important;
+      font-size: 7.5px !important;
     }
     .ministry-portrait-page .detailed-weekly-table thead .c-vert {
       display: inline-block;
@@ -17870,13 +17881,13 @@ function renderMonthlyExportButtons() {
         : '';
 
       if (blank && students.length === 0) {
-        students = Array.from({ length: 18 }, () => ({ id: '', name: '' }));
+        students = Array.from({ length: 20 }, () => ({ id: '', name: '' }));
       }
 
       const isPortrait = !!cfg.portrait;
       // طولي: فصل كامل في صفحة واحدة
-      // عرضي: حتى 18 طالباً/ورقة (مع ضغط ترويسة المكوّنات) + توزيع متوازن + توقيعات في الأخيرة فقط
-      const ML_LANDSCAPE_MAX_ROWS = 18;
+      // عرضي: حتى 20 طالباً/ورقة (مع ضغط ترويسة المكوّنات) + توزيع متوازن + توقيعات في الأخيرة فقط
+      const ML_LANDSCAPE_MAX_ROWS = 20;
       let chunks;
       let perPage;
       if (isPortrait) {
@@ -18050,7 +18061,7 @@ function renderMonthlyExportButtons() {
       const monthCount = cfg.monthCount || mlMonthCount(term);
       let students = (cfg.students || []).slice();
       if (blank && students.length === 0) {
-        students = Array.from({ length: 18 }, () => ({ id: '', name: '' }));
+        students = Array.from({ length: 20 }, () => ({ id: '', name: '' }));
       }
       if (!students.length) return '';
       const avgCols = buildMinistryAverageColumns({ db, subject, subjectName, cls, term, blank, monthCount });
@@ -18086,7 +18097,7 @@ function renderMonthlyExportButtons() {
         ? buildUnifiedFooter({ captions: ['معلم المادة', 'مشرف المادة', 'وكيل المرحلة', 'موجه المادة', 'مدير المدرسة'] })
         : '';
 
-      const ML_LANDSCAPE_MAX_ROWS = 18;
+      const ML_LANDSCAPE_MAX_ROWS = 20;
       let chunks;
       if (isPortrait) chunks = [students.slice()];
       else chunks = mlChunkStudentsBalanced(students, ML_LANDSCAPE_MAX_ROWS);
@@ -19092,7 +19103,7 @@ function renderMonthlyExportButtons() {
       }
 
       if (blank && students.length === 0) {
-        students = Array.from({ length: 18 }, () => ({ id: '', name: '' }));
+        students = Array.from({ length: 20 }, () => ({ id: '', name: '' }));
       }
 
       const { cls: clsPlain, section: clsSection } = (typeof splitClassSectionKey === 'function')
@@ -19125,7 +19136,7 @@ function renderMonthlyExportButtons() {
 
       const isPortrait = !!cfg.portrait;
       // طولي: فصل كامل — عرضي: حتى 18 + توزيع متوازن + توقيعات في الأخيرة فقط
-      const ML_LANDSCAPE_MAX_ROWS = 18;
+      const ML_LANDSCAPE_MAX_ROWS = 20;
       let chunks;
       if (isPortrait) chunks = [students.slice()];
       else chunks = mlChunkStudentsBalanced(students, ML_LANDSCAPE_MAX_ROWS);
