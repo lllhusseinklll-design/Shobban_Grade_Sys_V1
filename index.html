@@ -2194,9 +2194,11 @@
       justify-content: space-between;
       flex-wrap: nowrap;
       gap: 2mm;
-      margin-top: 4mm;
+      margin-top: 2.5mm;
       font-size: 9px;
       color: #1e293b;
+      page-break-inside: avoid;
+      break-inside: avoid;
     }
     .ministry-landscape-page .detailed-sheet-footer .gs-sign {
       text-align: center;
@@ -2209,8 +2211,21 @@
       white-space: nowrap;
     }
     .ministry-landscape-page .detailed-sheet-footer .gs-line {
-      margin-top: 8mm;
+      margin-top: 5.5mm;
       border-top: 1px dotted #64748b;
+    }
+    /* سطر متابعة بين صفحات الكشف العرضي — بدل التوقيعات في الصفحات غير الأخيرة */
+    .ministry-landscape-page .ml-continue-note {
+      margin-top: 3mm;
+      text-align: center;
+      font-size: 11px;
+      font-weight: 800;
+      color: #1e3a5f;
+      background: #eff6ff;
+      border: 1px dashed #93c5fd;
+      border-radius: 6px;
+      padding: 2.5mm 4mm;
+      page-break-inside: avoid;
     }
 
     .ministry-landscape-page .ml-week-head {
@@ -17809,22 +17824,27 @@ function renderMonthlyExportButtons() {
       }
 
       const isPortrait = !!cfg.portrait;
-      // طولي: فصل كامل في صفحة واحدة مهما كان العدد (يُضغط تلقائياً عند الطباعة)
-      // عرضي: حتى 20 طالباً/ورقة كما كان
+      // طولي: فصل كامل في صفحة واحدة
+      // عرضي: 20 طالباً/ورقة — التوقيعات في الصفحة الأخيرة فقط، والصفحات الوسطى بسطر «تابع…»
+      const ML_LANDSCAPE_MAX_ROWS = 20;
       let perPage;
       if (isPortrait) {
         perPage = Math.max(students.length, 1);
       } else {
-        perPage = students.length <= 20 ? Math.max(students.length, 1) : Math.ceil(students.length / Math.ceil(students.length / 20));
+        perPage = students.length <= ML_LANDSCAPE_MAX_ROWS
+          ? Math.max(students.length, 1)
+          : Math.ceil(students.length / Math.ceil(students.length / ML_LANDSCAPE_MAX_ROWS));
       }
       const chunks = [];
       for (let i = 0; i < students.length; i += perPage) chunks.push(students.slice(i, i + perPage));
       if (!chunks.length) chunks.push([]);
       const totalPages = chunks.length;
       const pageClass = (isPortrait ? 'ministry-portrait-page detailed-sheet-page ds-scope' : 'ministry-landscape-page detailed-sheet-page ds-scope') + (avgCols ? ' ml-avg-embedded' : '');
+      const continueNote = '<div class="ml-continue-note">↓ تابع باقي الطلاب في الصفحة التالية ↓</div>';
 
       let pagesHtml = '';
       chunks.forEach((chunk, pageIdx) => {
+        const isLastPage = pageIdx === totalPages - 1;
         const bodyHtml = buildBodyHtml(chunk, pageIdx * perPage);
         const pageLabel = `<div class="ml-page-label">ورقة ${toHindiDigits(pageIdx + 1)} من ${toHindiDigits(totalPages)} · ${escapeHtml(weekRangeLbl)} · ${escapeHtml(monthLabel)}</div>`;
         const lhHtml = (typeof buildUnifiedLetterhead === 'function') ? buildUnifiedLetterhead({
@@ -17839,8 +17859,10 @@ function renderMonthlyExportButtons() {
             academicYear: info.academicYear || '',
             metaBarHtml: metaBarHtmlDet
           }) : '';
-        // تقدير عدد الأعمدة لتكرار الترويسة داخل thead مع كل صفحة
         const colSpanEst = (typeof colgroupHtml === 'string' ? (colgroupHtml.match(/<col/gi) || []).length : 0) || 40;
+        const pageFoot = isPortrait
+          ? ministryFooter
+          : (isLastPage ? ministryFooter : (totalPages > 1 ? continueNote : ministryFooter));
         pagesHtml += `
         <div class="${pageClass}">
           ${pageLabel}
@@ -17849,7 +17871,7 @@ function renderMonthlyExportButtons() {
             ${typeof theadWithFixedLetterhead === 'function' ? theadWithFixedLetterhead(lhHtml, theadHtml, colSpanEst) : ('<thead>' + theadHtml + '</thead>')}
             <tbody>${bodyHtml}</tbody>
           </table>
-          ${ministryFooter}
+          ${pageFoot}
         </div>`;
       });
       return pagesHtml;
@@ -18013,17 +18035,24 @@ function renderMonthlyExportButtons() {
         ? buildUnifiedFooter({ captions: ['معلم المادة', 'مشرف المادة', 'وكيل المرحلة', 'موجه المادة', 'مدير المدرسة'] })
         : '';
 
+      const ML_LANDSCAPE_MAX_ROWS = 20;
       let perPage;
       if (isPortrait) perPage = Math.max(students.length, 1);
-      else perPage = students.length <= 20 ? Math.max(students.length, 1) : Math.ceil(students.length / Math.ceil(students.length / 20));
+      else perPage = students.length <= ML_LANDSCAPE_MAX_ROWS
+        ? Math.max(students.length, 1)
+        : Math.ceil(students.length / Math.ceil(students.length / ML_LANDSCAPE_MAX_ROWS));
       const chunks = [];
       for (let i = 0; i < students.length; i += perPage) chunks.push(students.slice(i, i + perPage));
+      if (!chunks.length) chunks.push([]);
+      const totalPages = chunks.length;
       const pageClass = isPortrait
         ? 'ministry-portrait-page detailed-sheet-page ds-scope'
         : 'ministry-landscape-page detailed-sheet-page ds-scope';
+      const continueNote = '<div class="ml-continue-note">↓ تابع باقي الطلاب في الصفحة التالية ↓</div>';
 
       let pagesHtml = '';
       chunks.forEach((chunk, pageIdx) => {
+        const isLastPage = pageIdx === totalPages - 1;
         const lh = (typeof buildUnifiedLetterhead === 'function') ? buildUnifiedLetterhead({
           title: (blank ? 'كشف المتوسطات (نموذج) — ' : 'كشف المتوسطات — ') + subjectName,
           subtitleRight: 'متوسطات الفصل + الاختبارات',
@@ -18039,15 +18068,18 @@ function renderMonthlyExportButtons() {
           const idx = pageIdx * perPage + li;
           return `<tr><td class="serial-col">${toHindiDigits(idx + 1)}</td><td class="gs-name">${escapeHtml(st.name || '')}</td>${avgCols.cells(st)}</tr>`;
         }).join('');
+        const pageFoot = isPortrait
+          ? footer
+          : (isLastPage ? footer : (totalPages > 1 ? continueNote : footer));
         pagesHtml += `
         <div class="${pageClass} ml-avg-standalone">
-          <div class="ml-page-label">ورقة المتوسطات · ${toHindiDigits(pageIdx + 1)} / ${toHindiDigits(chunks.length)}</div>
+          <div class="ml-page-label">ورقة المتوسطات · ${toHindiDigits(pageIdx + 1)} / ${toHindiDigits(totalPages)}</div>
           <table class="detailed-weekly-table ml-week-first-table" style="width:100%;table-layout:fixed;">
             <colgroup>${colgroupHtml}</colgroup>
             ${typeof theadWithFixedLetterhead === 'function' ? theadWithFixedLetterhead(lh, theadHtml, avgCols.count + 2) : ('<thead>' + theadHtml + '</thead>')}
             <tbody>${body}</tbody>
           </table>
-          ${footer}
+          ${pageFoot}
         </div>`;
       });
       return pagesHtml;
@@ -19042,22 +19074,28 @@ function renderMonthlyExportButtons() {
         : '';
 
       const isPortrait = !!cfg.portrait;
-      // طولي: فصل كامل في ورقة واحدة — عرضي: حتى 20 طالباً/ورقة
+      // طولي: فصل كامل في ورقة واحدة — عرضي: 20 طالباً/ورقة، التوقيعات في الأخيرة فقط
+      const ML_LANDSCAPE_MAX_ROWS = 20;
       let perPage;
       if (isPortrait) {
         perPage = Math.max(students.length, 1);
       } else {
-        perPage = students.length <= 20 ? Math.max(students.length, 1) : Math.ceil(students.length / Math.ceil(students.length / 20));
+        perPage = students.length <= ML_LANDSCAPE_MAX_ROWS
+          ? Math.max(students.length, 1)
+          : Math.ceil(students.length / Math.ceil(students.length / ML_LANDSCAPE_MAX_ROWS));
       }
       const chunks = [];
       for (let i = 0; i < students.length; i += perPage) chunks.push(students.slice(i, i + perPage));
       if (!chunks.length) chunks.push([]);
+      const totalPages = chunks.length;
       const pageClass = isPortrait
         ? 'ministry-portrait-page detailed-sheet-page ds-scope ml-absence-page'
         : 'ministry-landscape-page detailed-sheet-page ds-scope ml-absence-page';
+      const continueNote = '<div class="ml-continue-note">↓ تابع باقي الطلاب في الصفحة التالية ↓</div>';
 
       let pagesHtml = '';
       chunks.forEach((chunk, pageIdx) => {
+        const isLastPage = pageIdx === totalPages - 1;
         const lhAbs = (typeof buildUnifiedLetterhead === 'function') ? buildUnifiedLetterhead({
             title: (blank ? 'كشف رصد غياب (نموذج) — ' : 'كشف رصد غياب — ') + subjectName,
             subtitleRight: monthLabel,
@@ -19071,9 +19109,12 @@ function renderMonthlyExportButtons() {
             metaBarHtml: metaBarHtmlDet
           }) : '';
         const absCols = 2 + (weekCount * daysPerWeek) + 1;
+        const pageFoot = isPortrait
+          ? footer
+          : (isLastPage ? footer : (totalPages > 1 ? continueNote : footer));
         pagesHtml += `
         <div class="${pageClass}">
-          <div class="ml-page-label">ورقة ${toHindiDigits(pageIdx + 1)} من ${toHindiDigits(chunks.length)} · كشف رصد غياب · ${escapeHtml(monthLabel)}</div>
+          <div class="ml-page-label">ورقة ${toHindiDigits(pageIdx + 1)} من ${toHindiDigits(totalPages)} · كشف رصد غياب · ${escapeHtml(monthLabel)}</div>
           <table class="detailed-weekly-table ml-week-first-table ml-absence-table">
             <colgroup>
               <col class="col-serial">
@@ -19085,7 +19126,7 @@ function renderMonthlyExportButtons() {
             <tbody>${buildBody(chunk, pageIdx * perPage)}</tbody>
           </table>
           <div style="text-align:center;font-size:9px;color:#64748b;margin-top:2mm">✓ حضور · غ غياب · ع عذر · إج إجازة — التواريخ من الروزنامة المركزية</div>
-          ${footer}
+          ${pageFoot}
         </div>`;
       });
       return pagesHtml;
