@@ -2393,13 +2393,25 @@
       .ministry-landscape-page {
         page: ministry-landscape;
         page-break-after: always;
-        page-break-inside: avoid;
-        break-inside: avoid;
+        /* لا نستخدم page-break-inside:avoid على الصفحة كاملة — إن تجاوز المحتوى ارتفاع الورقة
+           يُدفع التذييل (تابع/توقيعات) لوحده لصفحة شبه فارغة. الاعتماد على حد الصفوف + ضغط الترويسة. */
         padding: 0 1mm;
-        overflow: hidden;
+        overflow: visible;
       }
       .ministry-landscape-page:last-child {
         page-break-after: auto !important;
+      }
+      /* إبقاء الجدول مع تذييله (تابع أو توقيعات) كتلة واحدة قدر الإمكان */
+      .ministry-landscape-page .detailed-weekly-table {
+        page-break-after: avoid;
+        break-after: avoid;
+      }
+      .ministry-landscape-page .ml-continue-note,
+      .ministry-landscape-page .detailed-sheet-footer {
+        page-break-before: avoid;
+        break-before: avoid;
+        page-break-inside: avoid;
+        break-inside: avoid;
       }
       @page ministry-landscape {
         size: A4 landscape;
@@ -17858,13 +17870,13 @@ function renderMonthlyExportButtons() {
         : '';
 
       if (blank && students.length === 0) {
-        students = Array.from({ length: 20 }, () => ({ id: '', name: '' }));
+        students = Array.from({ length: 18 }, () => ({ id: '', name: '' }));
       }
 
       const isPortrait = !!cfg.portrait;
       // طولي: فصل كامل في صفحة واحدة
-      // عرضي: حتى 20 طالباً/ورقة (مع ضغط ترويسة المكوّنات) + توزيع متوازن + توقيعات في الأخيرة فقط
-      const ML_LANDSCAPE_MAX_ROWS = 20;
+      // عرضي: حتى 18 طالباً/ورقة (مع ضغط ترويسة المكوّنات) + توزيع متوازن + توقيعات في الأخيرة فقط
+      const ML_LANDSCAPE_MAX_ROWS = 18;
       let chunks;
       let perPage;
       if (isPortrait) {
@@ -18038,7 +18050,7 @@ function renderMonthlyExportButtons() {
       const monthCount = cfg.monthCount || mlMonthCount(term);
       let students = (cfg.students || []).slice();
       if (blank && students.length === 0) {
-        students = Array.from({ length: 20 }, () => ({ id: '', name: '' }));
+        students = Array.from({ length: 18 }, () => ({ id: '', name: '' }));
       }
       if (!students.length) return '';
       const avgCols = buildMinistryAverageColumns({ db, subject, subjectName, cls, term, blank, monthCount });
@@ -18074,7 +18086,7 @@ function renderMonthlyExportButtons() {
         ? buildUnifiedFooter({ captions: ['معلم المادة', 'مشرف المادة', 'وكيل المرحلة', 'موجه المادة', 'مدير المدرسة'] })
         : '';
 
-      const ML_LANDSCAPE_MAX_ROWS = 20;
+      const ML_LANDSCAPE_MAX_ROWS = 18;
       let chunks;
       if (isPortrait) chunks = [students.slice()];
       else chunks = mlChunkStudentsBalanced(students, ML_LANDSCAPE_MAX_ROWS);
@@ -19080,7 +19092,7 @@ function renderMonthlyExportButtons() {
       }
 
       if (blank && students.length === 0) {
-        students = Array.from({ length: 20 }, () => ({ id: '', name: '' }));
+        students = Array.from({ length: 18 }, () => ({ id: '', name: '' }));
       }
 
       const { cls: clsPlain, section: clsSection } = (typeof splitClassSectionKey === 'function')
@@ -19112,8 +19124,8 @@ function renderMonthlyExportButtons() {
         : '';
 
       const isPortrait = !!cfg.portrait;
-      // طولي: فصل كامل — عرضي: حتى 20 + توزيع متوازن + توقيعات في الأخيرة فقط
-      const ML_LANDSCAPE_MAX_ROWS = 20;
+      // طولي: فصل كامل — عرضي: حتى 18 + توزيع متوازن + توقيعات في الأخيرة فقط
+      const ML_LANDSCAPE_MAX_ROWS = 18;
       let chunks;
       if (isPortrait) chunks = [students.slice()];
       else chunks = mlChunkStudentsBalanced(students, ML_LANDSCAPE_MAX_ROWS);
