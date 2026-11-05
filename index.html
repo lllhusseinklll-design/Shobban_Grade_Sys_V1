@@ -22954,8 +22954,9 @@ function renderMonthlyExportButtons() {
     const periods=[];
     ['first','second'].forEach(term=>{
       const labels = (typeof getMonthLabels==='function') ? getMonthLabels(term) : [];
-      labels.forEach((lab,i)=>periods.push({term, month:i+1, label:lab||('الشهر '+(i+1))}));
+      labels.forEach((lab,i)=>periods.push({term, month:i+1, label:lab||('الشهر '+(i+1)), exam:(typeof periodHasMonthlyExam==='function') ? periodHasMonthlyExam(term,i) : true}));
     });
+    const examPeriods = periods.filter(p=>p.exam);   // فترات الاختبار الشهري فقط (من بيانات المدرسة > فترات الرصد)
     const classIds = new Set((d.students||[]).filter(x=>((typeof classSectionKey==='function')?classSectionKey(x.class,x.section):(x.class||''))===classKey).map(x=>x.id));
     const filled = g => g && g.score!=='' && g.score!=null;
     const isAbs = v => (typeof isAbsentMark==='function') ? isAbsentMark(v) : v==='غ';
@@ -22971,7 +22972,7 @@ function renderMonthlyExportButtons() {
       const active = periods.filter(p=>subGrades.some(g=>classIds.has(g.studentId)&&g.term===p.term&&g.month===p.month&&filled(g)));
       const monthlyIdx = comps.findIndex(c=>c.isMonthlyGrade);
       const monthlyMax = monthlyIdx>=0 ? (Number(comps[monthlyIdx].maxScore)||0) : 0;
-      const months = periods.map(p=>{
+      const months = examPeriods.map(p=>{
         if(monthlyIdx<0) return {state:'na'};
         const g=find(p.term,p.month,monthlyIdx);
         if(!filled(g)) return {state: active.includes(p)?'missing':'na'};
@@ -22995,13 +22996,13 @@ function renderMonthlyExportButtons() {
         if(missing.length) issues.push({kind:'missing', name:c.name, text:'لم يُرصد: '+missing.join('، ')});
       });
       if(monthlyIdx>=0){
-        const miss = periods.filter((p,i)=>months[i].state==='missing').map(p=>p.label);
+        const miss = examPeriods.filter((p,i)=>months[i].state==='missing').map(p=>p.label);
         if(miss.length) issues.push({kind:'missing', name:comps[monthlyIdx].name||'الدرجة الشهرية', text:'لم تُرصد: '+miss.join('، ')});
       }
       subjects.push({name:sub.name, max:monthlyMax, months, issues});
     });
     const att = v20ComputeStudentAttendance(id, allowedList.map(x=>x.name));
-    return {s, full, periods, subjects, unrecorded, att, classLabel:(s.class||'—')+(s.section?(s.section==='languages'?' (لغات)':' (عربي)'):'')};
+    return {s, full, periods:examPeriods, subjects, unrecorded, att, classLabel:(s.class||'—')+(s.section?(s.section==='languages'?' (لغات)':' (عربي)'):'')};
   }
   function v20ScoreColor(n,max){ if(!(max>0)) return ''; const p=n/max*100; return p<50?'#b91c1c':(p<70?'#b45309':''); }
 
