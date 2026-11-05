@@ -4174,7 +4174,10 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
     <!-- ==================== STUDENTS ==================== -->
     <div id="tab-students" class="tab-content">
       <div class="card">
-        <h2>👨‍🎓 قائمة الطلاب</h2>
+        <div class="flex justify-between items-center flex-wrap gap-12" style="margin-bottom:8px;">
+          <h2 style="margin:0;">👨‍🎓 قائمة الطلاب</h2>
+          <button id="addStudentBtn" class="btn btn-success" style="display:none;" onclick="openAddStudentModal()">➕ إضافة طالب</button>
+        </div>
         <div class="filter-bar">
           <select id="studentClassFilter" onchange="filterStudents()"><option value="">جميع الفصول</option></select>
           <select id="studentGenderFilter" onchange="filterStudents()">
@@ -13553,7 +13556,8 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
       // نجهّز فقط قائمة (صف، عمود، قيمة) التي يجب كتابتها، ونرسلها للـ Worker ليقوم هو بفتح
       // الملف الأصلي وتعديلها وإعادة كتابته - بدون أي عملية XLSX ثقيلة هنا على الخيط الرئيسي.
       const writes = [];
-      db.students.filter(s => s.grade === grade && s.section === section).forEach(s => {
+      // الطالب المضاف يدوياً (بدون صف في ملف الإكسل الأصلي) لا rowIndex له، فيُتخطى هنا
+      db.students.filter(s => s.grade === grade && s.section === section && s.rowIndex != null).forEach(s => {
         db.subjects.map(sv => resolveSubjectForScope(sv, grade + '|' + section)).forEach(subj => {
           subj.components.forEach((comp, ci) => {
             if (comp.colIndex === undefined || comp.colIndex < 0) return;
@@ -15362,6 +15366,8 @@ function renderMonthlyExportButtons() {
       );
 
       const canEdit = currentRole === 'admin';
+      const addBtn = document.getElementById('addStudentBtn');
+      if (addBtn) addBtn.style.display = (canEdit && currentAccountType !== 'monitor') ? '' : 'none';
       const canOpenCard = (currentRole === 'admin' || currentRole === 'viewer' || currentRole === 'teacher') && typeof v20OpenStudent === 'function';
       const showNid = canViewNationalId();
       // المسار/التخصص: صف ثانٍ ثانوي فقط. اللغة الثانية: لغير الثاني (لأنها في الثاني اختيار ضمن مسار الآداب فقط)
@@ -15507,6 +15513,241 @@ function renderMonthlyExportButtons() {
       loadStudentsUI();
       updateFilters();
       if (typeof loadStatsUI === 'function') loadStatsUI();
+    }
+
+    // ============================================================
+    //  إضافة طالب يدوياً (بدون ملف Excel)
+    // ============================================================
+    function _asStageCtx() {
+      const rec = (typeof getStageRecord === 'function' && currentStageId) ? getStageRecord(currentStageId) : null;
+      const section = rec ? stageSectionOf(rec) : null;
+      let type = rec ? (stageTypeOf(rec) || inferEducationalStageTypeFromName(rec.name)) : null;
+      return { rec, section, type };
+    }
+    function _asGradeOptions(db, type) {
+      const out = [];
+      const types = type && STAGE_GRADE_CONFIG[type] ? [type] : Object.keys(STAGE_GRADE_CONFIG);
+      types.forEach(t => { const cfg = STAGE_GRADE_CONFIG[t]; for (let i = 0; i < cfg.count; i++) out.push(cfg.label(i)); });
+      // أي صف موجود فعلاً في بيانات المرحلة ولم يظهر أعلاه (مثلاً بصياغة مختلفة)
+      const lvOk = g => !type || levelOfGradeText(g) === type;
+      const extra = new Set();
+      Object.values(db.classGrade || {}).forEach(g => { if (g) extra.add(String(g)); });
+      (db.students || []).forEach(s => { if (s && s.grade) extra.add(String(s.grade)); });
+      extra.forEach(g => { if (!out.includes(g) && lvOk(g)) out.push(g); });
+      return out;
+    }
+    function _asClassesFor(db, grade, section) {
+      const set = new Set();
+      Object.keys(db.classGrade || {}).forEach(k => {
+        const p = splitClassSectionKey(k);
+        if (p.section === section && db.classGrade[k] === grade && p.cls) set.add(p.cls);
+      });
+      (db.students || []).forEach(s => { if (s && s.grade === grade && (s.section || '') === section && s.class) set.add(s.class); });
+      return Array.from(set).sort();
+    }
+    function _asEl(id) { return document.getElementById(id); }
+    function _asErr(msg) { const e = _asEl('asError'); if (e) { e.textContent = msg || ''; e.style.display = msg ? 'block' : 'none'; } }
+
+    function openAddStudentModal() {
+      if (currentRole !== 'admin') return;
+      if (!currentStageId) { alert('⚠️ اختر مرحلة دراسية أولاً.'); return; }
+      const db = loadDB();
+      const ctx = _asStageCtx();
+      let el = _asEl('addStudentOverlay');
+      if (el) el.remove();
+      el = document.createElement('div');
+      el.id = 'addStudentOverlay';
+      el.className = 'mg-modal-overlay';
+      el.addEventListener('mousedown', ev => { if (ev.target === el) closeAddStudentModal(); });
+      const inp = 'width:100%; padding:8px 10px; border:1px solid #cbd5e1; border-radius:6px; font-size:14px; background:#fff; box-sizing:border-box;';
+      const lbl = 'display:block; font-size:13px; font-weight:700; color:#1e3a5f; margin-bottom:4px;';
+      const req = '<span style="color:#b91c1c;">*</span>';
+      el.innerHTML = `
+        <div class="mg-modal-box" style="max-width:560px;" role="dialog" aria-modal="true">
+          <div class="mg-modal-header ui-modal-header ui-type-info">➕ إضافة طالب جديد</div>
+          <div class="mg-modal-body" style="white-space:normal;">
+            <div id="asError" style="display:none; background:#fef2f2; color:#991b1b; border:1px solid #fca5a5; border-radius:8px; padding:8px 12px; margin-bottom:12px; font-size:13px;"></div>
+            <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px;">
+              <div id="asSectionWrap" style="${ctx.section ? 'display:none;' : ''}">
+                <label style="${lbl}">القسم ${req}</label>
+                <select id="asSection" style="${inp}"><option value="">-- اختر القسم --</option><option value="arabic">عربي</option><option value="languages">لغات</option></select>
+              </div>
+              <div>
+                <label style="${lbl}">الصف ${req}</label>
+                <select id="asGrade" style="${inp}" onchange="asOnGradeChange()"></select>
+              </div>
+              <div>
+                <label style="${lbl}">الفصل ${req}</label>
+                <select id="asClass" style="${inp}" onchange="asOnClassChange()"></select>
+                <input type="text" id="asNewClass" placeholder="اسم الفصل الجديد (مثال: ٥/١)" style="${inp} margin-top:6px; display:none;" />
+              </div>
+              <div style="grid-column:1/-1;">
+                <label style="${lbl}">اسم الطالب ${req}</label>
+                <input type="text" id="asName" style="${inp}" placeholder="الاسم رباعي" autocomplete="off" />
+              </div>
+              <div>
+                <label style="${lbl}">الرقم القومي ${req}</label>
+                <input type="text" id="asNid" inputmode="numeric" maxlength="14" style="${inp} direction:ltr; text-align:right;" placeholder="14 رقماً" oninput="asOnNidInput()" autocomplete="off" />
+              </div>
+              <div>
+                <label style="${lbl}">رقم الجلوس</label>
+                <input type="text" id="asSeat" inputmode="numeric" style="${inp} direction:ltr; text-align:right;" autocomplete="off" oninput="this.dataset.touched='1'" />
+              </div>
+              <div>
+                <label style="${lbl}">النوع ${req}</label>
+                <select id="asGender" style="${inp}"><option value="M">ذكر</option><option value="F">أنثى</option></select>
+                <div id="asGenderHint" style="font-size:11px; color:#64748b; margin-top:3px;"></div>
+              </div>
+              <div id="asLangWrap">
+                <label style="${lbl}">اللغة الثانية</label>
+                <input type="text" id="asLang" list="secondLangDatalist" style="${inp}" placeholder="اختياري" autocomplete="off" />
+              </div>
+              <div id="asPathWrap" style="display:none;">
+                <label style="${lbl}">المسار</label>
+                <select id="asPath" style="${inp}" onchange="asOnPathChange()"></select>
+              </div>
+              <div id="asSpecWrap" style="display:none;">
+                <label style="${lbl}">مادة التخصص</label>
+                <select id="asSpec" style="${inp}"></select>
+              </div>
+            </div>
+            <div style="font-size:12px; color:#64748b; margin-top:12px; line-height:1.7;">
+              💡 الطالب المضاف يدوياً يظهر في كشوف الدرجات والحضور مباشرة. ملاحظة: إعادة رفع ملف Excel لنفس الصف والقسم تستبدل قائمة طلابه بما في الملف، فأضف الطالب إلى الملف أيضاً إن كنت ستعيد رفعه.
+            </div>
+          </div>
+          <div class="mg-modal-footer">
+            <button class="btn btn-outline btn-sm" onclick="closeAddStudentModal()">إلغاء</button>
+            <button class="btn btn-success btn-sm" id="asSaveBtn" onclick="saveNewStudent()">💾 حفظ الطالب</button>
+          </div>
+        </div>`;
+      document.body.appendChild(el);
+
+      const gSel = _asEl('asGrade');
+      const grades = _asGradeOptions(db, ctx.type);
+      gSel.innerHTML = '<option value="">-- اختر الصف --</option>' + grades.map(g => `<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`).join('');
+      // اختيار افتراضي: صف الفصل المُفلتر حالياً، وإلا الصف الوحيد الموجود في بيانات المرحلة
+      const fc = (_asEl('studentClassFilter') || {}).value || '';
+      const present = Array.from(new Set(Object.values(db.classGrade || {}).filter(g => g && grades.includes(g))));
+      let defGrade = (fc && db.classGrade && db.classGrade[fc]) || (present.length === 1 ? present[0] : '');
+      if (defGrade && grades.includes(defGrade)) gSel.value = defGrade;
+      const pSel = _asEl('asPath');
+      pSel.innerHTML = '<option value="">-- اختر المسار --</option>' + KNOWN_PATHS.map(p => `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join('');
+      asOnGradeChange(fc && splitClassSectionKey(fc).cls);
+      setTimeout(() => { const n = _asEl('asName'); if (n) n.focus(); }, 50);
+    }
+    function closeAddStudentModal() { const el = _asEl('addStudentOverlay'); if (el) el.remove(); }
+
+    function _asSection() { const ctx = _asStageCtx(); return ctx.section || (_asEl('asSection') ? _asEl('asSection').value : ''); }
+
+    function asOnGradeChange(preferClass) {
+      const db = loadDB();
+      const grade = _asEl('asGrade').value;
+      const section = _asSection();
+      const cSel = _asEl('asClass');
+      const classes = grade ? _asClassesFor(db, grade, section) : [];
+      cSel.innerHTML = (classes.length ? '' : '<option value="">-- اختر الصف أولاً --</option>')
+        + classes.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('')
+        + (grade ? '<option value="__new__">➕ فصل جديد…</option>' : '');
+      if (preferClass && classes.includes(preferClass)) cSel.value = preferClass;
+      else if (grade && !classes.length) cSel.value = '__new__';
+      // المسار/التخصص للثاني الثانوي فقط، واللغة الثانية لغيره
+      const ps = !!grade && isSecondYearSecondaryGrade(grade);
+      _asEl('asPathWrap').style.display = ps ? '' : 'none';
+      _asEl('asSpecWrap').style.display = ps ? '' : 'none';
+      _asEl('asLangWrap').style.display = ps ? 'none' : '';
+      if (ps) asOnPathChange();
+      asOnClassChange();
+    }
+    function asOnPathChange() {
+      const path = _asEl('asPath').value;
+      const specs = specializationsForPath(path);
+      _asEl('asSpec').innerHTML = '<option value="">-- اختر التخصص --</option>' + specs.map(sp => `<option value="${escapeHtml(sp)}">${escapeHtml(sp)}</option>`).join('');
+    }
+    function asOnClassChange() {
+      const cSel = _asEl('asClass');
+      _asEl('asNewClass').style.display = cSel.value === '__new__' ? '' : 'none';
+      // اقتراح رقم الجلوس التالي في نفس الفصل
+      const seat = _asEl('asSeat');
+      if (seat && !seat.dataset.touched) {
+        const db = loadDB();
+        const grade = _asEl('asGrade').value, section = _asSection(), cls = cSel.value;
+        let next = '';
+        if (grade && cls && cls !== '__new__') {
+          const nums = (db.students || []).filter(s => s.grade === grade && (s.section || '') === section && s.class === cls)
+            .map(s => parseInt(s.seat, 10)).filter(n => !isNaN(n));
+          if (nums.length) next = String(Math.max(...nums) + 1);
+        }
+        seat.value = next;
+      }
+    }
+    function asOnNidInput() {
+      const nid = _asEl('asNid');
+      nid.value = nid.value.replace(/[^\d]/g, '');
+      const g = genderFromNationalId(nid.value);
+      const hint = _asEl('asGenderHint');
+      if (g) { _asEl('asGender').value = g; hint.textContent = 'تم تحديده تلقائياً من الرقم القومي'; }
+      else hint.textContent = '';
+    }
+
+    async function saveNewStudent() {
+     try {
+      if (currentRole !== 'admin') return;
+      _asErr('');
+      const section = _asSection();
+      const grade = _asEl('asGrade').value;
+      let cls = _asEl('asClass').value;
+      if (cls === '__new__') cls = _asEl('asNewClass').value.trim() || 'عام';
+      const name = _asEl('asName').value.replace(/\s+/g, ' ').trim();
+      const nationalId = _asEl('asNid').value.replace(/\D/g, '');
+      const seat = _asEl('asSeat').value.trim();
+      let gender = _asEl('asGender').value === 'F' ? 'F' : 'M';
+      const idGender = genderFromNationalId(nationalId);
+      if (idGender) gender = idGender;
+
+      if (!section) return _asErr('اختر القسم.');
+      if (!grade) return _asErr('اختر الصف.');
+      if (!cls) return _asErr('اختر الفصل أو أنشئ فصلاً جديداً.');
+      if (!name) return _asErr('اكتب اسم الطالب.');
+      if (!nationalId) return _asErr('اكتب الرقم القومي للطالب.');
+
+      const db = loadDB();
+      const dupNid = (db.students || []).find(s => s.nationalId === nationalId);
+      if (dupNid) return _asErr('الرقم القومي مسجّل بالفعل للطالب: ' + dupNid.name + ' (' + (dupNid.class || '-') + ').');
+      if (seat) {
+        const dupSeat = (db.students || []).find(s => s.grade === grade && (s.section || '') === section && s.class === cls && String(s.seat) === seat);
+        if (dupSeat) return _asErr('رقم الجلوس ' + seat + ' مستخدم بالفعل في هذا الفصل للطالب: ' + dupSeat.name + '.');
+      }
+      if (nationalId.length !== 14) {
+        if (!(await showConfirm('الرقم القومي ' + nationalId.length + ' رقماً وليس 14. هل تريد الحفظ كما هو؟', 'warning'))) return;
+      }
+
+      const ps = isSecondYearSecondaryGrade(grade);
+      const student = {
+        id: (section || '') + '::' + (grade || '') + '::' + nationalId,
+        nationalId, seat, name, gender, class: cls, grade, section,
+        secondLanguage: ps ? '' : _asEl('asLang').value.trim(),
+        path: ps ? _asEl('asPath').value : '',
+        specialization: ps ? _asEl('asSpec').value : '',
+        manual: true
+      };
+      stuStamp([student]);
+      db.students = db.students || [];
+      db.students.push(student);
+      // تسجيل الفصل ضمن خريطة (فصل ← صف) حتى يظهر في الفلاتر وشاشات الدرجات
+      db.classGrade = db.classGrade || {};
+      const ck = classSectionKey(cls, section);
+      if (!db.classGrade[ck]) db.classGrade[ck] = grade;
+      db.classes = [...new Set(Object.keys(db.classGrade))].sort();
+      saveDB(db);
+      if (typeof scheduleCloudPush === 'function') scheduleCloudPush();
+      closeAddStudentModal();
+      updateFilters();
+      if (typeof loadStatsUI === 'function') loadStatsUI();
+      alert('✅ تمت إضافة الطالب «' + name + '» إلى ' + cls + '.');
+     } catch (e) {
+       console.error('saveNewStudent failed:', e);
+       _asErr('حدث خطأ أثناء حفظ الطالب: ' + (e && e.message ? e.message : e));
+     }
     }
 
     function filterStudents() { loadStudentsUI(); }
