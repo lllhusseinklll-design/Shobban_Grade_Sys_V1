@@ -11006,6 +11006,47 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
         this.missing = missing; }
     }
 
+    // ============================================================
+    //  فصل المواد حسب الصف/القسم: إذا اختلف تعريف مكوّنات مادة (أسماء/درجات عظمى) عن تعريفها
+    //  المسجّل لصف/قسم آخر، تُنشأ لها نسخة مستقلة بهذا النطاق (باسم يحمل الصف) بدل دمجها بالاسم فقط،
+    //  ويبقى اسم التصدير (exportName) هو اسم المادة الأصلي لنظام النتائج.
+    // ============================================================
+    function scopedSubjectShortLabel(grade, section) {
+      const g = String(grade || '').replace(/^الصف\s*/, '').split(/\s+/).filter(Boolean).map(w => w.replace(/^ال/, '')).join(' ');
+      const sec = section === 'languages' ? ' لغات' : (section === 'arabic' ? ' عربي' : '');
+      return (g + sec).trim();
+    }
+    function scopedSubjectName(base, grade, section) { return base + ' (' + scopedSubjectShortLabel(grade, section) + ')'; }
+    function componentSigName(name) { return normalizeArabic(name || '').replace(/\s+/g, ''); }
+    // متوافقة: كل مكوّن جديد له نفس اسم مكوّن محفوظ يجب أن يكون له نفس الدرجة العظمى
+    function freshComponentsCompatible(freshComps, existingComps) {
+      const ex = new Map((existingComps || []).map(c => [componentSigName(c.name), c]));
+      for (const fc of (freshComps || [])) {
+        const ec = ex.get(componentSigName(fc.name));
+        if (!ec) continue;
+        const a = Number(fc.maxScore), b = Number(ec.maxScore);
+        if (Number.isFinite(a) && Number.isFinite(b) && a !== b) return false;
+      }
+      return true;
+    }
+    function applySubjectScopeSeparation(freshSubjects, existingSubjects, grade, section) {
+      const scopeKey = String(grade || '') + '|' + String(section || '');
+      const byName = new Map((existingSubjects || []).map(x => [x.name, x]));
+      (freshSubjects || []).forEach(s => {
+        if (!s || !s.name || (typeof isNonGradeSubjectName === 'function' && isNonGradeSubjectName(s.name))) return;
+        const base = s.name;
+        const variantName = scopedSubjectName(base, grade, section);
+        const variant = byName.get(variantName);
+        if (variant) { s._scopedFrom = base; s.exportName = variant.exportName || base; s.name = variantName; return; }
+        const ex = byName.get(base);
+        if (!ex) return;
+        const scopes = ex.appliesTo || [];
+        if (scopes.length === 1 && scopes[0] === scopeKey) return; // مادة هذا النطاق وحده: السلوك المعتاد
+        if (freshComponentsCompatible(s.components, ex.components)) return;
+        s._scopedFrom = base; s.exportName = ex.exportName || base; s.name = variantName;
+      });
+    }
+
     function parseWorkbookSheet(wb, sheetName, term, grade, section, existingSubjects) {
       const ws = wb.Sheets[sheetName];
       const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
@@ -11040,6 +11081,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
 
       const skipCols = new Set(Object.values(colMap).filter(v => v !== undefined));
       const subjects = buildSubjects(headerRow, componentRow, maxRowIdx !== -1 ? rows[maxRowIdx] : null, skipCols);
+      applySubjectScopeSeparation(subjects, existingSubjects, grade, section);
       const { subjects: reconciledSubjects, warnings: catalogWarnings } = reconcileWithCatalog(subjects, existingSubjects);
       const dataStartIdx = maxRowIdx !== -1 ? maxRowIdx + 1 : headerIdx + 1;
 
@@ -11454,6 +11496,15 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
         db.subjects = db.subjects || [];
         const subjectsByName = new Map(db.subjects.map(s => [s.name, s]));
         const scopeKey = importGrade + '|' + importSection;
+        // المواد التي فُصلت لهذا الصف/القسم: نُخرج هذا النطاق من المادة الأصلية المشتركة (إن كان أُضيف إليها سابقاً)
+        result.subjects.forEach(s => {
+          if (!s._scopedFrom) return;
+          const orig = subjectsByName.get(s._scopedFrom);
+          if (orig && Array.isArray(orig.appliesTo) && orig.appliesTo.length > 1 && orig.appliesTo.includes(scopeKey)) {
+            orig.appliesTo = orig.appliesTo.filter(k => k !== scopeKey);
+          }
+          delete s._scopedFrom;
+        });
         result.subjects.forEach(s => {
           if (isNonGradeSubjectName(s.name)) return; // لا تستورد عمود المسار وغيره كمواد
           const existing = subjectsByName.get(s.name);
