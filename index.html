@@ -13657,7 +13657,7 @@ function renderMonthlyExportButtons() {
           ? ` <button type="button" onclick="editStudentName(${escapeHtml(JSON.stringify(s.id))})" title="تعديل اسم الطالب" style="margin-inline-start:6px; padding:2px 7px; border:1px solid #cbd5e1; background:#f8fafc; border-radius:6px; cursor:pointer; font-size:13px; line-height:1.4;">✏️</button>`
           : '';
         const nidCell = showNid
-          ? `<td class="col-id" data-label="الرقم القومي">${escapeHtml(s.nationalId || '-')}</td>`
+          ? `<td class="col-id" data-label="الرقم القومي">${escapeHtml(s.nationalId || '-')}${canEdit ? ` <button type="button" onclick="editStudentNationalId(${escapeHtml(JSON.stringify(s.id))})" title="تعديل الرقم القومي" style="margin-inline-start:6px; padding:2px 7px; border:1px solid #cbd5e1; background:#f8fafc; border-radius:6px; cursor:pointer; font-size:13px; line-height:1.4;">✏️</button>` : ''}</td>`
           : '';
         row.innerHTML = `
           <td class="col-index">${idx + 1}</td>
@@ -13734,6 +13734,56 @@ function renderMonthlyExportButtons() {
       if (typeof loadStatsUI === 'function') loadStatsUI();
     }
     window.editStudentName = editStudentName;
+
+    // تعديل الرقم القومي (للأدمن فقط). معرّف الطالب يحتوي على الرقم القومي، لذلك يُنقل معه كل ما يرتبط بالمعرّف
+    // القديم (الدرجات + سجلات الحضور والغياب + استثناءات اليوم) حتى لا تضيع بيانات الطالب.
+    function editStudentNationalId(id) {
+      if (currentRole !== 'admin') return;
+      const db = loadDB();
+      const student = (db.students || []).find(s => s.id === id);
+      if (!student) { alert('تعذّر العثور على الطالب'); return; }
+      const input = prompt('تعديل الرقم القومي (14 رقماً):', student.nationalId || '');
+      if (input === null) return;
+      const clean = String(input)
+        .replace(/[٠-٩]/g, d => String(d.charCodeAt(0) - 0x0660))
+        .replace(/[۰-۹]/g, d => String(d.charCodeAt(0) - 0x06F0))
+        .replace(/[^0-9]/g, '');
+      if (clean.length !== 14) { alert('⚠️ الرقم القومي يجب أن يكون 14 رقماً بالضبط — لم يتم الحفظ'); return; }
+      if (clean === student.nationalId) return;
+      const collision = (db.students || []).find(x => x.id !== student.id && x.nationalId === clean);
+      if (collision) {
+        alert('⚠️ تعذّر الحفظ: هذا الرقم القومي مسجَّل بالفعل للطالب «' + collision.name + '» في نفس المرحلة.');
+        return;
+      }
+      const oldId = student.id;
+      const newId = (student.section || '') + '::' + (student.grade || '') + '::' + clean;
+      if (newId !== oldId && (db.students || []).some(x => x.id === newId)) {
+        alert('⚠️ تعذّر الحفظ: يوجد طالب آخر بنفس المعرّف.');
+        return;
+      }
+      student.nationalId = clean;
+      if (newId !== oldId) {
+        student.id = newId;
+        (db.grades || []).forEach(g => { if (g.studentId === oldId) g.studentId = newId; });
+        const rec = db.attendance && db.attendance.records;
+        if (rec) {
+          const prefix = oldId + '|';
+          Object.keys(rec).forEach(k => {
+            if (k.startsWith(prefix)) { rec[newId + '|' + k.slice(prefix.length)] = rec[k]; delete rec[k]; }
+          });
+        }
+        if (db.daySkip && db.daySkip.excused && db.daySkip.excused[oldId]) {
+          db.daySkip.excused[newId] = db.daySkip.excused[oldId];
+          delete db.daySkip.excused[oldId];
+        }
+      }
+      delete student.conflictFlag;
+      saveDB(db);
+      loadStudentsUI();
+      updateFilters();
+      if (typeof loadStatsUI === 'function') loadStatsUI();
+    }
+    window.editStudentNationalId = editStudentNationalId;
 
     function filterStudents() { loadStudentsUI(); }
 
