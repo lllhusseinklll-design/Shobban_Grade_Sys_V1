@@ -4034,6 +4034,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
             <option value="">الكل</option><option value="F">طالبات</option><option value="M">طلاب</option>
           </select>
           <input type="text" id="studentSearch" placeholder="🔍 بحث بالاسم أو رقم الجلوس أو الرقم القومي..." oninput="filterStudents()" style="flex:1; min-width:200px;" />
+          <button id="addStudentBtn" class="btn btn-primary btn-sm" onclick="openAddStudentModal()" style="display:none">➕ إضافة طالب</button>
         </div>
         <div class="table-wrap students-table-wrap">
           <table class="students-table">
@@ -20448,6 +20449,46 @@ function renderMonthlyExportButtons() {
   }
   window.v20ComputeStudentAttendance = v20ComputeStudentAttendance;
 
+
+  // درجات الشهور (الأربعة): امتحان/تقييم الشهر لكل مادة، شهران لكل فصل + متوسط الفصل بنفس منطق النظام
+  function v20MonthlyGradesHtml(s, subjList, d){
+    try {
+      const fmt = v => (v === '' || v == null) ? null : (isAbsentMark(v) ? 'غ' : (Number.isFinite(Number(v)) ? String(Math.round(Number(v)*100)/100) : null));
+      const terms = ['first','second'];
+      const labels = terms.map(t => { let l = []; try { l = getMonthLabels(t) || []; } catch(e){} return [l[0] || 'الشهر الأول', l[1] || 'الشهر الثاني']; });
+      const idx = buildGradesIndex(d);
+      const rows = [];
+      subjList.forEach(sub => {
+        const ci = (sub.components || []).findIndex(c => c.isMonthlyGrade);
+        if (ci === -1) return;
+        const comp = sub.components[ci];
+        const max = Number(comp.maxScore) || 0;
+        const cells = [];
+        let any = false;
+        terms.forEach(t => {
+          const vals = [1,2].map(m => { const g = idx.get(s.id + '|' + sub.name + '|' + t + '|' + m + '|' + ci); return g ? fmt(g.score) : null; });
+          let avg = null;
+          try { avg = fmt(computeFinalComponentScore(d, s.id, sub.name, ci, t, comp.name, comp.maxScore)); } catch(e){}
+          vals.forEach(v => { if (v != null) any = true; });
+          cells.push(vals[0], vals[1], avg);
+        });
+        rows.push({ name: sub.name, max, cells, any });
+      });
+      if (!rows.length) return '<div class="v20-empty">لا توجد مواد لها درجة شهرية محدَّدة (يحدَّدها المسؤول من تبويب «المواد»).</div>';
+      rows.sort((a, b) => (b.any - a.any) || a.name.localeCompare(b.name, 'ar'));
+      const td = (v, extra) => `<td style="text-align:center;${extra||''}">${v == null ? '<span style="color:#94a3b8">—</span>' : esc(v)}</td>`;
+      const body = rows.map(r => `<tr style="${r.any ? '' : 'opacity:.72'}">
+        <td style="font-weight:700">${esc(r.name)}${r.max ? ` <span style="color:#94a3b8;font-weight:400;font-size:11px">(${r.max})</span>` : ''}</td>
+        ${td(r.cells[0])}${td(r.cells[1])}${td(r.cells[2], 'font-weight:800;background:#eff6ff')}
+        ${td(r.cells[3])}${td(r.cells[4])}${td(r.cells[5], 'font-weight:800;background:#f0fdf4')}
+      </tr>`).join('');
+      return `<div style="overflow:auto"><table class="v20-table"><thead>
+        <tr><th rowspan="2">المادة</th><th colspan="3" style="text-align:center">الفصل الأول</th><th colspan="3" style="text-align:center">الفصل الثاني</th></tr>
+        <tr><th>${esc(labels[0][0])}</th><th>${esc(labels[0][1])}</th><th>المتوسط</th><th>${esc(labels[1][0])}</th><th>${esc(labels[1][1])}</th><th>المتوسط</th></tr>
+      </thead><tbody>${body}</tbody></table></div>`;
+    } catch(e) { console.warn('monthly grades render failed', e); return '<div class="v20-empty">تعذّر عرض درجات الشهور.</div>'; }
+  }
+
   function v20OpenStudent(id){
     const s=(db().students||[]).find(x=>x.id===id); if(!s)return;
     const d=db(), subs=d.subjects||[];
@@ -20598,6 +20639,10 @@ function renderMonthlyExportButtons() {
               <th>المادة</th><th>مكوّنات مرصودة</th><th>الإجمالي</th><th>النسبة</th><th>الحالة</th>
             </tr></thead><tbody>${tableRows}</tbody></table></div>`
           : '<div class="v20-empty">لا توجد مواد متاحة لهذا الحساب.</div>'}
+      </div>
+      <div style="margin-top:18px">
+        <h3 style="margin:0 0 10px;font-size:15px">📅 درجات الشهور</h3>
+        ${v20MonthlyGradesHtml(s, allowedList, d)}
       </div>`;
 
     document.getElementById('v20StudentModalBody').innerHTML = bodyHtml;
@@ -25560,6 +25605,123 @@ function roundToHalf(n){ if (!Number.isFinite(n)) return 0; return Math.round(n 
     }
   }catch(e){}
 
+})();
+</script>
+
+<style id="add-student-css">
+.asm-ov{position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:100000;display:flex;align-items:center;justify-content:center;padding:14px}
+.asm-box{background:#fff;color:#0f172a;border-radius:16px;width:min(560px,100%);max-height:92vh;overflow:auto;padding:18px 20px;box-shadow:0 20px 50px rgba(0,0,0,.3)}
+.asm-box h3{margin:0 0 12px;font-size:17px}
+.asm-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.asm-grid .full{grid-column:1/-1}
+.asm-box label{display:block;font-size:12px;font-weight:700;color:#475569;margin-bottom:4px}
+.asm-box input,.asm-box select{width:100%;box-sizing:border-box;padding:9px 10px;border:1px solid #cbd5e1;border-radius:8px;font:inherit;background:#fff;color:#0f172a}
+.asm-msg{min-height:18px;font-size:12.5px;font-weight:700;color:#b91c1c;margin-top:8px}
+.asm-actions{display:flex;gap:8px;margin-top:12px}
+html[data-theme="dark"] .asm-box{background:#111827;color:#e5e7eb}
+html[data-theme="dark"] .asm-box input,html[data-theme="dark"] .asm-box select{background:#0f1626;color:#e5e7eb;border-color:#334155}
+html[data-theme="dark"] .asm-box label{color:#94a3b8}
+@media(max-width:520px){.asm-grid{grid-template-columns:1fr}}
+</style>
+
+<script id="add-student-js">
+(function(){
+  'use strict';
+  const esc = (typeof escapeHtml === 'function') ? escapeHtml : (x => String(x == null ? '' : x).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])));
+  function canAdd(){ return typeof currentRole !== 'undefined' && currentRole === 'admin' && currentAccountType !== 'monitor' && currentAccountType !== 'teacher'; }
+  function toggleBtn(){ const b = document.getElementById('addStudentBtn'); if (b) b.style.display = canAdd() ? '' : 'none'; }
+  function cleanDigits(v){
+    return String(v || '').replace(/[٠-٩]/g, d => String(d.charCodeAt(0) - 0x0660)).replace(/[۰-۹]/g, d => String(d.charCodeAt(0) - 0x06F0)).replace(/[^0-9]/g, '');
+  }
+  function classesFor(db, section){
+    const out = new Set();
+    (db.classes || []).forEach(k => { const p = splitClassSectionKey(k); if (p.section === section && p.cls) out.add(p.cls); });
+    (db.students || []).forEach(s => { if (s.section === section && s.class) out.add(s.class); });
+    return Array.from(out).sort((a, b) => String(a).localeCompare(String(b), 'ar'));
+  }
+  function close(){ const o = document.getElementById('asmOverlay'); if (o) o.remove(); }
+
+  window.openAddStudentModal = function(){
+    if (!canAdd()) { alert('إضافة الطلاب متاحة لحساب الإدارة فقط'); return; }
+    const db = loadDB();
+    const grades = Array.from(new Set((db.students || []).map(s => s.grade).filter(Boolean)));
+    const langs = Array.from(new Set((db.students || []).map(s => (s.secondLanguage || '').trim()).filter(Boolean)));
+    close();
+    const ov = document.createElement('div');
+    ov.id = 'asmOverlay'; ov.className = 'asm-ov';
+    ov.innerHTML = `<div class="asm-box" role="dialog" aria-modal="true">
+      <h3>➕ إضافة طالب جديد</h3>
+      <div class="asm-grid">
+        <div class="full"><label>اسم الطالب *</label><input id="asmName" type="text" autocomplete="off"></div>
+        <div><label>الرقم القومي (14 رقماً) *</label><input id="asmNid" type="text" inputmode="numeric" maxlength="14" autocomplete="off"></div>
+        <div><label>رقم الجلوس</label><input id="asmSeat" type="text" inputmode="numeric" autocomplete="off"></div>
+        <div><label>الصف *</label><input id="asmGrade" type="text" list="asmGradeList" autocomplete="off"><datalist id="asmGradeList">${grades.map(g => `<option value="${esc(g)}">`).join('')}</datalist></div>
+        <div><label>القسم *</label><select id="asmSection"><option value="arabic">عربي</option><option value="languages">لغات</option></select></div>
+        <div><label>الفصل *</label><input id="asmClass" type="text" list="asmClassList" autocomplete="off"><datalist id="asmClassList"></datalist></div>
+        <div><label>النوع</label><select id="asmGender"><option value="">تلقائي من الرقم القومي</option><option value="M">ذكر</option><option value="F">أنثى</option></select></div>
+        <div><label>اللغة الثانية</label><input id="asmLang" type="text" list="asmLangList" autocomplete="off"><datalist id="asmLangList">${langs.map(l => `<option value="${esc(l)}">`).join('')}</datalist></div>
+        <div><label>المسار</label><input id="asmPath" type="text" autocomplete="off"></div>
+        <div class="full"><label>التخصص</label><input id="asmSpec" type="text" autocomplete="off"></div>
+      </div>
+      <div id="asmMsg" class="asm-msg"></div>
+      <div class="asm-actions">
+        <button id="asmSave" class="btn btn-primary" style="flex:1">💾 حفظ الطالب</button>
+        <button id="asmCancel" class="btn btn-outline">إلغاء</button>
+      </div>
+    </div>`;
+    document.body.appendChild(ov);
+    const $ = id => ov.querySelector('#' + id);
+    const refreshClasses = () => { $('asmClassList').innerHTML = classesFor(db, $('asmSection').value).map(c => `<option value="${esc(c)}">`).join(''); };
+    $('asmSection').addEventListener('change', refreshClasses); refreshClasses();
+    ov.addEventListener('mousedown', e => { if (e.target === ov) close(); });
+    $('asmCancel').addEventListener('click', close);
+    $('asmName').focus();
+    $('asmSave').addEventListener('click', () => {
+      const msg = $('asmMsg'); msg.textContent = '';
+      const fail = t => { msg.textContent = '⚠️ ' + t; };
+      const db2 = loadDB();
+      const name = $('asmName').value.replace(/\s+/g, ' ').trim();
+      const nid = cleanDigits($('asmNid').value);
+      const seat = cleanDigits($('asmSeat').value);
+      const grade = $('asmGrade').value.trim();
+      const section = $('asmSection').value;
+      const cls = $('asmClass').value.trim();
+      if (!name) return fail('اكتب اسم الطالب');
+      if (nid.length !== 14) return fail('الرقم القومي يجب أن يكون 14 رقماً بالضبط');
+      if (!grade) return fail('اكتب الصف');
+      if (!cls) return fail('اكتب الفصل');
+      const id = section + '::' + grade + '::' + nid;
+      const dup = (db2.students || []).find(x => x.nationalId === nid || x.id === id);
+      if (dup) return fail('هذا الرقم القومي مسجَّل بالفعل للطالب «' + dup.name + '»');
+      if (seat) {
+        const sameSeat = (db2.students || []).find(x => x.class === cls && x.section === section && String(x.seat) === seat);
+        if (sameSeat && !confirm('رقم الجلوس ' + seat + ' مستخدم في نفس الفصل للطالب «' + sameSeat.name + '». هل تريد الحفظ على أي حال؟')) return;
+      }
+      const sameName = (db2.students || []).find(x => x.class === cls && x.section === section && normalizeArabicText(x.name || '') === normalizeArabicText(name));
+      if (sameName && !confirm('يوجد طالب بنفس الاسم في نفس الفصل. هل تريد الحفظ على أي حال؟')) return;
+      let gender = genderFromNationalId(nid) || $('asmGender').value || 'M';
+      if (!genderFromNationalId(nid) && !$('asmGender').value) gender = 'M';
+      db2.students = db2.students || [];
+      db2.students.push({ id, nationalId: nid, seat, name, gender, class: cls, grade, section,
+        secondLanguage: $('asmLang').value.trim(), path: $('asmPath').value.trim(), specialization: $('asmSpec').value.trim() });
+      db2.classGrade = db2.classGrade || {};
+      const ck = classSectionKey(cls, section);
+      if (!db2.classGrade[ck]) db2.classGrade[ck] = grade;
+      db2.classes = [...new Set(Object.keys(db2.classGrade))].sort();
+      try { if (typeof recordAudit === 'function') recordAudit('إضافة طالب', 'تمت إضافة الطالب ' + name + ' (' + cls + ')'); } catch(e){}
+      saveDB(db2);
+      close();
+      try { loadStudentsUI(); } catch(e){}
+      try { updateFilters(); } catch(e){}
+      try { if (typeof loadStatsUI === 'function') loadStatsUI(); } catch(e){}
+      try { if (typeof window.updateDashboard === 'function') window.updateDashboard(); } catch(e){}
+    });
+  };
+
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+  const oldApply = window.applyRoleUI; window.applyRoleUI = function(){ const r = typeof oldApply === 'function' ? oldApply.apply(this, arguments) : undefined; toggleBtn(); return r; };
+  const oldLoad = window.loadStudentsUI; window.loadStudentsUI = function(){ const r = typeof oldLoad === 'function' ? oldLoad.apply(this, arguments) : undefined; toggleBtn(); return r; };
+  setTimeout(toggleBtn, 800);
 })();
 </script>
 
