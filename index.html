@@ -1,25 +1,27 @@
 <!DOCTYPE html>
-<!-- saved from url=(0061)file:///C:/Users/Central%20Control/Downloads/index%20(1).html -->
-<html lang="ar" dir="rtl" data-theme="light"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-  
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>نظام رصد درجات أعمال السنة - Pro</title>
   <!-- PWA: تثبيت كتطبيق على الموبايل -->
+  <link rel="manifest" href="manifest.webmanifest">
   <meta name="theme-color" content="#1e3a5f">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="رصد">
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%93%8A%3C/text%3E%3C/svg%3E">
-  <script src="./index_files/xlsx.full.min.js.download">
+  <link rel="apple-touch-icon" href="icons/icon-192.svg">
+  <link rel="icon" type="image/svg+xml" href="icons/icon-192.svg">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js">
   </script>
-  <script src="./index_files/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <!-- خط عربي عالي الجودة (Cairo) لتحسين وضوح وجمال النصوص العربية في الواجهة والطباعة.
        يعمل النظام بدون إنترنت أساساً، فإن تعذّر تحميل الخط (لا يوجد اتصال) يرجع المتصفح تلقائياً
        للخطوط الاحتياطية (Tahoma/Segoe UI) دون أي كسر بالتصميم. -->
-  <link rel="preconnect" href="https://fonts.googleapis.com/">
-  <link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin="">
-  <link href="./index_files/css2" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <style>
     * {
       margin: 0;
@@ -3425,11 +3427,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
 
 </style>
 
-<style id="gspDynamicPrintPrefs">@media print{
-      @page{size:A4 portrait;margin:10mm 10mm 10mm 10mm;}
-      @page ministry-landscape{size:A4 landscape;margin:10mm 10mm 10mm 10mm;}
-      body{--gsp-print-scale:1;}
-    }</style></head>
+</head>
 <body class="auth-open">
 
 <!-- ===== واجهة مدير المرحلة (المراقب) ===== -->
@@ -3473,10 +3471,10 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
   </div>
 </div>
 
-<div id="v23SupabasePanel" style="display: none;">
+<div id="v23SupabasePanel">
   <h3>☁️ اتصال Supabase</h3>
   <div class="v22-sec-grid">
-    <div><b>المشروع</b><br><span class="v22-badge v22-ok">الاتصال متاح</span></div>
+    <div><b>المشروع</b><br><span class="v22-badge v22-ok">متصل بالإعدادات الجديدة</span></div>
     <div><b>المفتاح</b><br><span class="v22-badge v22-ok">Publishable Key</span></div>
   </div>
   <!-- ملاحظة مطوّر: النظام يعتمد على مصادقة PIN من جهة العميل بدل Supabase Auth حقيقي،
@@ -3488,8 +3486,8 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
 <div id="v22SecurityCenter" class="v22-sec-card" style="display:none">
   <h3>🔐 مركز الأمان والعمليات</h3>
   <div class="v22-sec-grid">
-    <div><b>المصادقة</b><br><span id="v22AuthStatus" class="v22-badge v22-warn">مصادقة العميل الحالية</span></div>
-    <div><b>المزامنة</b><br><span id="v22SyncStatus" class="v22-badge v22-ok">متصل</span></div>
+    <div><b>المصادقة</b><br><span id="v22AuthStatus" class="v22-badge v22-warn">مراجعة مطلوبة</span></div>
+    <div><b>المزامنة</b><br><span id="v22SyncStatus" class="v22-badge v22-ok">تعمل محلياً</span></div>
     <div><b>التعارضات</b><br><span id="v22ConflictCount" class="v22-badge v22-ok">0</span></div>
     <div><b>آخر نسخة احتياطية</b><br><span id="v22BackupStatus">لم يتم التحقق</span></div>
   </div>
@@ -3497,11 +3495,11 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
     <button type="button" onclick="v22ExportSecuritySnapshot()">💾 تصدير لقطة أمان</button>
     <button type="button" onclick="v22CheckSecurity()">🔎 فحص الأمان</button>
   </div>
-  <div id="v22SecurityMessage" style="margin-top:10px;font-size:13px" class="">اكتمل فحص الحالة الحالية دون تغيير البيانات.</div>
+  <div id="v22SecurityMessage" style="margin-top:10px;font-size:13px"></div>
 </div>
 
 
-  <div id="connStatusBadge" style="position: fixed; top: 10px; right: 10px; z-index: 9999; padding: 7px 16px; border-radius: 20px; font-size: 12px; font-weight: 700; color: rgb(255, 255, 255); background: rgb(11, 94, 66); box-shadow: rgba(0, 0, 0, 0.2) 0px 2px 8px; max-width: 280px; text-align: center;">🟢 متصل بالإنترنت — تم دمج أحدث التعديلات من السحابة (الدرجات الأحدث محفوظة)</div>
+  <div id="connStatusBadge" style="position:fixed; top:10px; right:10px; z-index:9999; padding:7px 16px; border-radius:20px; font-size:12px; font-weight:700; color:#fff; background:#64748b; box-shadow:0 2px 8px rgba(0,0,0,.2); max-width:280px; text-align:center;">⚪ جارِ التحقق من الاتصال...</div>
 
   <!-- ==================== AUTH OVERLAY ==================== -->
   <div id="authOverlay" class="auth-overlay">
@@ -3528,7 +3526,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
         <div id="adminSetupMsg" class="mt-16" style="font-size:13px; color:#b91c1c;"></div>
       </div>
 
-      <div id="authAdminPane" style="display: block;">
+      <div id="authAdminPane">
         <h3>دخول رئيس الكنترول</h3>
         <div class="form-group mb-16">
           <label>البريد الإلكتروني (الدخول السحابي)</label>
@@ -3581,7 +3579,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
         </div>
         <div class="form-group mb-16">
           <label>اختر اسمك</label>
-          <select id="teacherLoginSelect" disabled=""><option value="">-- اختر المرحلة والقسم أولاً --</option></select>
+          <select id="teacherLoginSelect" disabled><option value="">-- اختر المرحلة والقسم أولاً --</option></select>
         </div>
         <div class="form-group mb-16">
           <label>الرقم السري / كلمة المرور السحابية</label>
@@ -3603,7 +3601,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
     </div>
 
     <div class="account-bar">
-      <span id="accountStatus"></span><span id="autosaveStatus" class="autosave-status autosave-saved">🟢 تم الحفظ</span>
+      <span id="accountStatus"></span><span id="autosaveStatus" class="autosave-status autosave-saved">🟢 جاهز</span>
       <div id="stageSwitchWrap" style="display:none; align-items:center; gap:8px;">
         <label style="font-size:13px; font-weight:600; color:#334155;">🏛️ المرحلة الحالية:</label>
         <select id="stageSwitchSelect" onchange="switchStage()" style="padding:6px 10px; border-radius:6px; border:1px solid #cbd5e1;"></select>
@@ -3630,11 +3628,11 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
     </div>
 
     <!-- ==================== V19 DASHBOARD ==================== -->
-    <div id="dashboard" class="tab-content active" data-cal-obs="1"><div id="teacherCheckInSlot" style="display: none; margin-bottom: 12px;"></div>
+    <div id="dashboard" class="tab-content active">
       <!-- شريط ترحيب + بحث مضغوط -->
       <div class="dashboard-hero">
         <div class="dash-hero-left">
-          <h2 id="dashboardGreeting">👋 أهلاً بك، غير مسجل</h2>
+          <h2 id="dashboardGreeting">👋 أهلاً بك</h2>
           <p id="dashboardSubtitle">ملخص سريع لما تم وما يحتاج متابعة</p>
         </div>
         <div class="dash-search-wrap" id="dashSearchSlot">
@@ -3650,10 +3648,10 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
         <div class="kpi-card"><div class="kpi-label" id="kpiLabelTeachers">🧑‍🏫 المعلمون</div><div class="kpi-value" id="dashTeachers">0</div><div class="kpi-note" id="kpiNoteTeachers">المعلمون المسجلون</div></div>
         <div class="kpi-card">
           <div class="kpi-label">📝 اكتمال الرصد</div>
-          <div class="kpi-value" id="dashGrades">100%</div>
-          <div class="kpi-note" id="dashGradesNote">لا توجد درجات متوقعة ناقصة</div>
-          <div class="mini-progress"><span id="dashProgressBar" style="width: 100%;"></span></div>
-          <span id="dashProgressText" style="display:none">100%</span>
+          <div class="kpi-value" id="dashGrades">0%</div>
+          <div class="kpi-note" id="dashGradesNote">نسبة الاكتمال</div>
+          <div class="mini-progress"><span id="dashProgressBar" style="width:0%"></span></div>
+          <span id="dashProgressText" style="display:none">0%</span>
         </div>
         <div class="kpi-card"><div class="kpi-label" id="kpiLabelIssues">⚠️ يحتاج مراجعة</div><div class="kpi-value" id="dashIssues">0</div><div class="kpi-note" id="kpiNoteIssues">نواقص أو تنبيهات</div></div>
       </div>
@@ -3708,11 +3706,11 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
       <div class="dash-main-grid">
         <div class="dash-panel">
           <h3>🔔 يحتاج إلى انتباهك</h3>
-          <div class="panel-body" id="dashAlerts"><div class="alert-item danger"><span>🔴 لا توجد بيانات طلاب في المرحلة الحالية.</span><button class="btn btn-outline btn-sm" onclick="activateTab('upload')">رفع ملف</button></div></div>
+          <div class="panel-body" id="dashAlerts"><div class="alert-item ok">🟢 لا توجد تنبيهات حالياً.</div></div>
         </div>
         <div class="dash-panel">
           <h3>🎯 مهامك الآن</h3>
-          <div class="panel-body" id="v20Tasks"><div class="v20-item"><div class="v20-item-main"><div class="v20-item-title"><span class="v20-pill v20-danger">عاجل</span> رفع بيانات الطلاب</div><div class="v20-item-note">لا توجد بيانات طلاب في المرحلة الحالية.</div></div><button class="btn btn-outline btn-sm" data-task="0">رفع الملف</button></div></div>
+          <div class="panel-body" id="v20Tasks"><div class="v20-empty">جاري التحميل...</div></div>
         </div>
       </div>
 
@@ -3720,23 +3718,13 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
       <details class="dash-details" id="dashDetailsPanel">
         <summary>📊 عرض تفاصيل الفريق والتحليلات</summary>
         <div class="dash-details-body" id="dashDetailsBody">
-          <div id="v20TeamSummary" style="margin-bottom:10px"><div class="v20-mini-grid"><div class="v20-mini"><b>100%</b>إنجاز</div><div class="v20-mini"><b>0</b>طلاب</div><div class="v20-mini"><b>0</b>معلمين</div></div></div>
-          <div id="v20TeacherProgress" class="v20-list"><div class="v20-empty">لا يوجد معلمون مسجلون بعد.</div></div>
-          <div id="v24TeacherMount"><div id="v24TeacherBlock" style="display: none;">
-      <div class="kpi-grid" id="v24ExtraKpiGrid" style="margin-top:12px"></div>
-      <div class="v20-grid" style="margin-top:12px">
-        <div class="v20-card"><h3>📊 نسبة الإكمال لكل فصل</h3><div id="v24ClassBarChart" style="display:flex;justify-content:center"></div></div>
-        <div class="v20-card"><h3>🧩 الدرجات المرصودة مقابل الناقصة</h3><div id="v24DonutChart" style="display:flex;justify-content:center"></div></div>
-      </div>
-      <div class="v20-grid" style="margin-top:12px" id="v24ClassCardsWrap"></div>
-      <div class="v20-grid" style="margin-top:12px">
-        <div class="v20-card"><h3>📚 موادّي وفصولي — نسبة الإكمال</h3><div id="v24SubjectTable"></div></div>
-        <div class="v20-card"><h3>👨‍🎓 طلاب بلا درجات في موادّي</h3><div id="v24MissingList" class="v20-list"></div></div>
-      </div></div></div>
+          <div id="v20TeamSummary" style="margin-bottom:10px"></div>
+          <div id="v20TeacherProgress" class="v20-list"></div>
+          <div id="v24TeacherMount"></div>
         </div>
       </details>
       <!-- حاوية مخفية لتوافق الكود القديم الذي يبحث عن v20Alerts -->
-      <div id="v20Alerts" style="display:none"><div class="v20-item"><div class="v20-item-main"><div class="v20-item-title">🟢 كل شيء تحت السيطرة</div><div class="v20-item-note">لا توجد تنبيهات رئيسية حالياً.</div></div></div></div>
+      <div id="v20Alerts" style="display:none"></div>
       <div id="v20SmartBlock" style="display:none"></div>
     </div>
 
@@ -3859,22 +3847,22 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
                 <label>الأقسام المسموح بها</label>
                 <div style="display:flex; gap:20px; border:1px solid #cbd5e1; border-radius:6px; padding:8px 12px; background:#fff;">
                   <label style="display:flex; align-items:center; gap:6px; font-weight:400; font-size:14px;">
-                    <input type="checkbox" id="newStageAdminSectionArabic" value="arabic" checked=""> القسم العربي
+                    <input type="checkbox" id="newStageAdminSectionArabic" value="arabic" checked> القسم العربي
                   </label>
                   <label style="display:flex; align-items:center; gap:6px; font-weight:400; font-size:14px;">
-                    <input type="checkbox" id="newStageAdminSectionLanguages" value="languages" checked=""> قسم اللغات
+                    <input type="checkbox" id="newStageAdminSectionLanguages" value="languages" checked> قسم اللغات
                   </label>
                 </div>
               </div>
               <div class="form-group mt-16">
                 <label>صلاحيات التشغيل (يحددها رئيس الكنترول لكل مسؤول حاسب)</label>
                 <div id="newStageAdminPermsBox" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;border:1px solid #cbd5e1;border-radius:8px;padding:10px 12px;background:#f8fafc;">
-                  <label style="display:flex;align-items:center;gap:6px;font-weight:600;font-size:13px;"><input type="checkbox" id="saPermSubjects" checked=""> 📚 المواد والمكونات</label>
-                  <label style="display:flex;align-items:center;gap:6px;font-weight:600;font-size:13px;"><input type="checkbox" id="saPermStudents" checked=""> 👨‍🎓 الطلاب</label>
-                  <label style="display:flex;align-items:center;gap:6px;font-weight:600;font-size:13px;"><input type="checkbox" id="saPermTeachers" checked=""> 🧑‍🏫 المعلمون</label>
-                  <label style="display:flex;align-items:center;gap:6px;font-weight:600;font-size:13px;"><input type="checkbox" id="saPermImportExport" checked=""> 📤 استيراد/تصدير</label>
-                  <label style="display:flex;align-items:center;gap:6px;font-weight:600;font-size:13px;"><input type="checkbox" id="saPermLocks" checked=""> 🔒 أقفال</label>
-                  <label style="display:flex;align-items:center;gap:6px;font-weight:600;font-size:13px;color:#94a3b8;" title="تبويب بيانات المدرسة أصبح حصراً على رئيس الكنترول في كل أنحاء النظام، ولا يمكن منحه لمسؤول الحاسب."><input type="checkbox" id="saPermSchoolInfo" disabled=""> 🏫 بيانات المدرسة (حصراً لرئيس الكنترول)</label>
+                  <label style="display:flex;align-items:center;gap:6px;font-weight:600;font-size:13px;"><input type="checkbox" id="saPermSubjects" checked> 📚 المواد والمكونات</label>
+                  <label style="display:flex;align-items:center;gap:6px;font-weight:600;font-size:13px;"><input type="checkbox" id="saPermStudents" checked> 👨‍🎓 الطلاب</label>
+                  <label style="display:flex;align-items:center;gap:6px;font-weight:600;font-size:13px;"><input type="checkbox" id="saPermTeachers" checked> 🧑‍🏫 المعلمون</label>
+                  <label style="display:flex;align-items:center;gap:6px;font-weight:600;font-size:13px;"><input type="checkbox" id="saPermImportExport" checked> 📤 استيراد/تصدير</label>
+                  <label style="display:flex;align-items:center;gap:6px;font-weight:600;font-size:13px;"><input type="checkbox" id="saPermLocks" checked> 🔒 أقفال</label>
+                  <label style="display:flex;align-items:center;gap:6px;font-weight:600;font-size:13px;color:#94a3b8;" title="تبويب بيانات المدرسة أصبح حصراً على رئيس الكنترول في كل أنحاء النظام، ولا يمكن منحه لمسؤول الحاسب."><input type="checkbox" id="saPermSchoolInfo" disabled> 🏫 بيانات المدرسة (حصراً لرئيس الكنترول)</label>
                 </div>
               </div>
               <input type="hidden" id="editingStageAdminId" value="">
@@ -4023,11 +4011,21 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
             <div class="up-field-grid">
               <div class="up-field">
                 <label class="up-required">القسم</label>
-                <select id="importSection"><option value="">-- اختر القسم --</option><option value="arabic">عربي</option><option value="languages">لغات</option></select>
+                <select id="importSection">
+                  <option value="">-- اختر القسم --</option>
+                  <option value="arabic">عربي</option>
+                  <option value="languages">لغات</option>
+                </select>
               </div>
               <div class="up-field">
                 <label class="up-required">المرحلة</label>
-                <select id="importStage" onchange="onImportStageChange()"><option value="">-- اختر المرحلة --</option><option value="kg">رياض أطفال</option><option value="primary">ابتدائي</option><option value="prep">إعدادى</option><option value="secondary">ثانوي</option></select>
+                <select id="importStage" onchange="onImportStageChange()">
+                  <option value="">-- اختر المرحلة --</option>
+                  <option value="kg">رياض أطفال</option>
+                  <option value="primary">ابتدائي</option>
+                  <option value="prep">إعدادى</option>
+                  <option value="secondary">ثانوي</option>
+                </select>
               </div>
               <div class="up-field">
                 <label class="up-required">الصف</label>
@@ -4046,7 +4044,10 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
               </div>
               <div class="up-field">
                 <label class="up-required">الشهر</label>
-                <select id="importMonthSelect"><option value="1">سبتمبر</option><option value="2">أكتوبر</option><option value="3">نوفمبر</option><option value="4">ديسمبر</option></select>
+                <select id="importMonthSelect">
+                  <option value="1">الشهر الأول</option>
+                  <option value="2">الشهر الثاني</option>
+                </select>
               </div>
             </div>
 
@@ -4054,7 +4055,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
               <span class="icon">📁</span>
               <p style="font-weight:700;color:#1e3a5f;">اسحب ملف Excel هنا أو اضغط للاختيار</p>
               <span style="font-size:13px; color:#64748b;">بعد الاختيار اضغط «معالجة الملف» بالأسفل</span>
-              <input type="file" id="fileInput" accept=".xlsx,.xls,.xlsm">
+              <input type="file" id="fileInput" accept=".xlsx,.xls,.xlsm" />
             </div>
 
             <div class="up-field-grid cols-2" id="sheetRow" style="display:none;">
@@ -4066,12 +4067,12 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
 
             <div class="progress-wrap"><div class="bar" id="progressBar"></div></div>
             <div class="up-actions" style="margin-top:12px;">
-              <button class="btn btn-primary" id="processBtn" onclick="processMainFile()" disabled="">📤 معالجة الملف</button>
+              <button class="btn btn-primary" id="processBtn" onclick="processMainFile()" disabled>📤 معالجة الملف</button>
               <span class="up-hint" style="margin:0;">لن تُحفظ أي بيانات قبل الضغط على معالجة الملف.</span>
             </div>
 
             <div class="up-status-panel">
-              <div id="uploadStatus" style="font-size:14px; color:#64748b;">🏛️ يرجى إضافة مرحلة دراسية أولاً من تبويب "إدارة المراحل"، ثم رفع ملف Excel لها.</div>
+              <div id="uploadStatus" style="font-size:14px; color:#64748b;"></div>
               <div id="uploadMessages" class="mt-16"></div>
               <div id="fileSummary" class="mt-16" style="font-size:14px;"></div>
             </div>
@@ -4182,7 +4183,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
           <select id="studentGenderFilter" onchange="filterStudents()">
             <option value="">الكل</option><option value="F">طالبات</option><option value="M">طلاب</option>
           </select>
-          <input type="text" id="studentSearch" placeholder="🔍 بحث بالاسم أو رقم الجلوس أو الرقم القومي..." oninput="filterStudents()" style="flex:1; min-width:200px;">
+          <input type="text" id="studentSearch" placeholder="🔍 بحث بالاسم أو رقم الجلوس أو الرقم القومي..." oninput="filterStudents()" style="flex:1; min-width:200px;" />
         </div>
         <div class="table-wrap students-table-wrap">
           <table class="students-table">
@@ -4225,7 +4226,10 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
           </div>
           <div class="form-group">
             <label>📆 الشهر</label>
-            <select id="gradeMonthSelect" onchange="loadGradesUI(); updateGradeCalendarSummary()"><option value="1">سبتمبر</option><option value="2">أكتوبر</option><option value="3">نوفمبر</option><option value="4">ديسمبر</option></select>
+            <select id="gradeMonthSelect" onchange="loadGradesUI(); updateGradeCalendarSummary()">
+              <option value="1">الشهر الأول</option>
+              <option value="2">الشهر الثاني</option>
+            </select>
           </div>
           <div class="form-group" style="flex: 0 1 auto;">
             <label>&nbsp;</label>
@@ -4236,7 +4240,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
           </div>
         </div>
 
-        <div id="gradeCalendarSummary" style="margin:-6px 0 14px;padding:9px 12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;color:#166534;font-size:12.5px">🗓️ <strong>سبتمبر</strong> · من <strong>الأسبوع 1</strong> إلى <strong>الأسبوع 2</strong> · بداية الأسبوع: <strong>٢٠٢٦/٩/١٣</strong> · بداية آخر أسبوع: <strong>٢٠٢٦/٩/٢٠</strong></div>
+        <div id="gradeCalendarSummary" style="margin:-6px 0 14px;padding:9px 12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;color:#166534;font-size:12.5px"></div>
 
         <div class="card" id="globalLockPanel" style="display:none; background:#fff7ed; border:1px solid #fdba74; margin-bottom:16px; padding:14px 18px;">
           <div class="flex justify-between items-center flex-wrap gap-12">
@@ -4288,7 +4292,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
         <div class="filter-bar">
           <select id="gradeSubjectSelect" onchange="onGradeSubjectSelectChange()"><option value="">-- اختر مادة --</option></select>
           <select id="gradeClassSelect" onchange="onGradeClassSelectChange()"><option value="">-- اختر فصل --</option></select>
-          <input type="text" id="gradeSearch" placeholder="🔍 بحث عن طالب..." oninput="loadGradesUI()">
+          <input type="text" id="gradeSearch" placeholder="🔍 بحث عن طالب..." oninput="loadGradesUI()" />
           <button class="btn btn-primary" onclick="loadGradesUI()">📊 عرض</button>
           <button class="btn btn-success" onclick="showFinalResults()">🏁 النتيجة النهائية للفصل</button>
         </div>
@@ -4340,7 +4344,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
                 </select>
               </label>
               <label style="font-size:12.5px;color:#334155;display:flex;align-items:center;gap:6px" title="يُضاف غلاف رسمي + محضر فتح السجل في بداية الطباعة">
-                <input type="checkbox" id="mlIncludeCover" checked=""> غلاف + محضر فتح <span style="color:#64748b;font-weight:600">(مع الفترة الأولى فقط)</span>
+                <input type="checkbox" id="mlIncludeCover" checked> غلاف + محضر فتح <span style="color:#64748b;font-weight:600">(مع الفترة الأولى فقط)</span>
               </label>
             </div>
             <button class="btn btn-primary" onclick="printMinistryLandscapeSheet({blank:false})" title="كشف وزارة عرضي — أسبوع ثم مكوّنات — ببيانات">🖨️ كشف وزارة عرضي (ببيانات)</button>
@@ -4584,7 +4588,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
           </div>
         </div>
 
-        <div id="attendanceCalendarSummary" style="margin:-4px 0 14px;padding:9px 12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;color:#166534;font-size:12.5px">🗓️ <strong>سبتمبر</strong> · الأسابيع <strong>1–2</strong> · من <strong>٢٠٢٦/٩/١٣</strong> إلى بداية الأسبوع <strong>٢٠٢٦/٩/٢٠</strong> · كل أسبوع مقسم إلى أيام وتواريخ فعلية.</div>
+        <div id="attendanceCalendarSummary" style="margin:-4px 0 14px;padding:9px 12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;color:#166534;font-size:12.5px"></div>
 
         <!-- ===== تكامل سلوكي: رصد مخالفة من المعلم أثناء الحصة ===== -->
         <div class="card" id="soloukiBehaviorCard" style="background:linear-gradient(180deg,#fdf4ff,#faf5ff);border:1px solid #e9d5ff;margin-bottom:14px;">
@@ -4598,7 +4602,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
               <button type="button" class="btn btn-success btn-sm" id="soloukiOpenMeritBtn" onclick="openSoloukiMeritModal()">🏅 إضافة تكريم</button>
             </div>
           </div>
-          <div id="soloukiBridgeStatus" style="font-size:12.5px;color:#64748b;line-height:1.7;">حالة الجسر: <span style="color:#0b5e42;font-weight:700;">جاهز للإرسال عبر /api/solouki-bridge</span></div>
+          <div id="soloukiBridgeStatus" style="font-size:12.5px;color:#64748b;line-height:1.7;">حالة الجسر: يُفحص عند فتح النافذة.</div>
           <div id="soloukiBridgeAdminCfg" style="display:none;margin-top:12px;padding-top:12px;border-top:1px dashed #e9d5ff;">
             <div style="font-weight:800;font-size:13px;color:#6b21a8;margin-bottom:8px;">⚙️ إعدادات الجسر (رئيس الكنترول فقط)</div>
             <div class="up-field-grid cols-2" style="margin-bottom:8px;">
@@ -4754,7 +4758,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
           </div>
         </details>
 
-        <div id="gspWeeklyAttendanceBox" class="att-week-register-wrap"><div class="att-week-register-title">📋 كشف المواظبة القائم على الأسابيع</div><p class="att-week-register-note">هذا هو الكشف الأسبوعي الذي يجمع الأسابيع الأربعة مع تواريخها الفعلية، ويقرأ الحضور والغياب من سجل المواظبة المحفوظ لكل يوم.</p><div style="display:flex;align-items:end;gap:10px;flex-wrap:wrap;margin-bottom:10px;padding:10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px"><div class="form-group" style="margin:0;min-width:210px"><label style="font-size:12px">📅 تاريخ بداية الأسبوع الأول للشهر المحدد</label><input type="date" id="gspWeek1Date" style="width:100%;box-sizing:border-box;padding:7px 9px;border:1px solid #cbd5e1;border-radius:8px" onchange="gspSaveWeek1Date(this.value)"></div><div style="font-size:11.5px;color:#64748b;max-width:500px;line-height:1.7">يحدد هذا التاريخ الأسبوع الأول، ثم يحسب النظام الأسبوع الثاني والثالث والرابع تلقائياً بفاصل 7 أيام. وهو نفس التاريخ المستخدم في الروزنامة وكشوف الأسابيع.</div><button type="button" class="btn btn-outline btn-sm" onclick="activateTab('schoolinfo');setTimeout(()=&gt;{document.getElementById('siPeriodsEditor')?.scrollIntoView({behavior:'smooth',block:'start'});},100)">⚙️ إعدادات الفترات</button></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn btn-primary btn-sm" onclick="gspPrintWeeklyAttendance(false)">🖨️ طباعة كشف المواظبة بالبيانات الفعلية</button><button type="button" class="btn btn-outline btn-sm" onclick="gspPrintWeeklyAttendance(true)">🖨️ طباعة كشف مواظبة فارغ</button><button type="button" class="btn btn-primary btn-sm" onclick="printMinistryAbsenceLandscapeSheet({blank:false})">🖨️ كشف غياب عرضي (ببيانات)</button><button type="button" class="btn btn-outline btn-sm" onclick="printMinistryAbsenceLandscapeSheet({blank:true})">🖨️ كشف غياب عرضي (فارغ)</button></div><div id="gspWeek1Msg" style="font-size:12px;margin-top:7px;color:#166534"></div></div><div class="table-wrap" id="attGridWrap" style="max-height:70vh;">
+        <div class="table-wrap" id="attGridWrap" style="max-height:70vh;">
           <div id="attGridEmpty" style="padding:24px; text-align:center; color:#64748b; background:#f8fafc; border-radius:10px;">اختر المادة والفصل ثم اضغط «عرض / تحديث الكشف».</div>
           <table id="attGridTable" style="display:none;">
             <thead id="attGridHead"></thead>
@@ -4765,7 +4769,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
     </div>
 
     <div id="tab-printcenter" class="tab-content">
-      <div id="gspPrintSettingsCard" class="card gsp-print-settings"><h3>⚙️ إعدادات الطباعة وحفظ الخيارات</h3><p style="font-size:12.5px;color:#64748b;margin:0 0 9px;line-height:1.7">يتم حفظ آخر اختيار لمقاس الورق والاتجاه والهوامش وترتيب بعض كشوف الطباعة على هذا الجهاز. استخدم صفحة المعايرة بعد تجربة طباعة فعلية.</p><button type="button" class="btn btn-primary btn-sm" onclick="gspOpenPrintSettings()">🖨️ فتح إعدادات الطباعة</button><span id="gspPrefsSummary" style="margin-right:10px;font-size:12px;color:#64748b">A4 طولي · هوامش 10/10/10/10 مم · 100%</span></div><div class="card" style="border:1px solid #bfdbfe;background:linear-gradient(180deg,#eff6ff,#fff)">
+      <div class="card" style="border:1px solid #bfdbfe;background:linear-gradient(180deg,#eff6ff,#fff)">
         <h2 style="border:none;margin:0 0 6px;color:#1e3a5f">🖨️ مركز الطباعة</h2>
         <p style="margin:0;color:#64748b;font-size:13.5px;line-height:1.7">جميع أزرار الطباعة في مكان واحد حسب صلاحية حسابك. الأزرار ما زالت متاحة أيضاً في أماكنها الأصلية (الدرجات، المواظبة، التقارير…).</p>
       </div>
@@ -4858,14 +4862,14 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
         <div class="filter-bar">
           <div class="form-group">
             <label>الفصل الدراسي</label>
-            <select id="pcAttTerm" onchange="pcOnAttTermChange()" data-gsp-hook="1">
+            <select id="pcAttTerm" onchange="pcOnAttTermChange()">
               <option value="first">الفصل الأول</option>
               <option value="second">الفصل الثاني</option>
             </select>
           </div>
           <div class="form-group">
             <label>الشهر</label>
-            <select id="pcAttMonth" data-gsp-hook="1"></select>
+            <select id="pcAttMonth"></select>
           </div>
         </div>
         <div class="grid-2" style="gap:16px;margin-top:8px">
@@ -4893,7 +4897,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
         <div class="filter-bar" style="margin-top:12px">
           <div class="form-group" style="flex:1 1 280px">
             <label>ترتيب الطباعة</label>
-            <select id="pcAttPrintOrder" data-gsp-hook="1">
+            <select id="pcAttPrintOrder">
               <option value="class-first">حسب الفصول (لكل فصل → مواده)</option>
               <option value="subject-first">حسب المواد (لكل مادة → فصولها)</option>
             </select>
@@ -4947,7 +4951,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
         <div class="flex flex-wrap gap-12 items-center">
           <button type="button" class="btn btn-primary" onclick="printClassRosters()">🖨️ طباعة قوائم الفصول المحددة</button>
           <label style="font-size:13px;font-weight:600;color:#475569;display:inline-flex;align-items:center;gap:6px;cursor:pointer">
-            <input type="checkbox" id="pcRosterEmptyStatus" checked="" style="width:16px;height:16px">
+            <input type="checkbox" id="pcRosterEmptyStatus" checked style="width:16px;height:16px">
             خانة «الحالة» فارغة للتعبئة اليدوية
           </label>
         </div>
@@ -5021,112 +5025,8 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
         <div class="card" id="termCalendarCard" style="margin-top:16px;border:2px solid #3f7a57;background:linear-gradient(180deg,#ffffff,#f6fbf7)">
           <h2 style="margin-top:0;color:#285c42">🗓️ الروزنامة المركزية للأسابيع</h2>
           <p style="color:#475569;line-height:1.8;margin-bottom:12px">حدد <strong>تاريخ بداية الأسبوع الأول</strong> وعدد أسابيع الفصل بالكامل، ثم حدد لكل شهر من أي أسبوع إلى أي أسبوع. بعد الحفظ تصبح هذه الروزنامة هي المرجع الموحد لكشوف رصد الدرجات وكشوف الغياب والمواظبة والطباعة.</p>
-          <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap"><strong>الفصل:</strong><select id="siCalendarTerm" style="min-width:190px" data-cal-hook="1"><option value="first">الفصل الدراسي الأول</option><option value="second">الفصل الدراسي الثاني</option></select></div>
-          <div id="termCalendarEditor"><div style="background:#fff7ed;border:1px solid #fdba74;border-radius:8px;padding:8px 12px;margin-bottom:10px;font-size:13px;color:#9a3412">🔒 تعديل الروزنامة متاح لرئيس الكنترول فقط. سجّل الدخول ثم افتح تبويب بيانات المدرسة.</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px"><div class="form-group"><label>📅 تاريخ بداية الأسبوع الأول</label><input disabled="" type="date" id="termCalStartDate" value="2026-09-13" onchange="termCalBaseField('startDate',this.value)"></div><div class="form-group"><label>🔢 عدد أسابيع الفصل الدراسي بالكامل</label><input disabled="" type="number" min="1" max="40" id="termCalTotalWeeks" value="16" onchange="termCalBaseField('totalWeeks',this.value)"></div></div><div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:10px 12px;margin-bottom:12px;line-height:1.8;font-size:13px"><strong>القاعدة:</strong> الأسبوع 1 يبدأ من التاريخ المحدد، وكل أسبوع يليه تلقائياً بفاصل 7 أيام. تحدد هنا بعد أي أسبوع يبدأ كل شهر؛ وستستخدم نفس الخريطة في الرصد والطباعة والغياب.</div><div class="card" style="padding:12px;border:1px solid #dbe7df;background:#fbfefc;margin-bottom:10px" data-month-idx="0">
-        <div style="display:grid;grid-template-columns:1.4fr 1fr 1fr auto;gap:10px;align-items:end">
-          <div class="form-group"><label>اسم الشهر / الفترة 1</label>
-            <input disabled="" data-cal-field="name" data-cal-i="0" value="سبتمبر" onchange="termCalField(0,'name',this.value)">
-          </div>
-          <div class="form-group"><label>يبدأ من</label>
-            <select disabled="" data-cal-field="startWeek" data-cal-i="0" onchange="termCalField(0,'startWeek',this.value)"><option value="1">الأسبوع الأول</option><option value="2">الأسبوع الثاني</option><option value="3">الأسبوع الثالث</option><option value="4">الأسبوع الرابع</option><option value="5">الأسبوع الخامس</option><option value="6">الأسبوع السادس</option><option value="7">الأسبوع السابع</option><option value="8">الأسبوع الثامن</option><option value="9">الأسبوع التاسع</option><option value="10">الأسبوع العاشر</option><option value="11">الأسبوع الحادي عشر</option><option value="12">الأسبوع الثاني عشر</option><option value="13">الأسبوع الثالث عشر</option><option value="14">الأسبوع الرابع عشر</option><option value="15">الأسبوع الخامس عشر</option><option value="16">الأسبوع السادس عشر</option></select>
-          </div>
-          <div class="form-group"><label>ينتهي عند</label>
-            <select disabled="" data-cal-field="endWeek" data-cal-i="0" onchange="termCalField(0,'endWeek',this.value)"><option value="1">الأسبوع الأول</option><option value="2">الأسبوع الثاني</option><option value="3">الأسبوع الثالث</option><option value="4">الأسبوع الرابع</option><option value="5">الأسبوع الخامس</option><option value="6">الأسبوع السادس</option><option value="7">الأسبوع السابع</option><option value="8">الأسبوع الثامن</option><option value="9">الأسبوع التاسع</option><option value="10">الأسبوع العاشر</option><option value="11">الأسبوع الحادي عشر</option><option value="12">الأسبوع الثاني عشر</option><option value="13">الأسبوع الثالث عشر</option><option value="14">الأسبوع الرابع عشر</option><option value="15">الأسبوع الخامس عشر</option><option value="16">الأسبوع السادس عشر</option></select>
-          </div>
-          <div></div>
-        </div>
-        <div style="display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:center;margin-top:10px;padding:10px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px">
-          <label style="display:flex;align-items:center;gap:8px;font-weight:700;white-space:nowrap;cursor:pointer">
-            <input type="checkbox" disabled="" data-cal-field="hasExam" data-cal-i="0" onchange="termCalField(0,'hasExam',this.checked)"> يوجد اختبار شهر
-          </label>
-          <div class="form-group" style="margin:0">
-            <label style="font-size:12px">موضع عمود الاختبار في كشف الرصد (يختاره رئيس الكنترول)</label>
-            <select disabled="" data-cal-field="examAfterWeek" data-cal-i="0" onchange="termCalField(0,'examAfterWeek',this.value)" style="width:100%">
-              <option value="0">— في نهاية أسابيع هذه الفترة —</option>
-              <option value="1">بعد الأسبوع الأول (1)</option><option value="2" selected="">بعد الأسبوع الثاني (2)</option><option value="3">بعد الأسبوع الثالث (3)</option><option value="4">بعد الأسبوع الرابع (4)</option><option value="5">بعد الأسبوع الخامس (5)</option><option value="6">بعد الأسبوع السادس (6)</option><option value="7">بعد الأسبوع السابع (7)</option><option value="8">بعد الأسبوع الثامن (8)</option><option value="9">بعد الأسبوع التاسع (9)</option><option value="10">بعد الأسبوع العاشر (10)</option><option value="11">بعد الأسبوع الحادي عشر (11)</option><option value="12">بعد الأسبوع الثاني عشر (12)</option><option value="13">بعد الأسبوع الثالث عشر (13)</option><option value="14">بعد الأسبوع الرابع عشر (14)</option><option value="15">بعد الأسبوع الخامس عشر (15)</option><option value="16">بعد الأسبوع السادس عشر (16)</option>
-            </select>
-          </div>
-        </div>
-        <div style="font-size:12px;color:#64748b;margin-top:7px">تاريخ بداية هذا الشهر: <strong>٢٠٢٦/٩/١٣</strong> · عدد أسابيعه: <strong>2</strong></div>
-      </div><div class="card" style="padding:12px;border:1px solid #dbe7df;background:#fbfefc;margin-bottom:10px" data-month-idx="1">
-        <div style="display:grid;grid-template-columns:1.4fr 1fr 1fr auto;gap:10px;align-items:end">
-          <div class="form-group"><label>اسم الشهر / الفترة 2</label>
-            <input disabled="" data-cal-field="name" data-cal-i="1" value="أكتوبر" onchange="termCalField(1,'name',this.value)">
-          </div>
-          <div class="form-group"><label>يبدأ بعد الأسبوع السابق</label>
-            <select disabled="" data-cal-field="startWeek" data-cal-i="1" onchange="termCalField(1,'startWeek',this.value)"><option value="1">الأسبوع الأول</option><option value="2">الأسبوع الثاني</option><option value="3">الأسبوع الثالث</option><option value="4">الأسبوع الرابع</option><option value="5">الأسبوع الخامس</option><option value="6">الأسبوع السادس</option><option value="7">الأسبوع السابع</option><option value="8">الأسبوع الثامن</option><option value="9">الأسبوع التاسع</option><option value="10">الأسبوع العاشر</option><option value="11">الأسبوع الحادي عشر</option><option value="12">الأسبوع الثاني عشر</option><option value="13">الأسبوع الثالث عشر</option><option value="14">الأسبوع الرابع عشر</option><option value="15">الأسبوع الخامس عشر</option><option value="16">الأسبوع السادس عشر</option></select>
-          </div>
-          <div class="form-group"><label>ينتهي عند</label>
-            <select disabled="" data-cal-field="endWeek" data-cal-i="1" onchange="termCalField(1,'endWeek',this.value)"><option value="1">الأسبوع الأول</option><option value="2">الأسبوع الثاني</option><option value="3">الأسبوع الثالث</option><option value="4">الأسبوع الرابع</option><option value="5">الأسبوع الخامس</option><option value="6">الأسبوع السادس</option><option value="7">الأسبوع السابع</option><option value="8">الأسبوع الثامن</option><option value="9">الأسبوع التاسع</option><option value="10">الأسبوع العاشر</option><option value="11">الأسبوع الحادي عشر</option><option value="12">الأسبوع الثاني عشر</option><option value="13">الأسبوع الثالث عشر</option><option value="14">الأسبوع الرابع عشر</option><option value="15">الأسبوع الخامس عشر</option><option value="16">الأسبوع السادس عشر</option></select>
-          </div>
-          <div></div>
-        </div>
-        <div style="display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:center;margin-top:10px;padding:10px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px">
-          <label style="display:flex;align-items:center;gap:8px;font-weight:700;white-space:nowrap;cursor:pointer">
-            <input type="checkbox" disabled="" data-cal-field="hasExam" data-cal-i="1" checked="" onchange="termCalField(1,'hasExam',this.checked)"> يوجد اختبار شهر
-          </label>
-          <div class="form-group" style="margin:0">
-            <label style="font-size:12px">موضع عمود الاختبار في كشف الرصد (يختاره رئيس الكنترول)</label>
-            <select disabled="" data-cal-field="examAfterWeek" data-cal-i="1" onchange="termCalField(1,'examAfterWeek',this.value)" style="width:100%">
-              <option value="0">— في نهاية أسابيع هذه الفترة —</option>
-              <option value="1">بعد الأسبوع الأول (1)</option><option value="2">بعد الأسبوع الثاني (2)</option><option value="3">بعد الأسبوع الثالث (3)</option><option value="4">بعد الأسبوع الرابع (4)</option><option value="5">بعد الأسبوع الخامس (5)</option><option value="6" selected="">بعد الأسبوع السادس (6)</option><option value="7">بعد الأسبوع السابع (7)</option><option value="8">بعد الأسبوع الثامن (8)</option><option value="9">بعد الأسبوع التاسع (9)</option><option value="10">بعد الأسبوع العاشر (10)</option><option value="11">بعد الأسبوع الحادي عشر (11)</option><option value="12">بعد الأسبوع الثاني عشر (12)</option><option value="13">بعد الأسبوع الثالث عشر (13)</option><option value="14">بعد الأسبوع الرابع عشر (14)</option><option value="15">بعد الأسبوع الخامس عشر (15)</option><option value="16">بعد الأسبوع السادس عشر (16)</option>
-            </select>
-          </div>
-        </div>
-        <div style="font-size:12px;color:#64748b;margin-top:7px">تاريخ بداية هذا الشهر: <strong>٢٠٢٦/٩/٢٧</strong> · عدد أسابيعه: <strong>4</strong> · <span style="color:#b45309;font-weight:700">عمود الاختبار بعد الأسبوع 6</span></div>
-      </div><div class="card" style="padding:12px;border:1px solid #dbe7df;background:#fbfefc;margin-bottom:10px" data-month-idx="2">
-        <div style="display:grid;grid-template-columns:1.4fr 1fr 1fr auto;gap:10px;align-items:end">
-          <div class="form-group"><label>اسم الشهر / الفترة 3</label>
-            <input disabled="" data-cal-field="name" data-cal-i="2" value="نوفمبر" onchange="termCalField(2,'name',this.value)">
-          </div>
-          <div class="form-group"><label>يبدأ بعد الأسبوع السابق</label>
-            <select disabled="" data-cal-field="startWeek" data-cal-i="2" onchange="termCalField(2,'startWeek',this.value)"><option value="1">الأسبوع الأول</option><option value="2">الأسبوع الثاني</option><option value="3">الأسبوع الثالث</option><option value="4">الأسبوع الرابع</option><option value="5">الأسبوع الخامس</option><option value="6">الأسبوع السادس</option><option value="7">الأسبوع السابع</option><option value="8">الأسبوع الثامن</option><option value="9">الأسبوع التاسع</option><option value="10">الأسبوع العاشر</option><option value="11">الأسبوع الحادي عشر</option><option value="12">الأسبوع الثاني عشر</option><option value="13">الأسبوع الثالث عشر</option><option value="14">الأسبوع الرابع عشر</option><option value="15">الأسبوع الخامس عشر</option><option value="16">الأسبوع السادس عشر</option></select>
-          </div>
-          <div class="form-group"><label>ينتهي عند</label>
-            <select disabled="" data-cal-field="endWeek" data-cal-i="2" onchange="termCalField(2,'endWeek',this.value)"><option value="1">الأسبوع الأول</option><option value="2">الأسبوع الثاني</option><option value="3">الأسبوع الثالث</option><option value="4">الأسبوع الرابع</option><option value="5">الأسبوع الخامس</option><option value="6">الأسبوع السادس</option><option value="7">الأسبوع السابع</option><option value="8">الأسبوع الثامن</option><option value="9">الأسبوع التاسع</option><option value="10">الأسبوع العاشر</option><option value="11">الأسبوع الحادي عشر</option><option value="12">الأسبوع الثاني عشر</option><option value="13">الأسبوع الثالث عشر</option><option value="14">الأسبوع الرابع عشر</option><option value="15">الأسبوع الخامس عشر</option><option value="16">الأسبوع السادس عشر</option></select>
-          </div>
-          <div></div>
-        </div>
-        <div style="display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:center;margin-top:10px;padding:10px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px">
-          <label style="display:flex;align-items:center;gap:8px;font-weight:700;white-space:nowrap;cursor:pointer">
-            <input type="checkbox" disabled="" data-cal-field="hasExam" data-cal-i="2" checked="" onchange="termCalField(2,'hasExam',this.checked)"> يوجد اختبار شهر
-          </label>
-          <div class="form-group" style="margin:0">
-            <label style="font-size:12px">موضع عمود الاختبار في كشف الرصد (يختاره رئيس الكنترول)</label>
-            <select disabled="" data-cal-field="examAfterWeek" data-cal-i="2" onchange="termCalField(2,'examAfterWeek',this.value)" style="width:100%">
-              <option value="0">— في نهاية أسابيع هذه الفترة —</option>
-              <option value="1">بعد الأسبوع الأول (1)</option><option value="2">بعد الأسبوع الثاني (2)</option><option value="3">بعد الأسبوع الثالث (3)</option><option value="4">بعد الأسبوع الرابع (4)</option><option value="5">بعد الأسبوع الخامس (5)</option><option value="6">بعد الأسبوع السادس (6)</option><option value="7">بعد الأسبوع السابع (7)</option><option value="8">بعد الأسبوع الثامن (8)</option><option value="9">بعد الأسبوع التاسع (9)</option><option value="10" selected="">بعد الأسبوع العاشر (10)</option><option value="11">بعد الأسبوع الحادي عشر (11)</option><option value="12">بعد الأسبوع الثاني عشر (12)</option><option value="13">بعد الأسبوع الثالث عشر (13)</option><option value="14">بعد الأسبوع الرابع عشر (14)</option><option value="15">بعد الأسبوع الخامس عشر (15)</option><option value="16">بعد الأسبوع السادس عشر (16)</option>
-            </select>
-          </div>
-        </div>
-        <div style="font-size:12px;color:#64748b;margin-top:7px">تاريخ بداية هذا الشهر: <strong>٢٠٢٦/١٠/٢٥</strong> · عدد أسابيعه: <strong>4</strong> · <span style="color:#b45309;font-weight:700">عمود الاختبار بعد الأسبوع 10</span></div>
-      </div><div class="card" style="padding:12px;border:1px solid #dbe7df;background:#fbfefc;margin-bottom:10px" data-month-idx="3">
-        <div style="display:grid;grid-template-columns:1.4fr 1fr 1fr auto;gap:10px;align-items:end">
-          <div class="form-group"><label>اسم الشهر / الفترة 4</label>
-            <input disabled="" data-cal-field="name" data-cal-i="3" value="ديسمبر" onchange="termCalField(3,'name',this.value)">
-          </div>
-          <div class="form-group"><label>يبدأ بعد الأسبوع السابق</label>
-            <select disabled="" data-cal-field="startWeek" data-cal-i="3" onchange="termCalField(3,'startWeek',this.value)"><option value="1">الأسبوع الأول</option><option value="2">الأسبوع الثاني</option><option value="3">الأسبوع الثالث</option><option value="4">الأسبوع الرابع</option><option value="5">الأسبوع الخامس</option><option value="6">الأسبوع السادس</option><option value="7">الأسبوع السابع</option><option value="8">الأسبوع الثامن</option><option value="9">الأسبوع التاسع</option><option value="10">الأسبوع العاشر</option><option value="11">الأسبوع الحادي عشر</option><option value="12">الأسبوع الثاني عشر</option><option value="13">الأسبوع الثالث عشر</option><option value="14">الأسبوع الرابع عشر</option><option value="15">الأسبوع الخامس عشر</option><option value="16">الأسبوع السادس عشر</option></select>
-          </div>
-          <div class="form-group"><label>ينتهي عند</label>
-            <select disabled="" data-cal-field="endWeek" data-cal-i="3" onchange="termCalField(3,'endWeek',this.value)"><option value="1">الأسبوع الأول</option><option value="2">الأسبوع الثاني</option><option value="3">الأسبوع الثالث</option><option value="4">الأسبوع الرابع</option><option value="5">الأسبوع الخامس</option><option value="6">الأسبوع السادس</option><option value="7">الأسبوع السابع</option><option value="8">الأسبوع الثامن</option><option value="9">الأسبوع التاسع</option><option value="10">الأسبوع العاشر</option><option value="11">الأسبوع الحادي عشر</option><option value="12">الأسبوع الثاني عشر</option><option value="13">الأسبوع الثالث عشر</option><option value="14">الأسبوع الرابع عشر</option><option value="15">الأسبوع الخامس عشر</option><option value="16">الأسبوع السادس عشر</option></select>
-          </div>
-          <div></div>
-        </div>
-        <div style="display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:center;margin-top:10px;padding:10px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px">
-          <label style="display:flex;align-items:center;gap:8px;font-weight:700;white-space:nowrap;cursor:pointer">
-            <input type="checkbox" disabled="" data-cal-field="hasExam" data-cal-i="3" onchange="termCalField(3,'hasExam',this.checked)"> يوجد اختبار شهر
-          </label>
-          <div class="form-group" style="margin:0">
-            <label style="font-size:12px">موضع عمود الاختبار في كشف الرصد (يختاره رئيس الكنترول)</label>
-            <select disabled="" data-cal-field="examAfterWeek" data-cal-i="3" onchange="termCalField(3,'examAfterWeek',this.value)" style="width:100%">
-              <option value="0">— في نهاية أسابيع هذه الفترة —</option>
-              <option value="1">بعد الأسبوع الأول (1)</option><option value="2">بعد الأسبوع الثاني (2)</option><option value="3">بعد الأسبوع الثالث (3)</option><option value="4">بعد الأسبوع الرابع (4)</option><option value="5">بعد الأسبوع الخامس (5)</option><option value="6">بعد الأسبوع السادس (6)</option><option value="7">بعد الأسبوع السابع (7)</option><option value="8">بعد الأسبوع الثامن (8)</option><option value="9">بعد الأسبوع التاسع (9)</option><option value="10">بعد الأسبوع العاشر (10)</option><option value="11">بعد الأسبوع الحادي عشر (11)</option><option value="12">بعد الأسبوع الثاني عشر (12)</option><option value="13">بعد الأسبوع الثالث عشر (13)</option><option value="14" selected="">بعد الأسبوع الرابع عشر (14)</option><option value="15">بعد الأسبوع الخامس عشر (15)</option><option value="16">بعد الأسبوع السادس عشر (16)</option>
-            </select>
-          </div>
-        </div>
-        <div style="font-size:12px;color:#64748b;margin-top:7px">تاريخ بداية هذا الشهر: <strong>٢٠٢٦/١١/٢٢</strong> · عدد أسابيعه: <strong>4</strong></div>
-      </div><div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap"><span style="color:#64748b;font-size:13px">لا يمكن الحفظ من هذا الحساب.</span></div><div id="termCalendarMsg" style="font-size:13px;margin-top:8px"></div></div>
+          <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap"><strong>الفصل:</strong><select id="siCalendarTerm" style="min-width:190px"><option value="first">الفصل الدراسي الأول</option><option value="second">الفصل الدراسي الثاني</option></select></div>
+          <div id="termCalendarEditor"></div>
         </div>
 
         <h2 class="mt-16">📅 ضبط فترات الرصد</h2>
@@ -28332,6 +28232,7 @@ function roundToHalf(n){ if (!Number.isFinite(n)) return 0; return Math.round(n 
 })();
 </script>
 
-
-
-</body></html>
+  <!-- PWA: تسجيل Service Worker وزر التثبيت -->
+  <script src="pwa-register.js"></script>
+</body>
+</html>
