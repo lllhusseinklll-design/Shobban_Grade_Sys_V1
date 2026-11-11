@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0055)file:///C:/Users/Central%20Control/Downloads/index.html -->
+<!-- saved from url=(0057)file:///C:/Users/Central%20Control/Downloads/index_1.html -->
 <html lang="ar" dir="rtl" data-theme="light"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -15592,7 +15592,7 @@ function renderMonthlyExportButtons() {
           ? `<td class="col-id" data-label="الرقم القومي">${escapeHtml(s.nationalId || '-')}</td>`
           : '';
         const editNameBtn = (canEdit && currentAccountType !== 'monitor')
-          ? ` <button type="button" class="btn-edit-name" onclick="openEditStudentNameModal(${escapeHtml(JSON.stringify(s.id))})" title="تعديل اسم الطالب" aria-label="تعديل اسم الطالب" style="border:1px solid #cbd5e1; background:#fff; border-radius:6px; cursor:pointer; padding:1px 6px; font-size:13px; margin-inline-start:6px;">✏️</button>`
+          ? ` <button type="button" class="btn-edit-name" onclick="openEditStudentNameModal(${escapeHtml(JSON.stringify(s.id))})" title="تعديل اسم الطالب والرقم القومي" aria-label="تعديل بيانات الطالب" style="border:1px solid #cbd5e1; background:#fff; border-radius:6px; cursor:pointer; padding:1px 6px; font-size:13px; margin-inline-start:6px;">✏️</button>`
           : '';
         row.innerHTML = `
           <td class="col-index">${idx + 1}</td>
@@ -15633,18 +15633,24 @@ function renderMonthlyExportButtons() {
       el.addEventListener('mousedown', ev => { if (ev.target === el) closeEditStudentNameModal(); });
       el.innerHTML = `
         <div class="mg-modal-box" style="max-width:520px;" role="dialog" aria-modal="true">
-          <div class="mg-modal-header ui-modal-header ui-type-info">✏️ تعديل اسم الطالب</div>
+          <div class="mg-modal-header ui-modal-header ui-type-info">✏️ تعديل بيانات الطالب</div>
           <div class="mg-modal-body" style="white-space:normal;">
             <div id="esnError" style="display:none; background:#fef2f2; color:#991b1b; border:1px solid #fca5a5; border-radius:8px; padding:8px 12px; margin-bottom:12px; font-size:13px;"></div>
-            <div style="font-size:13px; color:#64748b; margin-bottom:10px;">رقم الجلوس: <strong>${escapeHtml(student.seat || '-')}</strong> — تعديل الاسم لا يؤثر على الدرجات أو الغياب المسجّلة.</div>
+            <div style="font-size:13px; color:#64748b; margin-bottom:10px;">رقم الجلوس: <strong>${escapeHtml(student.seat || '-')}</strong> — التعديل لا يؤثر على الدرجات أو الغياب المسجّلة.</div>
             <label style="display:block; font-size:13px; font-weight:700; color:#1e3a5f; margin-bottom:4px;">اسم الطالب <span style="color:#b91c1c;">*</span></label>
             <input type="text" id="esnName" value="${escapeHtml(student.name || '')}" autocomplete="off"
               style="width:100%; padding:8px 10px; border:1px solid #cbd5e1; border-radius:6px; font-size:15px; box-sizing:border-box;"
               onkeydown="if(event.key==='Enter'){saveEditedStudentName(${escapeHtml(JSON.stringify(id))});}else if(event.key==='Escape'){closeEditStudentNameModal();}" />
+            ${canViewNationalId() ? `
+            <label style="display:block; font-size:13px; font-weight:700; color:#1e3a5f; margin:12px 0 4px;">الرقم القومي (14 رقماً)</label>
+            <input type="text" id="esnNid" dir="ltr" inputmode="numeric" maxlength="14" value="${escapeHtml(student.nationalId || '')}" autocomplete="off"
+              style="width:100%; padding:8px 10px; border:1px solid #cbd5e1; border-radius:6px; font-size:15px; box-sizing:border-box; text-align:left;"
+              onkeydown="if(event.key==='Enter'){saveEditedStudentName(${escapeHtml(JSON.stringify(id))});}else if(event.key==='Escape'){closeEditStudentNameModal();}" />
+            <div style="font-size:12px; color:#64748b; margin-top:4px;">تعديل الرقم القومي ينقل معه درجات الطالب وسجل غيابه تلقائياً.</div>` : ''}
           </div>
           <div class="mg-modal-footer">
             <button class="btn btn-outline btn-sm" onclick="closeEditStudentNameModal()">إلغاء</button>
-            <button class="btn btn-success btn-sm" onclick="saveEditedStudentName(${escapeHtml(JSON.stringify(id))})">💾 حفظ الاسم</button>
+            <button class="btn btn-success btn-sm" onclick="saveEditedStudentName(${escapeHtml(JSON.stringify(id))})">💾 حفظ</button>
           </div>
         </div>`;
       document.body.appendChild(el);
@@ -15657,6 +15663,7 @@ function renderMonthlyExportButtons() {
     function saveEditedStudentName(id) {
       if (currentRole !== 'admin' || currentAccountType === 'monitor') return;
       const input = document.getElementById('esnName');
+      const nidInput = document.getElementById('esnNid');
       const errBox = document.getElementById('esnError');
       const showErr = m => { if (errBox) { errBox.textContent = m; errBox.style.display = 'block'; } };
       const newName = String(input ? input.value : '').replace(/\s+/g, ' ').trim();
@@ -15665,14 +15672,63 @@ function renderMonthlyExportButtons() {
       const student = (db.students || []).find(s => s.id === id);
       if (!student) { closeEditStudentNameModal(); return; }
       const oldName = student.name || '';
-      if (newName === oldName) { closeEditStudentNameModal(); return; }
+      const oldNid = student.nationalId || '';
+
+      // الرقم القومي: يُحوَّل أي رقم هندي/عربي إلى لاتيني، وتُزال أي رموز، ويجب أن يكون 14 رقماً
+      let newNid = oldNid;
+      if (nidInput) {
+        newNid = String(nidInput.value || '')
+          .replace(/[٠-٩]/g, d => String(d.charCodeAt(0) - 0x0660))
+          .replace(/[۰-۹]/g, d => String(d.charCodeAt(0) - 0x06F0))
+          .replace(/[^0-9]/g, '');
+        if (newNid !== oldNid && newNid.length !== 14) { showErr('⚠️ الرقم القومي يجب أن يكون 14 رقماً بالضبط.'); return; }
+        if (newNid !== oldNid) {
+          const clash = (db.students || []).find(x => x.id !== id && x.nationalId === newNid);
+          if (clash) { showErr('⚠️ هذا الرقم القومي مسجَّل بالفعل للطالب «' + clash.name + '» (رقم جلوس ' + (clash.seat || '-') + ') في نفس المرحلة.'); return; }
+        }
+      }
+      const nameChanged = newName !== oldName;
+      const nidChanged = newNid !== oldNid;
+      if (!nameChanged && !nidChanged) { closeEditStudentNameModal(); return; }
+
       // تنبيه (لا منع) إن وُجد طالب آخر بنفس الاسم تماماً في نفس الفصل
-      const dup = (db.students || []).find(s => s.id !== id && s.class === student.class && s.section === student.section &&
-        normalizeArabicText(s.name || '') === normalizeArabicText(newName));
-      if (dup && !confirm('⚠️ يوجد طالب آخر بنفس الاسم في هذا الفصل (رقم جلوس ' + (dup.seat || '-') + '). هل تريد المتابعة؟')) return;
+      if (nameChanged) {
+        const dup = (db.students || []).find(s => s.id !== id && s.class === student.class && s.section === student.section &&
+          normalizeArabicText(s.name || '') === normalizeArabicText(newName));
+        if (dup && !confirm('⚠️ يوجد طالب آخر بنفس الاسم في هذا الفصل (رقم جلوس ' + (dup.seat || '-') + '). هل تريد المتابعة؟')) return;
+      }
+      if (nidChanged && !confirm('تأكيد تغيير الرقم القومي للطالب «' + newName + '»؟\nمن: ' + (oldNid || '—') + '\nإلى: ' + newNid)) return;
+
       student.name = newName;
+      if (nidChanged) {
+        student.nationalId = newNid;
+        // معرّف الطالب مبني على الرقم القومي (القسم::الصف::الرقم القومي) — ننقل الدرجات وسجل الحضور للمعرّف الجديد
+        const oldId = student.id;
+        const newId = (student.section || '') + '::' + (student.grade || '') + '::' + newNid;
+        if (newId !== oldId) {
+          try { stuTomb(db, [oldId]); } catch (e) {}
+          student.id = newId;
+          (db.grades || []).forEach(g => { if (g.studentId === oldId) g.studentId = newId; });
+          const rec = db.attendance && db.attendance.records;
+          if (rec && typeof rec === 'object') {
+            const prefix = oldId + '|';
+            Object.keys(rec).forEach(k => {
+              if (k.startsWith(prefix)) { rec[newId + '|' + k.slice(prefix.length)] = rec[k]; delete rec[k]; }
+            });
+          }
+        }
+        delete student.conflictFlag;
+      }
+      try { student.updatedAt = (typeof gcNowIso === 'function') ? gcNowIso() : new Date().toISOString(); } catch (e) {}
       saveDB(db);
-      try { if (typeof recordAudit === 'function') recordAudit('student_name_edit', { studentId: id, seat: student.seat || '', from: oldName, to: newName }, 'info'); } catch (e) {}
+      try {
+        if (typeof recordAudit === 'function') {
+          const det = { studentId: student.id, seat: student.seat || '' };
+          if (nameChanged) { det.nameFrom = oldName; det.nameTo = newName; }
+          if (nidChanged) { det.nidFrom = oldNid; det.nidTo = newNid; }
+          recordAudit(nidChanged ? 'student_nid_edit' : 'student_name_edit', det, nidChanged ? 'warning' : 'info');
+        }
+      } catch (e) {}
       closeEditStudentNameModal();
       loadStudentsUI();
       if (typeof updateFilters === 'function') updateFilters();
