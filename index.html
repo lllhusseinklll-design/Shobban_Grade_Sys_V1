@@ -10626,7 +10626,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
           for (let r = 1; r < rows.length; r++) {
             const row = rows[r];
             if (!row || row.every(c => String(c).trim() === '')) continue;
-            const nationalId = String(row[2] !== undefined ? row[2] : '').trim().replace(/[^0-9]/g, '');
+            const nationalId = normalizeNationalId(row[2]);
             const name = String(row[3] !== undefined ? row[3] : '').trim();
             const grade = String(row[4] !== undefined ? row[4] : '').trim();
             const seat = String(row[1] !== undefined ? row[1] : '').trim();
@@ -12191,9 +12191,25 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
       return { subjects: reconciled, warnings };
     }
 
+    // يحوّل أي صيغة للرقم القومي إلى أرقام لاتينية فقط: أرقام هندية/فارسية (٠-٩ ، ۰-۹)، مسافات ورموز،
+    // خلايا إكسيل الرقمية، والصيغة العلمية (2.9501E+13) أو النهاية «.0».
+    function normalizeNationalId(v) {
+      if (v === null || v === undefined) return '';
+      if (typeof v === 'number') return isFinite(v) ? String(Math.round(v)) : '';
+      let s = String(v).trim()
+        .replace(/[٠-٩]/g, d => String(d.charCodeAt(0) - 0x0660))
+        .replace(/[۰-۹]/g, d => String(d.charCodeAt(0) - 0x06F0));
+      if (/^\d+(\.\d+)?e\+?\d+$/i.test(s)) { const n = Number(s); if (isFinite(n)) s = n.toFixed(0); }
+      s = s.replace(/\.0+$/, '');
+      return s.replace(/\D/g, '');
+    }
+
+    // النوع من الرقم القومي المصري (14 رقماً): الخانة 13 فردية = ذكر (M)، زوجية = أنثى (F).
+    // الخانة الأولى هي رقم القرن (2 = 1900-1999، 3 = 2000-2099). ترجع null إن لم يكن الرقم صالحاً.
     function genderFromNationalId(nationalId) {
-      const digits = String(nationalId || '').replace(/\D/g, '');
+      const digits = normalizeNationalId(nationalId);
       if (digits.length !== 14) return null;
+      if (digits.charAt(0) !== '2' && digits.charAt(0) !== '3') return null;
       const genderDigit = parseInt(digits.charAt(12), 10);
       if (isNaN(genderDigit)) return null;
       return (genderDigit % 2 === 0) ? 'F' : 'M';
@@ -12813,7 +12829,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
 
         const name = String(row[colMap.name] !== undefined ? row[colMap.name] : '').trim();
         const seat = String(row[colMap.seat] !== undefined ? row[colMap.seat] : '').trim();
-        const nationalId = colMap.nationalId !== undefined ? String(row[colMap.nationalId] || '').trim() : '';
+        const nationalId = colMap.nationalId !== undefined ? normalizeNationalId(row[colMap.nationalId]) : '';
         if (!name || !nationalId) continue;
 
         const cls = colMap.class !== undefined ? (String(row[colMap.class] || '').trim() || 'عام') : 'عام';
@@ -13195,6 +13211,9 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
 
         // مقارنة الكشف القديم بالكشف الجديد المستخرج من الملف: تمييز الطلاب المستمرين (بلا تغيير أو
         // بتعديل بعض الحقول)، الطلاب الجدد، والطلاب غير الموجودين في الملف الجديد (سيُحذفون مع درجاتهم).
+        // النوع الذي عُدِّل يدوياً (يخالف الرقم القومي) يبقى كما هو ولا تستبدله إعادة الرفع
+        const _manualGender = new Map(oldStudentsThisGrade.filter(o => o && o.genderManual).map(o => [o.id, o.gender]));
+        result.students.forEach(ns => { if (_manualGender.has(ns.id)) { ns.gender = _manualGender.get(ns.id); ns.genderManual = true; } });
         const rosterDiff = buildStudentRosterDiff(oldStudentsThisGrade, result.students);
         if (oldStudentsThisGrade.length > 0 && studentRosterDiffHasChanges(rosterDiff)) {
           const proceed = await showConfirm(buildStudentRosterDiffConfirmMessage(rosterDiff));
@@ -15609,9 +15628,16 @@ function renderMonthlyExportButtons() {
             <input type="text" id="esnName" value="${escapeHtml(student.name || '')}" autocomplete="off"
               style="width:100%; padding:8px 10px; border:1px solid #cbd5e1; border-radius:6px; font-size:15px; box-sizing:border-box;"
               onkeydown="if(event.key==='Enter'){saveEditedStudentName(${escapeHtml(JSON.stringify(id))});}else if(event.key==='Escape'){closeEditStudentNameModal();}" />
+            <label style="display:block; font-size:13px; font-weight:700; color:#1e3a5f; margin:12px 0 4px;">النوع</label>
+            <select id="esnGender" onchange="this.dataset.manual='1'; esnUpdateGenderHint();"
+              style="width:100%; padding:8px 10px; border:1px solid #cbd5e1; border-radius:6px; font-size:15px; box-sizing:border-box; background:#fff;">
+              <option value="M" ${isFemaleStudent(student) ? '' : 'selected'}>ذكر</option>
+              <option value="F" ${isFemaleStudent(student) ? 'selected' : ''}>أنثى</option>
+            </select>
+            <div id="esnGenderHint" style="font-size:12px; color:#64748b; margin-top:4px;"></div>
             ${canViewNationalId() ? `
             <label style="display:block; font-size:13px; font-weight:700; color:#1e3a5f; margin:12px 0 4px;">الرقم القومي (14 رقماً)</label>
-            <input type="text" id="esnNid" dir="ltr" inputmode="numeric" maxlength="14" value="${escapeHtml(student.nationalId || '')}" autocomplete="off"
+            <input type="text" id="esnNid" dir="ltr" inputmode="numeric" maxlength="14" value="${escapeHtml(student.nationalId || '')}" autocomplete="off" oninput="esnOnNidInput()"
               style="width:100%; padding:8px 10px; border:1px solid #cbd5e1; border-radius:6px; font-size:15px; box-sizing:border-box; text-align:left;"
               onkeydown="if(event.key==='Enter'){saveEditedStudentName(${escapeHtml(JSON.stringify(id))});}else if(event.key==='Escape'){closeEditStudentNameModal();}" />
             <div style="font-size:12px; color:#64748b; margin-top:4px;">تعديل الرقم القومي ينقل معه درجات الطالب وسجل غيابه تلقائياً.</div>` : ''}
@@ -15622,7 +15648,28 @@ function renderMonthlyExportButtons() {
           </div>
         </div>`;
       document.body.appendChild(el);
+      esnUpdateGenderHint();
       setTimeout(() => { const n = document.getElementById('esnName'); if (n) { n.focus(); n.select(); } }, 50);
+    }
+    function isFemaleStudent(s) {
+      return /^(f|female|أنثى|انثى|بنت|فتاة)$/i.test(String((s && s.gender) || '').trim());
+    }
+    // عند كتابة الرقم القومي: يُحدَّد النوع تلقائياً (ما لم يختَر المستخدم النوع يدوياً)
+    function esnOnNidInput() {
+      const nid = document.getElementById('esnNid'), sel = document.getElementById('esnGender');
+      if (!nid || !sel) return;
+      const g = genderFromNationalId(nid.value);
+      if (g && !sel.dataset.manual) sel.value = g;
+      esnUpdateGenderHint();
+    }
+    function esnUpdateGenderHint() {
+      const nid = document.getElementById('esnNid'), sel = document.getElementById('esnGender'), hint = document.getElementById('esnGenderHint');
+      if (!sel || !hint) return;
+      const g = nid ? genderFromNationalId(nid.value) : null;
+      const label = v => (v === 'F' ? 'أنثى' : 'ذكر');
+      if (!g) { hint.style.color = '#64748b'; hint.textContent = nid ? 'يُحدَّد تلقائياً عند كتابة رقم قومي صحيح (14 رقماً)، ويمكنك تغييره يدوياً.' : ''; return; }
+      if (sel.value === g) { hint.style.color = '#15803d'; hint.textContent = '✓ يتوافق مع الرقم القومي (الخانة 13 ' + (g === 'F' ? 'زوجية' : 'فردية') + ').'; }
+      else { hint.style.color = '#b45309'; hint.textContent = '⚠️ الرقم القومي يدل على «' + label(g) + '» (الخانة 13 ' + (g === 'F' ? 'زوجية' : 'فردية') + ') — النوع المختار يدوي.'; }
     }
     function closeEditStudentNameModal() {
       const el = document.getElementById('editStudentNameOverlay');
@@ -15641,14 +15688,14 @@ function renderMonthlyExportButtons() {
       if (!student) { closeEditStudentNameModal(); return; }
       const oldName = student.name || '';
       const oldNid = student.nationalId || '';
+      const oldGender = isFemaleStudent(student) ? 'F' : 'M';
+      const genderSel = document.getElementById('esnGender');
+      const newGender = genderSel ? (genderSel.value === 'F' ? 'F' : 'M') : oldGender;
 
       // الرقم القومي: يُحوَّل أي رقم هندي/عربي إلى لاتيني، وتُزال أي رموز، ويجب أن يكون 14 رقماً
       let newNid = oldNid;
       if (nidInput) {
-        newNid = String(nidInput.value || '')
-          .replace(/[٠-٩]/g, d => String(d.charCodeAt(0) - 0x0660))
-          .replace(/[۰-۹]/g, d => String(d.charCodeAt(0) - 0x06F0))
-          .replace(/[^0-9]/g, '');
+        newNid = normalizeNationalId(nidInput.value);
         if (newNid !== oldNid && newNid.length !== 14) { showErr('⚠️ الرقم القومي يجب أن يكون 14 رقماً بالضبط.'); return; }
         if (newNid !== oldNid) {
           const clash = (db.students || []).find(x => x.id !== id && x.nationalId === newNid);
@@ -15657,7 +15704,8 @@ function renderMonthlyExportButtons() {
       }
       const nameChanged = newName !== oldName;
       const nidChanged = newNid !== oldNid;
-      if (!nameChanged && !nidChanged) { closeEditStudentNameModal(); return; }
+      const genderChanged = newGender !== oldGender;
+      if (!nameChanged && !nidChanged && !genderChanged) { closeEditStudentNameModal(); return; }
 
       // تنبيه (لا منع) إن وُجد طالب آخر بنفس الاسم تماماً في نفس الفصل
       if (nameChanged) {
@@ -15668,6 +15716,11 @@ function renderMonthlyExportButtons() {
       if (nidChanged && !confirm('تأكيد تغيير الرقم القومي للطالب «' + newName + '»؟\nمن: ' + (oldNid || '—') + '\nإلى: ' + newNid)) return;
 
       student.name = newName;
+      student.gender = newGender;
+      // علامة «نوع يدوي»: إن خالف النوع المختار ما يدل عليه الرقم القومي (أو لم يكن الرقم صالحاً) يُحفظ كتعديل يدوي
+      // فلا يُستبدل عند إعادة رفع كشف الطلاب
+      const _idG = genderFromNationalId(newNid || oldNid);
+      if (!_idG || _idG !== newGender) student.genderManual = true; else delete student.genderManual;
       if (nidChanged) {
         student.nationalId = newNid;
         // معرّف الطالب مبني على الرقم القومي (القسم::الصف::الرقم القومي) — ننقل الدرجات وسجل الحضور للمعرّف الجديد
@@ -15694,7 +15747,8 @@ function renderMonthlyExportButtons() {
           const det = { studentId: student.id, seat: student.seat || '' };
           if (nameChanged) { det.nameFrom = oldName; det.nameTo = newName; }
           if (nidChanged) { det.nidFrom = oldNid; det.nidTo = newNid; }
-          recordAudit(nidChanged ? 'student_nid_edit' : 'student_name_edit', det, nidChanged ? 'warning' : 'info');
+          if (genderChanged) { det.genderFrom = oldGender; det.genderTo = newGender; }
+          recordAudit(nidChanged ? 'student_nid_edit' : (genderChanged && !nameChanged ? 'student_gender_edit' : 'student_name_edit'), det, nidChanged ? 'warning' : 'info');
         }
       } catch (e) {}
       closeEditStudentNameModal();
@@ -15900,7 +15954,7 @@ function renderMonthlyExportButtons() {
     }
     function asOnNidInput() {
       const nid = _asEl('asNid');
-      nid.value = nid.value.replace(/[^\d]/g, '');
+      nid.value = normalizeNationalId(nid.value);
       const g = genderFromNationalId(nid.value);
       const hint = _asEl('asGenderHint');
       if (g) { _asEl('asGender').value = g; hint.textContent = 'تم تحديده تلقائياً من الرقم القومي'; }
@@ -15916,11 +15970,10 @@ function renderMonthlyExportButtons() {
       let cls = _asEl('asClass').value;
       if (cls === '__new__') cls = _asEl('asNewClass').value.trim() || 'عام';
       const name = _asEl('asName').value.replace(/\s+/g, ' ').trim();
-      const nationalId = _asEl('asNid').value.replace(/\D/g, '');
+      const nationalId = normalizeNationalId(_asEl('asNid').value);
       const seat = _asEl('asSeat').value.trim();
+      // النوع المختار في القائمة (يُملأ تلقائياً من الرقم القومي ويمكن تغييره يدوياً)
       let gender = _asEl('asGender').value === 'F' ? 'F' : 'M';
-      const idGender = genderFromNationalId(nationalId);
-      if (idGender) gender = idGender;
 
       if (!section) return _asErr('اختر القسم.');
       if (!grade) return _asErr('اختر الصف.');
