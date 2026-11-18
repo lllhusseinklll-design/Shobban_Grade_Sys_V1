@@ -6740,6 +6740,13 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
         if (prev === 'teachers' && typeof loadTeachersUI === 'function') {
           try { loadTeachersUI(); } catch (e) {}
         }
+        if (prev === 'students' && typeof loadStudentsUI === 'function') {
+          try {
+            const ae2 = document.activeElement;
+            const typing = ae2 && /^(INPUT|SELECT|TEXTAREA)$/.test(ae2.tagName) && ae2.closest && ae2.closest('#tab-students, #students');
+            if (!typing) loadStudentsUI();
+          } catch (e) {}
+        }
         if (prev === 'stats' && typeof loadStatsUI === 'function') {
           try { loadStatsUI(); } catch (e) {}
         }
@@ -9561,7 +9568,12 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
         stage_id: currentStageId || null,
         stage_name: stageName || null,
         action: String(action || '').slice(0, 200),
-        details: String(details || '').slice(0, 2000),
+        details: (function (d) {
+          if (d && typeof d === 'object') {
+            try { return Object.keys(d).map(function (k) { return k + ': ' + (d[k] && typeof d[k] === 'object' ? JSON.stringify(d[k]) : d[k]); }).join(' | '); } catch (e) { return ''; }
+          }
+          return String(d || '');
+        })(details).slice(0, 2000),
         level: level || 'info',
         app_version: (typeof APP_VERSION !== 'undefined' ? APP_VERSION : '')
       };
@@ -13452,8 +13464,10 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
               const ws = wb.Sheets[payload.sheetName];
               (payload.writes || []).forEach(function(w) {
                 const addr = XLSX.utils.encode_cell({ r: w[0], c: w[1] });
-                if (!ws[addr]) ws[addr] = { t: 'n', v: w[2] };
-                else { ws[addr].v = w[2]; ws[addr].t = 'n'; delete ws[addr].f; }
+                const isStr = w[3] === 's';
+                const tt = isStr ? 's' : 'n';
+                if (!ws[addr]) ws[addr] = { t: tt, v: w[2] };
+                else { ws[addr].v = w[2]; ws[addr].t = tt; delete ws[addr].f; delete ws[addr].w; }
               });
               buffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
             } else if (type === 'buildFromAoa') {
@@ -13591,8 +13605,14 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
       // نجهّز فقط قائمة (صف، عمود، قيمة) التي يجب كتابتها، ونرسلها للـ Worker ليقوم هو بفتح
       // الملف الأصلي وتعديلها وإعادة كتابته - بدون أي عملية XLSX ثقيلة هنا على الخيط الرئيسي.
       const writes = [];
+      // بيانات الطالب المعدَّلة (الاسم/الرقم القومي/اللغة الثانية) تُكتب أيضاً في الملف الأصلي حسب أعمدته المحفوظة وقت الرفع
+      const _cm = meta.colMap || {};
+      const _numOk = (v) => typeof v === 'number' && v >= 0;
       // الطالب المضاف يدوياً (بدون صف في ملف الإكسل الأصلي) لا rowIndex له، فيُتخطى هنا
       db.students.filter(s => s.grade === grade && s.section === section && s.rowIndex != null).forEach(s => {
+        if (_numOk(_cm.name) && s.name) writes.push([s.rowIndex, _cm.name, String(s.name), 's']);
+        if (_numOk(_cm.nationalId) && s.nationalId) writes.push([s.rowIndex, _cm.nationalId, String(s.nationalId), 's']);
+        if (_numOk(_cm.secondLang)) writes.push([s.rowIndex, _cm.secondLang, String(s.secondLanguage || ''), 's']);
         db.subjects.map(sv => resolveSubjectForScope(sv, grade + '|' + section)).forEach(subj => {
           subj.components.forEach((comp, ci) => {
             if (comp.colIndex === undefined || comp.colIndex < 0) return;
@@ -15769,6 +15789,7 @@ function renderMonthlyExportButtons() {
       if (student.specialization && !allowed.some(sp => normalizeArabicText(sp) === normalizeArabicText(student.specialization))) {
         student.specialization = '';
       }
+      try { student.updatedAt = (typeof gcNowIso === 'function') ? gcNowIso() : new Date().toISOString(); } catch (e) {}
       saveDB(db);
       loadStudentsUI();
       updateFilters();
@@ -15781,6 +15802,8 @@ function renderMonthlyExportButtons() {
       const student = db.students.find(s => s.id === id);
       if (!student) return;
       student[field] = value;
+      // ختم وقت التعديل: بدونه يتعادل الطالب مع نسخة الأجهزة الأخرى فتفوز النسخة المحلية القديمة ولا تصل التعديلات
+      try { student.updatedAt = (typeof gcNowIso === 'function') ? gcNowIso() : new Date().toISOString(); } catch (e) {}
       saveDB(db);
       loadStudentsUI();
       updateFilters();
