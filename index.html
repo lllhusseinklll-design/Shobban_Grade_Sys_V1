@@ -14064,13 +14064,38 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
     }
     function pcApplyLangFilter(students, lang) {
       if (!lang || lang === 'all') return students;
-      return students.filter(s => {
-        const v = normalizeArabicText(s.secondLanguage || '');
-        if (lang === 'none') return !v;
-        if (lang === 'fr') return v.indexOf('فرنس') >= 0 || v === 'f' || v === 'french' || v === 'fr';
-        if (lang === 'de') return v.indexOf('مان') >= 0 || v === 'g' || v === 'german' || v === 'de';
-        return true;
-      });
+      return students.filter(s => pcLangMatches(s.secondLanguage, lang));
+    }
+    function pcLangMatches(val, lang) {
+      const v = normalizeArabicText(val || '');
+      if (!lang || lang === 'all') return true;
+      if (lang === 'none') return !v;
+      if (lang === 'fr') return v.indexOf('فرنس') >= 0 || v === 'f' || v === 'french' || v === 'fr';
+      if (lang === 'de') return v.indexOf('مان') >= 0 || v === 'g' || v === 'german' || v === 'de';
+      return true;
+    }
+    // اسم المعلم على الكشف: كشف لغة محددة => معلم هذه اللغة فقط وبدون وسم اللغة؛ كشف «الكل» => كل المعلمين مع وسم لغة كل معلم
+    function pcTeacherLabel(teachers, subjectName, cls, lang) {
+      const list = Array.isArray(teachers) ? teachers : [];
+      if (lang && lang !== 'all' && subjectIsSecondLang(subjectName)) {
+        const f = list.filter(t => pcLangMatches(teacherLanguageTypeForSubject(t, subjectName, cls), lang) &&
+          (lang === 'none' || !!normalizeArabicText(teacherLanguageTypeForSubject(t, subjectName, cls) || '')));
+        const noLang = lang === 'none' ? list.filter(t => !normalizeArabicText(teacherLanguageTypeForSubject(t, subjectName, cls) || '')) : f;
+        return formatAssignedTeachersForPrint(noLang, null, cls);
+      }
+      return formatAssignedTeachersForPrint(list, subjectName, cls);
+    }
+    // عمود اللغة يظهر فقط في كشف «الكل» لمادة اللغة الثانية
+    function pcShowLangCol(cfg, subjectName) {
+      return !!(cfg && cfg.lang === 'all' && subjectIsSecondLang(subjectName));
+    }
+    function pcLangCellText(s) {
+      const v = String((s && s.secondLanguage) || '').trim();
+      if (!v) return '—';
+      const n = normalizeArabicText(v);
+      if (n.indexOf('فرنس') >= 0 || n === 'f' || n === 'fr' || n === 'french') return 'فرنسي';
+      if (n.indexOf('مان') >= 0 || n === 'g' || n === 'de' || n === 'german') return 'ألماني';
+      return v;
     }
     function pcSkipEmptyLang(job, students) { return !!(job.lang && job.lang !== 'all' && !students.length); }
 
@@ -14552,10 +14577,11 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
         // اسم معلم المادة/الفصل
         let teacherName = '';
         try {
-          const t = (db.teachers || []).find(tch => (tch.assignments || []).some(a =>
+          const ts = (db.teachers || []).filter(tch => (tch.assignments || []).some(a =>
             a.subjectName === subjectName && (a.classes || []).includes(cls)));
-          if (t) teacherName = t.name || '';
+          teacherName = pcTeacherLabel(ts, subjectName, cls, job.lang);
         } catch (e) {}
+        const showLangCol = pcShowLangCol(job, subjectName);
 
         const colsPerComp = 5; // 4 أسابيع + متوسط
         const extraCols = (attendanceComp ? 1 : 0) + (monthlyComp ? 1 : 0) + 1;
@@ -14563,14 +14589,15 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
         const namePct = 14;
         const serialPct = 3;
         const seatPct = 5;
-        const restPct = 100 - namePct - serialPct - seatPct;
+        const langPct = showLangCol ? 4 : 0;
+        const restPct = 100 - namePct - serialPct - seatPct - langPct;
         const colPct = totalDataCols > 0 ? (restPct / totalDataCols) : 3;
 
-        let colgroupHtml = `<col style="width:${serialPct}%"><col style="width:${seatPct}%"><col style="width:${namePct}%">`;
+        let colgroupHtml = `<col style="width:${serialPct}%"><col style="width:${seatPct}%"><col style="width:${namePct}%">` + (showLangCol ? `<col style="width:${langPct}%">` : '');
         for (let i = 0; i < totalDataCols; i++) colgroupHtml += `<col style="width:${colPct}%">`;
 
         // صف 1: أسماء المكوّنات
-        let compGroupRow = `<th rowspan="3" class="serial-col">م</th><th rowspan="3">رقم الجلوس</th><th rowspan="3">اسم الطالب</th>`;
+        let compGroupRow = `<th rowspan="3" class="serial-col">م</th><th rowspan="3">رقم الجلوس</th><th rowspan="3">اسم الطالب</th>` + (showLangCol ? `<th rowspan="3">اللغة</th>` : '');
         weeklyComps.forEach((x, i) => {
           const sep = i === 0 ? 'week-sep-left' : '';
           compGroupRow += `<th colspan="5" class="${sep}">${escapeHtml(x.comp.name)}</th>`;
@@ -14627,6 +14654,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
           row += `<td class="serial-col">${hindi(idx + 1)}</td>`;
           row += `<td>${escapeHtml(String(s.seat || ''))}</td>`;
           row += `<td class="name-col">${escapeHtml(s.name || '')}</td>`;
+          if (showLangCol) row += `<td>${escapeHtml(s.id ? pcLangCellText(s) : '')}</td>`;
           weeklyComps.forEach(() => {
             for (let wi = 0; wi < weekCount; wi++) row += (typeof isWeekExcluded === 'function' ? isWeekExcluded(term, month - 1, wi) : (wi >= scopeWeeks)) ? '<td class="blank-cell week-out-of-scope"></td>' : emptyCell;
             row += emptyAvgCell; // متوسط
@@ -14642,7 +14670,7 @@ body.role-monitor #tab-teachers > .card:not(#monTeachersPanel) { display: none !
           `<span><strong>المادة:</strong> ${escapeHtml(subjectName + (job.langLabel ? ' — ' + job.langLabel : ''))}</span>`,
           `<span><strong>الفصل:</strong> ${escapeHtml(classLabel)}</span>`,
           `<span><strong>${termLabel}</strong> — ${escapeHtml(monthLabel)}</span>`,
-          teacherName ? `<span><strong>المعلم:</strong> ${escapeHtml(teacherName)}</span>` : ''
+          teacherName ? `<span><strong>المعلم:</strong> ${teacherName}</span>` : ''
         ].filter(Boolean).join('');
 
         const letterhead = (typeof buildUnifiedLetterhead === 'function')
@@ -17856,7 +17884,7 @@ function renderMonthlyExportButtons() {
       const assignedTeachers = (db.teachers || []).filter(t =>
         (t.assignments || []).some(a => a.subjectName === subjectName && (a.classes || []).includes(cls)));
       const teacherName = (typeof formatAssignedTeachersForPrint === 'function')
-        ? formatAssignedTeachersForPrint(assignedTeachers, subjectName, cls)
+        ? pcTeacherLabel(assignedTeachers, subjectName, cls, cfg.lang)
         : (assignedTeachers.map(t => escapeHtml(t.name || '')).filter(Boolean).join('، '));
       const printedBy = (typeof resolvePrintedByName === 'function') ? resolvePrintedByName() : '';
       const printDate = new Date().toLocaleDateString('ar-EG');
@@ -18067,6 +18095,7 @@ function renderMonthlyExportButtons() {
 
     function buildMinistryLandscapePagesHtml(cfg) {
       const { db, subject, subjectName, cls, term, month, blank, examColMode } = cfg;
+      const showLangCol = pcShowLangCol(cfg, subjectName);
       const subjectDisp = subjectName + (cfg.langLabel ? ' — ' + cfg.langLabel : '');
       let students = (cfg.students || []).slice();
       let weekCount = 4;
@@ -18150,14 +18179,15 @@ function renderMonthlyExportButtons() {
       const isPortraitPage = !!cfg.portrait;
       const namePct = isPortraitPage ? 18 : 16;
       const serialPct = isPortraitPage ? 3.2 : 2.4;
-      const restPct = 100 - namePct - serialPct;
+      const langPct = showLangCol ? 3.6 : 0;
+      const restPct = 100 - namePct - serialPct - langPct;
       const colPct = totalDataCols > 0 ? (restPct / totalDataCols) : 3;
-      let colgroupHtml = `<col style="width:${serialPct}%"><col style="width:${namePct}%">`;
+      let colgroupHtml = `<col style="width:${serialPct}%"><col style="width:${namePct}%">` + (showLangCol ? `<col style="width:${langPct}%">` : '');
       for (let i = 0; i < totalDataCols; i++) colgroupHtml += `<col style="width:${colPct}%">`;
 
       // --- صف 1: الأسابيع (+ خانة امتحان مدمجة بعد الأسبوع المختار) ---
       // rowspan=3 للامتحان والمجموع الكلي حتى لا يتداخل صفّا المكوّنات والدرجات القصوى
-      let weekHeaderRow = `<th rowspan="3" class="serial-col">م</th><th rowspan="3">اسم الطالب</th>`;
+      let weekHeaderRow = `<th rowspan="3" class="serial-col">م</th><th rowspan="3">اسم الطالب</th>` + (showLangCol ? `<th rowspan="3">اللغة</th>` : '');
       for (let wi = 0; wi < weekCount; wi++) {
         const d = weekDates[wi] ? (typeof formatWeekDateAr === 'function' ? formatWeekDateAr(weekDates[wi]) : weekDates[wi]) : '—';
         const out = weekOutCls(wi);
@@ -18278,7 +18308,7 @@ function renderMonthlyExportButtons() {
             if (hasAny) grand = hasNum ? sum : (typeof ABSENT_MARK !== 'undefined' ? ABSENT_MARK : 'غ');
           }
 
-          let row = `<td class="serial-col">${toHindiDigits(idx + 1)}</td><td class="gs-name">${escapeHtml(s.name || '')}</td>`;
+          let row = `<td class="serial-col">${toHindiDigits(idx + 1)}</td><td class="gs-name">${escapeHtml(s.name || '')}</td>` + (showLangCol ? `<td class="gs-lang">${escapeHtml(s.id ? pcLangCellText(s) : '')}</td>` : '');
           for (let wi = 0; wi < weekCount; wi++) {
             const out = weekOutCls(wi);
             if (blank) {
@@ -18329,7 +18359,7 @@ function renderMonthlyExportButtons() {
       const assignedTeachers = (db.teachers || []).filter(t =>
         (t.assignments || []).some(a => a.subjectName === subjectName && (a.classes || []).includes(cls)));
       const teacherName = (typeof formatAssignedTeachersForPrint === 'function')
-        ? formatAssignedTeachersForPrint(assignedTeachers, subjectName, cls)
+        ? pcTeacherLabel(assignedTeachers, subjectName, cls, cfg.lang)
         : (assignedTeachers.map(t => escapeHtml(t.name || '')).filter(Boolean).join('، '));
       const printedBy = (typeof resolvePrintedByName === 'function') ? resolvePrintedByName() : 'المستخدم';
       const printDate = new Date().toLocaleDateString('ar-EG');
@@ -18548,6 +18578,7 @@ function renderMonthlyExportButtons() {
     // ورقة المتوسطات المستقلة: الجدول يملأ عرض الورقة بالكامل (الأعمدة موزعة بالتساوي بعد عمود الاسم)
     function buildMinistrySummaryPagesHtml(cfg) {
       const { db, subject, subjectName, cls, term, blank } = cfg;
+      const showLangCol = pcShowLangCol(cfg, subjectName);
       const subjectDisp = subjectName + (cfg.langLabel ? ' — ' + cfg.langLabel : '');
       const monthCount = cfg.monthCount || mlMonthCount(term);
       let students = (cfg.students || []).slice();
@@ -18561,10 +18592,11 @@ function renderMonthlyExportButtons() {
       const isPortrait = !!cfg.portrait;
       const serialPct = isPortrait ? 3.2 : 2.4;
       const namePct = isPortrait ? 20 : 22;
-      const colPct = (100 - serialPct - namePct) / avgCols.count;
-      let colgroupHtml = `<col style="width:${serialPct}%"><col style="width:${namePct}%">`;
+      const langPct = showLangCol ? 5 : 0;
+      const colPct = (100 - serialPct - namePct - langPct) / avgCols.count;
+      let colgroupHtml = `<col style="width:${serialPct}%"><col style="width:${namePct}%">` + (showLangCol ? `<col style="width:${langPct}%">` : '');
       for (let i = 0; i < avgCols.count; i++) colgroupHtml += `<col style="width:${colPct}%">`;
-      const theadHtml = `<tr class="week-row"><th rowspan="3" class="serial-col">م</th><th rowspan="3">اسم الطالب</th>${avgCols.row1}</tr>`
+      const theadHtml = `<tr class="week-row"><th rowspan="3" class="serial-col">م</th><th rowspan="3">اسم الطالب</th>${showLangCol ? '<th rowspan="3">اللغة</th>' : ''}${avgCols.row1}</tr>`
         + `<tr class="comp-row">${avgCols.row2}</tr><tr class="max-row">${avgCols.row3}</tr>`;
 
       const { cls: clsPlain, section: clsSection } = splitClassSectionKey(cls);
@@ -18573,7 +18605,7 @@ function renderMonthlyExportButtons() {
       const assignedTeachers = (db.teachers || []).filter(t =>
         (t.assignments || []).some(a => a.subjectName === subjectName && (a.classes || []).includes(cls)));
       const teacherName = (typeof formatAssignedTeachersForPrint === 'function')
-        ? formatAssignedTeachersForPrint(assignedTeachers, subjectName, cls)
+        ? pcTeacherLabel(assignedTeachers, subjectName, cls, cfg.lang)
         : assignedTeachers.map(t => escapeHtml(t.name || '')).join('، ');
       const printedBy = (typeof resolvePrintedByName === 'function') ? resolvePrintedByName() : 'المستخدم';
       const printDate = new Date().toLocaleDateString('ar-EG');
@@ -18611,7 +18643,7 @@ function renderMonthlyExportButtons() {
         const offsetNow = rowOffset;
         const body = chunk.map((st, li) => {
           const idx = offsetNow + li;
-          return `<tr><td class="serial-col">${toHindiDigits(idx + 1)}</td><td class="gs-name">${escapeHtml(st.name || '')}</td>${avgCols.cells(st)}</tr>`;
+          return `<tr><td class="serial-col">${toHindiDigits(idx + 1)}</td><td class="gs-name">${escapeHtml(st.name || '')}</td>${showLangCol ? `<td class="gs-lang">${escapeHtml(st.id ? pcLangCellText(st) : '')}</td>` : ''}${avgCols.cells(st)}</tr>`;
         }).join('');
         rowOffset += chunk.length;
         const pageFoot = isPortrait
@@ -18673,7 +18705,7 @@ function renderMonthlyExportButtons() {
       monthsToPrint.forEach((m, idx) => {
         const doEmbed = embed && m === monthCount;
         const pages = buildMinistryLandscapePagesHtml({
-          db, subject, subjectName, langLabel: cfg.langLabel, cls, term, month: m, students, blank, examColMode,
+          db, subject, subjectName, lang: cfg.lang, langLabel: cfg.langLabel, cls, term, month: m, students, blank, examColMode,
           blockIndex: idx, totalBlocks: monthsToPrint.length,
           embedAverages: doEmbed ? { monthCount } : null
         });
@@ -18683,7 +18715,7 @@ function renderMonthlyExportButtons() {
         }
       });
       if (withSummary && !summaryDone) {
-        html += buildMinistrySummaryPagesHtml({ db, subject, subjectName, langLabel: cfg.langLabel, cls, term, students, blank, monthCount });
+        html += buildMinistrySummaryPagesHtml({ db, subject, subjectName, lang: cfg.lang, langLabel: cfg.langLabel, cls, term, students, blank, monthCount });
       }
       return html;
     }
@@ -19330,19 +19362,19 @@ function renderMonthlyExportButtons() {
         if (typeof mlIncludeCover === 'function' && mlIncludeCover() &&
             (typeof mlShouldPrintCoverForMonths === 'function' ? mlShouldPrintCoverForMonths(monthsToPrint) : monthsToPrint.indexOf(1) >= 0)) {
           allHtml += buildMinistryCoverAndProtocolHtml({
-            db, subjectName: job.subjectName, langLabel: job.langLabel, cls: job.cls, term, blank, portrait: true
+            db, subjectName: job.subjectName, lang: job.lang, langLabel: job.langLabel, cls: job.cls, term, blank, portrait: true
           });
         }
         monthsToPrint.forEach(m => {
           const pages = buildMinistryLandscapePagesHtml({
-            db, subject: job.subj, subjectName: job.subjectName, langLabel: job.langLabel, cls: job.cls,
+            db, subject: job.subj, subjectName: job.subjectName, lang: job.lang, langLabel: job.langLabel, cls: job.cls,
             term, month: m, students, blank, examColMode, portrait: true
           });
           if (pages) allHtml += pages;
         });
         if (weekScope === 'full' || weekScope === 'from2') {
           const summary = buildMinistrySummaryPagesHtml({
-            db, subject: job.subj, subjectName: job.subjectName, langLabel: job.langLabel, cls: job.cls,
+            db, subject: job.subj, subjectName: job.subjectName, lang: job.lang, langLabel: job.langLabel, cls: job.cls,
             term, students, blank, monthCount, portrait: true
           });
           if (summary) allHtml += summary;
@@ -19425,11 +19457,11 @@ function renderMonthlyExportButtons() {
         // غلاف + محضر مرة واحدة فقط إذا كانت الفترة الأولى ضمن الطباعة
         if (mlShouldPrintCoverForMonths(monthsToPrint)) {
           allHtml += buildMinistryCoverAndProtocolHtml({
-            db, subjectName: job.subjectName, langLabel: job.langLabel, cls: job.cls, term, blank
+            db, subjectName: job.subjectName, lang: job.lang, langLabel: job.langLabel, cls: job.cls, term, blank
           });
         }
         allHtml += mlAssembleLandscapeHtml({
-          db, subject: job.subj, subjectName: job.subjectName, langLabel: job.langLabel, cls: job.cls, term, students, blank, examColMode,
+          db, subject: job.subj, subjectName: job.subjectName, lang: job.lang, langLabel: job.langLabel, cls: job.cls, term, students, blank, examColMode,
           monthsToPrint,
           withSummary: (weekScope === 'full' || weekScope === 'from2' || weekScope === 'avg'),
           onlySummary: weekScope === 'avg'
@@ -19476,7 +19508,7 @@ function renderMonthlyExportButtons() {
         if (pcSkipEmptyLang(job, students)) continue;
         students.sort((a, b) => a.gender !== b.gender ? (a.gender === 'F' ? -1 : 1) : a.name.localeCompare(b.name));
         allHtml += mlAssembleLandscapeHtml({
-          db, subject: job.subj, subjectName: job.subjectName, langLabel: job.langLabel, cls: job.cls, term, students, blank, examColMode,
+          db, subject: job.subj, subjectName: job.subjectName, lang: job.lang, langLabel: job.langLabel, cls: job.cls, term, students, blank, examColMode,
           monthsToPrint: [], withSummary: true, onlySummary: true
         });
       }
@@ -19517,6 +19549,7 @@ function renderMonthlyExportButtons() {
 
     function buildMinistryAbsencePagesHtml(cfg) {
       const { db, subjectName, cls, term, month, blank } = cfg;
+      const showLangCol = pcShowLangCol(cfg, subjectName);
       const subjectDisp = subjectName + (cfg.langLabel ? ' — ' + cfg.langLabel : '');
       let students = (cfg.students || []).slice();
       const att = (typeof ensureAttendance === 'function') ? ensureAttendance(db) : (db.attendance || {});
@@ -19551,7 +19584,7 @@ function renderMonthlyExportButtons() {
       const vertHead = !!cfg.portrait;
       const vWrap = (t) => vertHead ? `<span class="att-vert">${t}</span>` : t;
       // صف 1: الأسابيع
-      let weekRow = `<th rowspan="3" class="serial-col">م</th><th rowspan="3" class="gs-name-head">اسم الطالب</th>`;
+      let weekRow = `<th rowspan="3" class="serial-col">م</th><th rowspan="3" class="gs-name-head">اسم الطالب</th>` + (showLangCol ? `<th rowspan="3">اللغة</th>` : '');
       weeks.forEach((wk, wi) => {
         const out = wi >= scopeWeeks ? ' week-out-of-scope' : '';
         const name = (typeof mlWeekArabicName === 'function') ? mlWeekArabicName(wk.globalWeek) : ('الأسبوع ' + wk.globalWeek);
@@ -19600,7 +19633,7 @@ function renderMonthlyExportButtons() {
         const list = slice.length ? slice : [{ id: '', name: '' }];
         list.forEach((s, li) => {
           const idx = startIdx + li;
-          let row = `<td class="serial-col">${toHindiDigits(idx + 1)}</td><td class="gs-name">${escapeHtml(s.name || '')}</td>`;
+          let row = `<td class="serial-col">${toHindiDigits(idx + 1)}</td><td class="gs-name">${escapeHtml(s.name || '')}</td>` + (showLangCol ? `<td class="gs-lang">${escapeHtml(s.id ? pcLangCellText(s) : '')}</td>` : '');
           let totalAbs = 0;
           weeks.forEach((wk, wi) => {
             wk.days.forEach((col) => {
@@ -19633,7 +19666,7 @@ function renderMonthlyExportButtons() {
       const termLabel = term === 'first' ? 'الفصل الدراسي الأول' : 'الفصل الدراسي الثاني';
       const assignedTeachers = (db.teachers || []).filter(t =>
         (t.assignments || []).some(a => a.subjectName === subjectName && (a.classes || []).includes(cls)));
-      const teacherName = (typeof formatAssignedTeachersForPrint === 'function') ? formatAssignedTeachersForPrint(assignedTeachers, subjectName, cls) : assignedTeachers.map(t=>escapeHtml(t.name||'')).join('، ');
+      const teacherName = (typeof formatAssignedTeachersForPrint === 'function') ? pcTeacherLabel(assignedTeachers, subjectName, cls, cfg.lang) : assignedTeachers.map(t=>escapeHtml(t.name||'')).join('، ');
       const printedBy = (typeof resolvePrintedByName === 'function') ? resolvePrintedByName() : '';
       const printDate = new Date().toLocaleDateString('ar-EG');
       const classGradeLabelForPrint = (db.classGrade && db.classGrade[cls]) || info.grade || '';
@@ -19818,7 +19851,7 @@ function renderMonthlyExportButtons() {
         if (pcSkipEmptyLang(job, students)) continue;
         students.sort((a, b) => a.gender !== b.gender ? (a.gender === 'F' ? -1 : 1) : a.name.localeCompare(b.name));
         const pages = buildMinistryAbsencePagesHtml({
-          db, subjectName: job.subjectName, langLabel: job.langLabel, cls: job.cls, term, month, students, blank,
+          db, subjectName: job.subjectName, lang: job.lang, langLabel: job.langLabel, cls: job.cls, term, month, students, blank,
           portrait: !!opts.portrait
         });
         if (pages) allHtml += pages;
